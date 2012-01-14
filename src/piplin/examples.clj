@@ -69,7 +69,9 @@
                             (connect z (init-fn z z0 dz >=)))
                           (connect i (if (= :waiting state)
                                        0
-                                       (inc i))))]
-    (if (= (dec n) (:i logic))
-      [(:x logic) (:y logic)]
-      nil))
+                                       (inc i)))
+                          (connect state (if (= (dec n) i)
+                                           :waiting
+                                           :calculating)))]
+    (guard-and [(:x logic) (:y logic)] ;is vector a structural type?
+               (= (dec n) (:i logic))))
