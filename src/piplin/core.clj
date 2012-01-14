@@ -98,6 +98,8 @@
 ;Define typechecking phase
 ;Make syntax
 
+;TODO: still needs max cycle to run until
+
 (defn sim-elt [logic argnames fwd]
   "Returns a new simulation element with a function logic "
   "and inputs argnames and value-forwarder fwd"
@@ -125,6 +127,13 @@
           {}
           m))
 
+(defn send-from [sim-elt val]
+  "Takes a sim-elt and a value, and sends the val to all of the sim-elt's "
+  "destinations. If a sim-elt is a pipeline stage, can be used to "
+  "initialize the stage"
+  (doseq [addr (:dests sim-elt)]
+    (apply (:fwd-fn sim-elt) val addr)))
+
 (defn process-sim-elt [sim-elt]
   "takes a sim-elt and, if every input list has at least one element, "
   "removes the head of each element, computes the result, and invokes "
@@ -135,15 +144,16 @@
           inputs-first (map-vals first inputs)
           inputs-rest (map-vals rest inputs)
           result ((:logic sim-elt) inputs-first)]
-      (doseq [addr (:dests sim-elt)]
-        (apply (:fwd-fn sim-elt) result addr))
+      (send-from sim-elt result)
       (recur (assoc sim-elt :inputs inputs-rest)))
     sim-elt))
 
 (defn add-input-process [sim-elt key val]
+  "Adds the value to the input named key for the sim-elt"
   (process-sim-elt (add-input sim-elt key val)))
 
 (defn- agent-fwd [result name dest]
+  "fwd function for agents"
   (send dest add-input-process name result))
 
 (def adder (sim-elt (fn [{x :x y :y}]
