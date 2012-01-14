@@ -28,7 +28,9 @@
 
 (defn johnson-with-dir [dir]
   "johnson counter for either direction"
-  (flip (johnson)))
+  (if dir
+    (johnson)
+    (flip (johnson))))
 
 (defn cordic
   "computes [sin(z) cos(z)]"
@@ -53,9 +55,9 @@
                            i (make-type (uintm i) 0)
                            state (make-type
                                    (enum :waiting :calculating)
-                                   :waiting)]
+                                   :waiting)] ;todo forgot to manage state
                           (let [inc-fn (fn [a da comp]
-                                         (if (apply comp z 0)
+                                         (if (apply comp [z 0])
                                            (- a da)
                                            (+ a da)))
                                 init-fn (fn [a a0 da comp]
