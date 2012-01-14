@@ -23,7 +23,7 @@
   (loop [idx (dec (bit-count n))
          result []]
     (if (>= idx 0)
-      (conj (bit n idx) result)
+      (recur (dec idx) (conj (bit n idx) result))
       (reduce cat nil result))))
 
 (defn johnson-with-dir [dir]
