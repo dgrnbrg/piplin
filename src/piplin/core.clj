@@ -156,20 +156,27 @@
   "fwd function for agents"
   (send dest add-input-process name result))
 
+(comment
+
 (def adder (sim-elt (fn [{x :x y :y}]
                       (+ x y))
                     [:x :y]
                     nil))
+
+(defn mk-logger []
+                 (let [a (atom [])
+                       se (assoc (sim-elt #(swap! a conj (:a %)) [:a] nil)
+                                 :log-atom a)]
+                   se))
+
+(def logger (agent (mk-logger)))
 
 (def printer (sim-elt (fn [{a :a}]
                         (println "printing result:" a "end result"))
                       [:a]
                       nil))
 
-(comment
-
 (def p (agent (assoc printer :fwd-fn agent-fwd)))
-(send p add-input-process :a "hello world")
 
 (let [agent-adder (assoc adder :fwd-fn agent-fwd)]
   (def a1 (agent agent-adder))
@@ -182,5 +189,31 @@
 (send a2 add-input-process :y 7)
 
 (send a1 add-input-process :x 1)
+
+(def counter (agent (assoc adder :fwd-fn agent-fwd)))
+
+(defn mask [x] nil)
+
+(send counter add-dest :a logger)
+
+(mask (send counter add-dest :x counter))
+
+(await counter)
+
+(send-from @counter 0)
+
+(await counter)
+
+(pprint (map first (:dests @counter)))
+
+(dotimes [n 20] (send counter add-input-process :y 1))
+
+(use 'clojure.pprint)
+
+(pprint (dissoc @counter :dests))
+
+(pprint (dissoc @logger :dests))
+
+(send p add-input-process :a "hello world")
 
   )
