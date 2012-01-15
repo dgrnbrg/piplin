@@ -210,6 +210,8 @@
 
 (use 'clojure.pprint)
 
+(await counter)
+
 (pprint (dissoc @counter :dests))
 
 (pprint (dissoc @logger :dests))
