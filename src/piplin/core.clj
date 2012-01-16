@@ -98,124 +98,183 @@
 ;Define typechecking phase
 ;Make syntax
 
-;TODO: still needs max cycle to run until
+(comment
+  It's time for a new lesson! In hardware protocols!
 
-(defn sim-elt [logic argnames fwd]
-  "Returns a new simulation element with a function logic "
-  "and inputs argnames and value-forwarder fwd"
-  {:dests []
-   :logic logic
-   :fwd-fn fwd
-   :inputs (zipmap argnames (repeat []))})
+  I think protocols are a great abstraction to link data types and functions
+  since we want to be able to do things like addition for multiple times,
+  even though those types are incompatible. What kinds of constraints exist?
 
-(defn add-dest [se name dest]
-  "Adds [name dest] to the list of :dests in se"
-  (let [dests (:dests se)]
-    (assoc se :dests (conj dests [name dest]))))
+  [1] We might have sintm8, uinte6, and sfxpt32.18, and they all might have
+      addition defined on them, but all of the additions will be different.
+      Thus the protocol must be able to generate the correct hardware.
 
-(defn add-input [sim-elt key val]
-  "Appends an input named key with value val to the sim-elt"
-  (let [input-key [:inputs key]
-        input-vec (get-in sim-elt input-key)]
-    (assoc-in sim-elt input-key (conj input-vec val))))
+  [2] We might want to allow adding uintm8 to uinte8, so we need a type
+      checker that allows for this. Alternatively, support on the protocol
+      may be the best way to represent these conversions, since explicit is
+      better than implicit.
 
-(defn- map-vals [f m]
-  "takes a function of one argument and a map and returns a new map "
-  "with the same keys and whose values are the (f old-value)"
-  (reduce (fn [tmp-map old-entry]
-            (assoc tmp-map (key old-entry) (f (val old-entry))))
-          {}
-          m))
+  [3] We may be able to generate 3 kinds of barrel shifters, one of which
+      uses little logic and a MAC, one of which uses little logic but takes
+      4 cycles, and one of which that uses a lot of logic but takes one
+      cycle. We should be able to have the optimizer choose between them,
+      which means encoding potenially several template expansions of the
+      same functional unit. (Note that this can be deferred until we start
+      looking at the template expansion).
 
-(defn send-from [sim-elt val]
-  "Takes a sim-elt and a value, and sends the val to all of the sim-elt's "
-  "destinations. If a sim-elt is a pipeline stage, can be used to "
-  "initialize the stage"
-  (doseq [addr (:dests sim-elt)]
-    (apply (:fwd-fn sim-elt) val addr)))
+  With these design goals, I think that an initial implementation can be
+  done by making types specify multimethods that generate the appropriate
+  hardware, and if no multimethod exists, then that isn't synthesizable.
+  )
 
-(defn process-sim-elt [sim-elt]
-  "takes a sim-elt and, if every input list has at least one element, "
-  "removes the head of each element, computes the result, and invokes "
-  "(fwd result name dest) for every destination. Returns the procesed "
-  "sim-elt."
-  (if (every? #(seq (val %)) (:inputs sim-elt)) ;all inputs are ready
-    (let [inputs (:inputs sim-elt)
-          inputs-first (map-vals first inputs)
-          inputs-rest (map-vals rest inputs)
-          result ((:logic sim-elt) inputs-first)]
-      (send-from sim-elt result)
-      (recur (assoc sim-elt :inputs inputs-rest)))
-    sim-elt))
+(defrecord Fragment [op args])
 
-(defn add-input-process [sim-elt key val]
-  "Adds the value to the input named key for the sim-elt"
-  (process-sim-elt (add-input sim-elt key val)))
+(defrecord Instance [type val])
 
-(defn- agent-fwd [result name dest]
-  "fwd function for agents"
-  (send dest add-input-process name result))
+(defn instance [type val]
+  (Instance. type val))
+
+;TODO: enforce that all instances are positive
+(defrecord UIntM [type n]
+  clojure.lang.IFn
+  (invoke [this init-val]
+    (instance this init-val)))
+
+(defn uintm [n]
+  (UIntM. :uintm n))
+
+(defprotocol IPiplinType
+  (piplin-type [this] "returns a keyword representing the type"))
+
+(extend-protocol IPiplinType
+  Fragment
+  (piplin-type [this] :fragment)
+  Instance
+  (piplin-type [this] (:type (:type this)))
+  Number
+  (piplin-type [this] :number)
+  Integer
+  (piplin-type [this] :int)
+  Long
+  (piplin-type [this] :int))
+
+(defn nary-dispatch
+  ([] ::nullary)
+  ([x] (piplin-type x))
+  ([x y] [(piplin-type x) (piplin-type y)])
+  ([x y & more] ::n-ary))
+
+(defmacro defbinop [op zero]
+  `(do
+     (defmulti ~op nary-dispatch)
+     (defmethod ~op ::nullary [] ~zero)
+     (defmethod ~op ::n-ary
+       [~'x ~'y & ~'more]
+       (if ~'more
+         (recur (~op ~'x ~'y) (first ~'more) (next ~'more))
+         (~op ~'x ~'y)))))
+
+(defbinop + 0)
+
+(defmethod + [:int :int] [x y] (clojure.core/+ x y))
+(defmethod + [:number :number] [x y] (clojure.core/+ x y))
+(defmethod + [:uintm :uintm]
+  [x y]
+  {:pre [(= (:type x) (:type y))]}
+  (instance (:type x)
+            (+ (:val x) (:val y))))
+
+(defprotocol IAutocast
+  "Allows a type to convert other objects to an instance of their type"
+  (autocast [to-type from-obj]))
+
+(defmacro defbinop-promotion [op from to coerce]
+  `(let [coerce# ~coerce]
+     (defmethod ~op [~from ~to]
+       [~'x ~'y]
+       (~op (coerce# ~'x ~'y) ~'y))
+     (defmethod ~op [~to ~from]
+       [~'x ~'y]
+       (~op ~'x (coerce# ~'y ~'x)))))
+
+(defprimitive slice [bits low high]
+  (typecheck (bits? bits)
+             (> high low)
+             (>= low 0))
+  ...)
+
+(defprimitive uintm-adder [lhs rhs]
+  (typecheck
+    ;This typecheck works for if they're both uintm
+    (fresh [lhs-bits rhs-bits]
+           (== {:type uintm :n lhs-bits} lhs)
+           (== {:type uintm :n rhs-bits} rhs)
+           (== lhs-bits rhs-bits)))
+  ...)
 
 (comment
+  How to determine which implementation of each function is permitted.
 
-(def adder (sim-elt (fn [{x :x y :y}]
-                      (+ x y))
-                    [:x :y]
-                    nil))
+  [1] When declaring components, you must know all the concrete types
+      supported in that position, be they Numbers, Longs, Pipelines,
+      or other objects. This list is supplied as a list of predicates.
+      The predicates must return a proper type-encoded AST fragment.
 
-(defn mk-logger []
-                 (let [a (atom [])
-                       se (assoc (sim-elt #(swap! a conj (:a %)) [:a] nil)
-                                 :log-atom a)]
-                   se))
+  [2] Now you need to figure out what types everything should be. Each
+      component must have had type-flows provided for each type. The
+      type flows express the constraints between the input and output
+      types. The constraint is given as a function on the :types of
+      all the inputs and the output of the component. When the typechecker
+      solves the constraint problem, every node now has an acceptable
+      type (nodes with unknown type initially are given type (lvar),
+      nodes with partial types initially can be given types with some
+      parameters having (lvar)).
 
-(def logger (agent (mk-logger)))
+      The coerce function can then be used to realize all of the
+      assigned types that the type checker discovers.
 
-(def printer (sim-elt (fn [{a :a}]
-                        (println "printing result:" a "end result"))
-                      [:a]
-                      nil))
+  [3] The type checker is executed with (run 2 ...), so that we can detect
+      ambiguities. The checker runs by walking through the tree,
+      extracting the types of arguments and calling logic functions as
+      it does the traditional logic rewrite of the tree-based calls.
+      Structural blocks must be handled specially, by carrying the ports
+      through a (binding) context to allow the types of special port
+      references to be resolved to the same logic variable (or they could
+      get unified through the binding).
 
-(def p (agent (assoc printer :fwd-fn agent-fwd)))
-
-(let [agent-adder (assoc adder :fwd-fn agent-fwd)]
-  (def a1 (agent agent-adder))
-  (def a2 (agent agent-adder)))
-
-(send a1 add-dest :x a2)
-(send a2 add-dest :a p)
-
-(send a1 add-input-process :y 2)
-(send a2 add-input-process :y 7)
-
-(send a1 add-input-process :x 1)
-
-(def counter (agent (assoc adder :fwd-fn agent-fwd)))
-
-(defn mask [x] nil)
-
-(send counter add-dest :a logger)
-
-(mask (send counter add-dest :x counter))
-
-(await counter)
-
-(send-from @counter 0)
-
-(await counter)
-
-(pprint (map first (:dests @counter)))
-
-(dotimes [n 20] (send counter add-input-process :y 1))
-
-(use 'clojure.pprint)
-
-(await counter)
-
-(pprint (dissoc @counter :dests))
-
-(pprint (dissoc @logger :dests))
-
-(send p add-input-process :a "hello world")
-
+  Appendix:
+  [1] Derived types (typedef) can be done by prefix-checking on lists
+      in a :derivation field of the type
   )
+
+(comment
+(defmethod + [:uintm :int]
+  [x y]
+  {:pre [(pos? y)]}
+  (+ x (instance (:type x) y)))
+
+(defmethod + [:int :uintm]
+  [x y]
+  (+ (instance (:type y) x) y))
+  )
+
+(defbinop-promotion + :int :uintm (fn [f t] (instance (:type t) f)))
+
+(+ 1 2 3)
+
+(+)
+
+;successfully blocked
+;(+ ((uintm 3) 3) ((uintm 4) 3))
+
+(+ ((uintm 8) 3) ((uintm 8) 4))
+
+(+ ((uintm 8) 3) -4)
+(+ 3 ((uintm 8) 4))
+
+;(defmacro structural ...)
+
+(comment
+(structural [count ((uintm 8) 0)]
+            (connect count (+ count 1)))
+)
