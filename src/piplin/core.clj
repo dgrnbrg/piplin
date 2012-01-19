@@ -248,6 +248,66 @@
   )
 
 (comment
+;Interesting type example
+;TODO: show that the above algorithm works for it
+;note that we should get that a is a uintm with under 32 bits
+(structural [a ^input (unknown-type) b ((uintm 32) 0)]
+            (connect b (+ (zext a) 7)))
+;yields this structure
+{:type :structure
+ :inputs {:a {:type (lvar)}}
+ :outputs {:b {:type :uintm :n 32}}
+ :connections {:b {:op :add ;can't know what we're adding!!
+                   :lhs {:op :zext
+                         :arg {:port :a}}
+                   :rhs 7}}}
+;Here, we get to make this sequence of deductions:
+;b is uintm32 so the :add is a uintm32
+;so lhs and rhs are uintm32
+;so :port :a is uintm<32
+;and the jvm-int is a uintm32
+
+;transposing + and zext is interesting
+(structural [a ^input (unknown-type) b ((uintm 32) 0)]
+            (connect b (zext (+ a 7))))
+;yields this structure
+{:type :structure
+ :inputs {:a {:type (lvar)}}
+ :outputs {:b {:type :uintm :n 32}}
+ :connections {:b {:op :zext
+                   :arg {:op :add
+                         :lhs {:port :a}
+                         ;we get to deal w/ jvm ints as if they had no type
+                         ;but this couldn't have been made if autocast wasn't
+                         ;possible
+                         :rhs 7}}}}
+;Here, we get to make this sequence of deductions:
+;b is uintm32 so the :zext is a uintm32
+;so :add is uintm<32
+;so lhs and rhs are uintm<32
+;so :port :a is uintm<32
+;but 7 is :uintm<32, which can't be further specified. FAIL!
+
+(structural [a ^input (uintm 16) b ((uintm 32) 0)]
+            (connect b (+ (zext a) b)))
+{:type :structure
+ :inputs {:a {:type :uintm :n 16}}
+ :outputs {:b {:type :uintm :n 32}}
+ :connections {:b {:op :add
+                   :lhs {:op :zext
+                             :arg {:port :a}}
+                   :rhs {:port :b}}}}
+;Here, we get these deductions
+;b is uintm32, so :add is uintm32
+;thus :rhs remains consistent, and :zext is uintm32
+;thus :port :a remains consistent
+
+;this should fail due to type mismatch
+(structural [a ^input (uintm 16) b ((uintm 32) 0)]
+            (connect b (zext (+ a b))))
+)
+
+(comment
 (defmethod + [:uintm :int]
   [x y]
   {:pre [(pos? y)]}
@@ -263,6 +323,7 @@
 (+ 1 2 3)
 
 (+)
+
 
 ;successfully blocked
 ;(+ ((uintm 3) 3) ((uintm 4) 3))
