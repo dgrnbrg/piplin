@@ -140,6 +140,23 @@
   (invoke [this init-val]
     (instance this init-val)))
 
+(defprotocol IPromotable
+  "Used for instance objects"
+  (dopromote [type obj]
+             "Produces an instance of the given "
+             "obj with the type changed"))
+
+(defprotocol IType
+  "Used for type objects"
+  (kindof [this] "Returns kind of this type."))
+
+(defprotocol ITyped
+  "Used for instance objects"
+  (type [this] "Returns type instance. "
+        "Any parameters have concrete values")
+  (kind [this] "Returns kind. Parameters "
+        "are ignored"))
+
 (defn uintm [n]
   (UIntM. :uintm n))
 
@@ -150,7 +167,7 @@
   Fragment
   (piplin-type [this] :fragment)
   Instance
-  (piplin-type [this] (:type (:type this)))
+  (piplin-type [this] (kind this))
   Number
   (piplin-type [this] :number)
   Integer
@@ -176,27 +193,13 @@
 
 (defbinop + 0)
 
+(declare uintm-adder)
+
 (defmethod + [:int :int] [x y] (clojure.core/+ x y))
 (defmethod + [:number :number] [x y] (clojure.core/+ x y))
-(defmethod + [:uintm :uintm]
-  [x y]
-  {:pre [(= (:type x) (:type y))]}
-  (instance (:type x)
-            (+ (:val x) (:val y))))
+(defmethod + [:uintm :uintm] [x y] (uintm-adder x y))
 
-(defprotocol IAutocast
-  "Allows a type to convert other objects to an instance of their type"
-  (autocast [to-type from-obj]))
-
-(defmacro defbinop-promotion [op from to coerce]
-  `(let [coerce# ~coerce]
-     (defmethod ~op [~from ~to]
-       [~'x ~'y]
-       (~op (coerce# ~'x ~'y) ~'y))
-     (defmethod ~op [~to ~from]
-       [~'x ~'y]
-       (~op ~'x (coerce# ~'y ~'x)))))
-
+(comment
 (defprimitive slice [bits low high]
   (typecheck (bits? bits)
              (> high low)
@@ -211,7 +214,7 @@
            (== {:type uintm :n rhs-bits} rhs)
            (== lhs-bits rhs-bits)))
   ...)
-
+)
 (comment
   How to determine which implementation of each function is permitted.
 
@@ -242,7 +245,7 @@
       references to be resolved to the same logic variable (or they could
       get unified through the binding).
 
-  Appendix:
+  Appendix
   [1] Derived types (typedef) can be done by prefix-checking on lists
       in a :derivation field of the type
   )
@@ -318,23 +321,6 @@
   (+ (instance (:type y) x) y))
   )
 
-(defprotocol IPromotable
-  "Used for instance objects"
-  (dopromote [type obj]
-             "Produces an instance of the given "
-             "obj with the type changed"))
-
-(defprotocol IType
-  "Used for type objects"
-  (kindof [this] "Returns kind of this type."))
-
-(defprotocol ITyped
-  "Used for instance objects"
-  (type [this] "Returns type instance. "
-        "Any parameters have concrete values")
-  (kind [this] "Returns kind. Parameters "
-        "are ignored"))
-
 (defrecord CompilerError [msg]
   ITyped
   (type [this] :error)
@@ -362,6 +348,15 @@
         (flatten errors)
         (apply f args)))))
 
+(defn promote [typeinst obj]
+  (cond 
+    (not (satisfies? IPromotable typeinst))
+         (error typeinst "is not a valid type instance")
+    (not (satisfies? ITyped obj))
+        (error "Cannot promote" obj "to" typeinst)
+    :else
+    (dopromote typeinst obj)))
+
 (def type-unify
   (error-unify*
     (fn [target-kind a b]
@@ -373,16 +368,16 @@
       "any of the objects were errors"
       (cond
         (not (satisfies? ITyped a))
-        (error a "doesn't have a type"))
+        (error a "doesn't have a type")
         (not (satisfies? ITyped b))
-        (error b "doesn't have a type"))
+        (error b "doesn't have a type")
         (= (kind a) target-kind)
         [a (promote (type a) b)]
         (= (kind b) target-kind)
         (let [[b a] (type-unify target-kind b a)]
           [a b])
         :else
-        (error "Neither" a "nor" b "is of kind" target-kind))))))
+        (error "Neither" a "nor" b "is of kind" target-kind)))))
 
 (extend-protocol IType
   UIntM
@@ -398,15 +393,6 @@
   Long
   (type [this] java-long)
   (kind [this] :j-long))
-
-(defn promote [typeinst obj]
-  (cond 
-    (not (satisfies? IPromotable typeinst))
-         (error typeinst "is not a valid type instance"))
-    (not (satisfies? ITyped obj))
-        (error "Cannot promote" obj "to" typeinst))
-    :else
-    (dopromote typeinst obj)))
 
 (extend-protocol IPromotable
   JavaLong
@@ -428,23 +414,12 @@
   (let [[x y] (type-unify :uintm x y)]
     ((type x) (+ (:val x) (:val y)))))
 
-(comment
 (defmethod + [:int :uintm]
   [& more] (apply uintm-adder more))
 (defmethod + [:uintm :int]
   [& more] (apply uintm-adder more))
 (defmethod + [:uintm :uintm]
-  [& more] (apply uintm-adder more)))
-
-(defpromotefn +
-  (fn [lhs UIntM_t [JLong_t JInt_t]  rhs UIntM_t [JLong_t JInt_t] ] ; :dyn means anything
-    (create-uintm-adder
-      (:n (type lhs)))))
-
-(+ 1 2 3)
-
-(+)
-
+  [& more] (apply uintm-adder more))
 
 ;successfully blocked
 ;(+ ((uintm 3) 3) ((uintm 4) 3))
