@@ -350,7 +350,8 @@
   "otherwise returns the result of invoking "
   "the function normally."
   (letfn [(error? [a]
-            (= (kind a) :error))
+            (and (satisfies? ITyped a)
+                 (= (kind a) :error)))
           (error-coll? [c]
             (and (coll? c) (every? error? c)))]
     (fn [& args]
@@ -372,17 +373,16 @@
       "any of the objects were errors"
       (cond
         (not (satisfies? ITyped a))
-        (CompilerError. (print-str a "doesn't have a type"))
+        (error a "doesn't have a type"))
         (not (satisfies? ITyped b))
-        (CompilerError. (print-str b "doesn't have a type"))
+        (error b "doesn't have a type"))
         (= (kind a) target-kind)
-        (promote (type a) b)
+        [a (promote (type a) b)]
         (= (kind b) target-kind)
-        (type-unify target-kind b a)
+        (let [[b a] (type-unify target-kind b a)]
+          [a b])
         :else
-        (CompilerError. (print-str "Neither" a
-                                   "nor" b "is of kind"
-                                   target-kind))))))
+        (error "Neither" a "nor" b "is of kind" target-kind))))))
 
 (extend-protocol IType
   UIntM
@@ -402,11 +402,9 @@
 (defn promote [typeinst obj]
   (cond 
     (not (satisfies? IPromotable typeinst))
-         (CompilerError.
-           (print-str typeinst "is not a valid type instance"))
+         (error typeinst "is not a valid type instance"))
     (not (satisfies? ITyped obj))
-        (CompilerError.
-          (print-str "Cannot promote" obj "to" typeinst))
+        (error "Cannot promote" obj "to" typeinst))
     :else
     (dopromote typeinst obj)))
 
@@ -427,20 +425,16 @@
       :else (error "Don't know how to promote from" (type obj)))))
 
 (defn uintm-adder [x y]
-  ;(when (every? #(not= (type %) :uintm) [x y])
-  ;  (throw (RuntimeException. "failed typecheck")))
-  (type-kind-assert x :uintm)
-  (type-equals-assert x y)
-  (if (not= (type x) :uintm)
-    (uintm-adder y x)
-    (create-uintm-adder (promote (type x) y))))
+  (let [[x y] (type-unify :uintm x y)]
+    ((type x) (+ (:val x) (:val y)))))
 
+(comment
 (defmethod + [:int :uintm]
   [& more] (apply uintm-adder more))
 (defmethod + [:uintm :int]
   [& more] (apply uintm-adder more))
 (defmethod + [:uintm :uintm]
-  [& more] (apply uintm-adder more))
+  [& more] (apply uintm-adder more)))
 
 (defpromotefn +
   (fn [lhs UIntM_t [JLong_t JInt_t]  rhs UIntM_t [JLong_t JInt_t] ] ; :dyn means anything
