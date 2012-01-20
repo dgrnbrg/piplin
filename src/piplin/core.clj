@@ -319,11 +319,17 @@
   )
 
 (defprotocol IPromotable
-  (promote [type obj]
-           "Produces an instance of the given "
-           "obj with the type changed"))
+  "Used for instance objects"
+  (dopromote [type obj]
+             "Produces an instance of the given "
+             "obj with the type changed"))
+
+(defprotocol IType
+  "Used for type objects"
+  (kindof [this] "Returns kind of this type."))
 
 (defprotocol ITyped
+  "Used for instance objects"
   (type [this] "Returns type instance. "
         "Any parameters have concrete values")
   (kind [this] "Returns kind. Parameters "
@@ -334,6 +340,9 @@
   (type [this] :error)
   (kind [this] :error))
 
+(defn error [& args]
+  (CompilerError. (apply print-str args)))
+
 (defn error-unify* [f]
   "Takes a function a function and produces "
   "a new function that returns a set of errors "
@@ -341,7 +350,7 @@
   "otherwise returns the result of invoking "
   "the function normally."
   (letfn [(error? [a]
-            (= (clojure.core/type a) CompilerError))
+            (= (kind a) :error))
           (error-coll? [c]
             (and (coll? c) (every? error? c)))]
     (fn [& args]
@@ -352,13 +361,70 @@
         (flatten errors)
         (apply f args)))))
 
-(defn type-unify [target & more]
-  "Takes a target kind and any number of "
-  "objects. Attempts to find one of the "
-  "target kind, then promotes all others "
-  "to that type instance. Returns errors "
-  "objects if any errors occurred, or if "
-  "any of the objects were errors")
+(def type-unify
+  (error-unify*
+    (fn [target-kind a b]
+      "Takes a target kind and two other "
+      "objects. Determines which of them is the "
+      "target kind, then promotes the other "
+      "to that type instance. Returns errors "
+      "objects if any errors occurred, or if "
+      "any of the objects were errors"
+      (cond
+        (not (satisfies? ITyped a))
+        (CompilerError. (print-str a "doesn't have a type"))
+        (not (satisfies? ITyped b))
+        (CompilerError. (print-str b "doesn't have a type"))
+        (= (kind a) target-kind)
+        (promote (type a) b)
+        (= (kind b) target-kind)
+        (type-unify target-kind b a)
+        :else
+        (CompilerError. (print-str "Neither" a
+                                   "nor" b "is of kind"
+                                   target-kind))))))
+
+(extend-protocol IType
+  UIntM
+  (kindof [this] :uintm))
+
+(defrecord JavaLong [])
+(def java-long (JavaLong.))
+
+(extend-protocol ITyped
+  Instance
+  (type [this] (:type this))
+  (kind [this] (kindof (:type this)))
+  Long
+  (type [this] java-long)
+  (kind [this] :j-long))
+
+(defn promote [typeinst obj]
+  (cond 
+    (not (satisfies? IPromotable typeinst))
+         (CompilerError.
+           (print-str typeinst "is not a valid type instance"))
+    (not (satisfies? ITyped obj))
+        (CompilerError.
+          (print-str "Cannot promote" obj "to" typeinst))
+    :else
+    (dopromote typeinst obj)))
+
+(extend-protocol IPromotable
+  JavaLong
+  (dopromote [this obj]
+    (if (= java-long (type obj))
+      obj
+      (error "Cannot promote " obj "to Long")))
+  UIntM
+  (dopromote [this obj]
+    (cond
+      (= (type obj) this) obj ;Already correct
+      (= (kind obj) (kindof this)) (error
+                                   "Incompatible type instances: " this
+                                   "and" (type obj))
+      (= (type obj) java-long) (this obj)
+      :else (error "Don't know how to promote from" (type obj)))))
 
 (defn uintm-adder [x y]
   ;(when (every? #(not= (type %) :uintm) [x y])
