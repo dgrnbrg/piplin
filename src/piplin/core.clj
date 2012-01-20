@@ -318,7 +318,68 @@
   (+ (instance (:type y) x) y))
   )
 
-(defbinop-promotion + :int :uintm (fn [f t] (instance (:type t) f)))
+(defprotocol IPromotable
+  (promote [type obj]
+           "Produces an instance of the given "
+           "obj with the type changed"))
+
+(defprotocol ITyped
+  (type [this] "Returns type instance. "
+        "Any parameters have concrete values")
+  (kind [this] "Returns kind. Parameters "
+        "are ignored"))
+
+(defrecord CompilerError [msg]
+  ITyped
+  (type [this] :error)
+  (kind [this] :error))
+
+(defn error-unify* [f]
+  "Takes a function a function and produces "
+  "a new function that returns a set of errors "
+  "if any of the arguments were errors, and "
+  "otherwise returns the result of invoking "
+  "the function normally."
+  (letfn [(error? [a]
+            (= (clojure.core/type a) CompilerError))
+          (error-coll? [c]
+            (and (coll? c) (every? error? c)))]
+    (fn [& args]
+      (if-let [errors (seq (filter
+                             #(or (error? %)
+                                  (error-coll? %))
+                             args))]
+        (flatten errors)
+        (apply f args)))))
+
+(defn type-unify [target & more]
+  "Takes a target kind and any number of "
+  "objects. Attempts to find one of the "
+  "target kind, then promotes all others "
+  "to that type instance. Returns errors "
+  "objects if any errors occurred, or if "
+  "any of the objects were errors")
+
+(defn uintm-adder [x y]
+  ;(when (every? #(not= (type %) :uintm) [x y])
+  ;  (throw (RuntimeException. "failed typecheck")))
+  (type-kind-assert x :uintm)
+  (type-equals-assert x y)
+  (if (not= (type x) :uintm)
+    (uintm-adder y x)
+    (create-uintm-adder (promote (type x) y))))
+
+(defmethod + [:int :uintm]
+  [& more] (apply uintm-adder more))
+(defmethod + [:uintm :int]
+  [& more] (apply uintm-adder more))
+(defmethod + [:uintm :uintm]
+  [& more] (apply uintm-adder more))
+
+(defpromotefn +
+  (fn [lhs UIntM_t [JLong_t JInt_t]  rhs UIntM_t [JLong_t JInt_t] ] ; :dyn means anything
+    (create-uintm-adder
+      (:n (type lhs)))))
 
 (+ 1 2 3)
 
