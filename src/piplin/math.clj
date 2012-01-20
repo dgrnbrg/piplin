@@ -64,19 +64,12 @@
 
 (defbinop + 0)
 
-;TODO: This function doesn't work due to an 
-;incompletely designed error-unify*. Since
-;type-unify is wrapped by error-unify*, I wrongly
-;thought that I could use destructuring let.
-;In fact, if 2 different cardinality uintms
-;are added, type-unify returns a vector
-;with one instance of a uintm and one Error.
-;(:val error) is null, so when it's passed to
-;the + multimethod, since nil isn't ITyped,
-;it doesn't have a :kind method, so it fails.
 (defn uintm-adder [x y]
-  (let [[x y] (type-unify :uintm x y)]
-    ((type x) (+ (:val x) (:val y)))))
+  (let [result (type-unify :uintm x y)]
+    (if-not (error? result)
+      (let [[x y] result]
+        ((type x) (+ (:val x) (:val y))))
+      result)))
 
 (defmethod + [:j-long :j-long] [x y] (clojure.core/+ x y))
 (defmethod + [:number :number] [x y] (clojure.core/+ x y))
