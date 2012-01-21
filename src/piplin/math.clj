@@ -117,21 +117,6 @@
   [x y]
   ((type x) (+ (:val x) (:val y))))
 
-(comment
-(defn uintm-adder [x y]
-  "Adds 2 uintms, first unifying their types"
-  (let-safe [[x y] (type-unify :uintm x y)]
-    ((type x) (+ (:val x) (:val y)))))
-
-(defmethod + [:uintm :uintm] [x y] (uintm-adder x y))
-(defmethod + [:j-long :uintm]
-  [& more] (apply uintm-adder more))
-(defmethod + [:uintm :j-long]
-  [& more] (apply uintm-adder more))
-(defmethod + [:uintm :uintm]
-  [& more] (apply uintm-adder more))
- )
-
 ;successfully blocked
 ;(+ ((uintm 3) 3) ((uintm 4) 3))
 
