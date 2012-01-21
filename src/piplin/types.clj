@@ -17,24 +17,32 @@
   (kind [this] "Returns kind. Parameters "
         "are ignored"))
 
-(defrecord CompilerError [msg]
+(def *filename* nil)
+(def *lineno* nil)
+
+(defrecord CompilerError [msg filename lineno]
   ITyped
   (type [this] :error)
   (kind [this] :error))
 
-(defn error [& args]
-  (CompilerError. (apply print-str args)))
+(defn error
+  "Convenience function to define a compiler error"
+  [& args]
+  (CompilerError. (apply print-str args) *filename* *lineno*))
 
-(defn error? [a]
+(defn error?
+  "True iff a is a reportable error"
+  [a]
   (and (satisfies? ITyped a)
        (= (kind a) :error)))
 
-(defn error-unify* [f]
-  "Takes a function a function and produces "
-  "a new function that returns a set of errors "
-  "if any of the arguments were errors, and "
-  "otherwise returns the result of invoking "
-  "the function normally."
+(defn unify-error-args
+  "Takes a function a function and produces 
+  a new function that returns a set of errors 
+  if any of the arguments were errors, and 
+  otherwise returns the result of invoking 
+  the function normally."
+  [f]
   (letfn [(error-coll? [c]
             (and (coll? c) (every? error? c)))]
     (fn [& args]
@@ -45,7 +53,10 @@
         (flatten errors)
         (apply f args)))))
 
-(defn promote [typeinst obj]
+(defn promote
+  "Promotes an object to a type. If it's not
+  promotable, returns an error."
+  [typeinst obj]
   (cond 
     (not (satisfies? IPromotable typeinst))
     (error typeinst "is not a valid type instance")
@@ -54,28 +65,45 @@
     :else
     (dopromote typeinst obj)))
 
-(def type-unify
-  (error-unify*
-    (fn [target-kind a b]
-      "Takes a target kind and two other "
-      "objects. Determines which of them is the "
-      "target kind, then promotes the other "
-      "to that type instance. Returns errors "
-      "objects if any errors occurred, or if "
-      "any of the objects were errors"
-      (cond
-        (not (satisfies? ITyped a))
-        (error a "doesn't have a type")
-        (not (satisfies? ITyped b))
-        (error b "doesn't have a type")
-        (= (kind a) target-kind);
-        ;TODO: this needs to propagate the error
-        (let [b (promote (type a) b)]
-          (if-not (error? b)
-            [a b]
-            b))
-        (= (kind b) target-kind)
-        (let [[b a] (type-unify target-kind b a)]
-          [a b])
-        :else
-        (error "Neither" a "nor" b "is of kind" target-kind)))))
+(defmacro let-safe
+  "Similar to let, but if any expression satisfies
+  the predicate error?, the let is short-circuited
+  and the error is returned"
+  ([bindings & body]
+   (if (> 2 (count bindings))
+     `(let-safe [~@(take 2 bindings)]
+        (let-safe [~@(drop 2 bindings)]
+          ~@body))
+     (let [[vars expr] bindings]
+       `(let [result# ~expr]
+          (if-not (error? result#)
+            (let [~vars result#]
+              (do ~@body))
+            result#))))))
+
+(defn type-unify
+  "Takes a target kind and two other
+  objects. Determines which of them is the
+  target kind, then promotes the other
+  to that type instance. Returns errors
+  objects if any errors occurred, or if
+  any of the objects were errors"
+  [target-kind a b]
+  ((unify-error-args
+     (fn [target-kind a b]
+       (cond
+         (not (satisfies? ITyped a))
+         (error a "doesn't have a type")
+         (not (satisfies? ITyped b))
+         (error b "doesn't have a type")
+         (= (kind a) target-kind);
+         (let [b (promote (type a) b)]
+           (if-not (error? b)
+             [a b]
+             b))
+         (= (kind b) target-kind)
+         (let [[b a] (type-unify target-kind b a)]
+           [a b])
+         :else
+         (error "Neither" a "nor" b "is of kind" target-kind))))
+     target-kind a b))

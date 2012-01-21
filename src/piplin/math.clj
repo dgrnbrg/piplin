@@ -23,8 +23,9 @@
   (type [this] type)
   (kind [this] (kindof type)))
 
-
-(defn instance [type val]
+(defn instance
+  "Creates an instance of the type with value val"
+  [type val]
   (Instance. type val))
 
 (defrecord UIntM [n]
@@ -44,35 +45,84 @@
         :else (error "Don't know how to promote from" (type obj)))))
 
 (defn uintm [n]
+  "Make a new uintm type object"
   (UIntM. n))
 
 (defn nary-dispatch
+  "Dispatching logic used by binary math operations"
   ([] ::nullary)
   ([x] (kind x))
   ([x y] [(kind x) (kind y)])
   ([x y & more] ::n-ary))
 
-(defmacro defbinop [op zero]
-  `(do
-     (defmulti ~op nary-dispatch)
-     (defmethod ~op ::nullary [] ~zero)
-     (defmethod ~op ::n-ary
-       [~'x ~'y & ~'more]
-       (if ~'more
-         (recur (~op ~'x ~'y) (first ~'more) (next ~'more))
-         (~op ~'x ~'y)))))
+(defmacro defbinop
+  "Defines a generic function for a binary operation
+  on numeric types. Uses the function in clojure/core
+  to provide implementations for Numbers. Handles
+  nullary and n-ary invocations by returning zero and
+  the left-associative folds, respectively."
+  [op zero]
+  (let [core-op (gensym (str (name op) "core"))]
+    `(do
+       (defmulti ~op nary-dispatch)
+       (defmethod ~op ::nullary [] ~zero)
+       (defmethod ~op ::n-ary
+         [~'x ~'y & ~'more]
+         (if ~'more
+           (recur (~op ~'x ~'y) (first ~'more) (next ~'more))
+           (~op ~'x ~'y)))
+       (def ~core-op (ns-resolve 'clojure.core '~op))
+       (defmethod ~op [:number :number]
+         [~'x ~'y]
+         (~core-op ~'x ~'y))
+       (defmethod ~op [:j-long :j-long]
+         [~'x ~'y]
+         (~core-op ~'x ~'y)))))
 
 (defbinop + 0)
+(defbinop - 0)
+(defbinop * 0)
+(defbinop bit-and 0)
+(defbinop bit-or 0)
+(defbinop bit-xor 0)
+(defbinop bit-not 0)
 
+(defmacro defbinopimpl
+  "Defines implementation of a binop on a piplin kind.
+  Requires the kind to attempt to unify to, the list
+  of types which can be promoted to the kind, and an
+  fntail that takes 2 arguments and returns the result.
+  The implementation will return an error if the
+  unification failed."
+  [op k bases & fntail]
+  (let [impl-name (gensym (str (name op) (name k)))
+        impl-body `(defn ~impl-name
+                     [x# y#]
+                     (let-safe [[x# y#] (type-unify ~k x# y#)]
+                       ((fn ~@fntail) x# y#)))
+        k-bases (map #(vector k %) bases)
+        dispatches (concat k-bases
+                           (map reverse k-bases)
+                           [[k k]])
+        bodies (map (fn [[a b]]
+                      `(defmethod ~op [~a ~b]
+                         [~'x ~'y]
+                         (~impl-name ~'x ~'y)))
+                    dispatches)]
+    `(do
+       ~impl-body
+       ~@bodies)))
+
+(defbinopimpl + :uintm [:j-long]
+  [x y]
+  ((type x) (+ (:val x) (:val y))))
+
+(comment
 (defn uintm-adder [x y]
-  (let [result (type-unify :uintm x y)]
-    (if-not (error? result)
-      (let [[x y] result]
-        ((type x) (+ (:val x) (:val y))))
-      result)))
+  "Adds 2 uintms, first unifying their types"
+  (let-safe [[x y] (type-unify :uintm x y)]
+    ((type x) (+ (:val x) (:val y)))))
 
-(defmethod + [:j-long :j-long] [x y] (clojure.core/+ x y))
-(defmethod + [:number :number] [x y] (clojure.core/+ x y))
 (defmethod + [:uintm :uintm] [x y] (uintm-adder x y))
 (defmethod + [:j-long :uintm]
   [& more] (apply uintm-adder more))
@@ -80,6 +130,7 @@
   [& more] (apply uintm-adder more))
 (defmethod + [:uintm :uintm]
   [& more] (apply uintm-adder more))
+ )
 
 ;successfully blocked
 ;(+ ((uintm 3) 3) ((uintm 4) 3))
