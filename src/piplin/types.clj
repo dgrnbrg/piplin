@@ -17,8 +17,8 @@
   (kind [this] "Returns kind. Parameters "
         "are ignored"))
 
-(def *filename* nil)
-(def *lineno* nil)
+(def ^:dynamic *filename*)
+(def ^:dynamic *lineno*)
 
 (defrecord CompilerError [msg filename lineno]
   ITyped
