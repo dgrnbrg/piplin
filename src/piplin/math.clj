@@ -203,31 +203,98 @@
     ;if x is valid, returns valid x
     ;if y is valid and x isn't, returns valid y
     ;if x and y are invalid, returns invalid
-    (if (valid? x) x y)))
+    (let [pass (valid? x)]
+      (if pass
+        x
+        ;stall-with is like guard-with, but adds logic
+        ;to the backpressure path
+        ;stall-with is implemented by pushing the current
+        ;stall expr onto the stall stack, and then making
+        ;the new stall expr the bit-and of the argument
+        ;and the current stall expr
+        (stall-with pass y)))))
 
 (defn mkalu [data op]
-  (structural [:in data op :out results (aluresult nil)]
-    (let [intmath-op (isany? op #{:+ :- :* :/})
-          cordic-op (bit-not intmath-op)
-          ;isany? and bit-not can be used in guarded-with clauses
-          ;since they can be synthesized as combinational logic
-          ;noncombinational logic cannot be used as the guard
-          intpipe (guarded-with intmath-op
-                    (mkintmath op data))
-          cordicpipe (guarded-with cordic-op
-                       (mkcordic op data))]
-      ;merge functions do arbitration
-      (connect results
-               (priority-merge intpipe cordicpipe))
-      (comment
-        How should backpressure work? Here's my hypothesis:
+  (:out
+    ;structural must automagically apply backpressure to
+    ;any input that is valid? if is any input that isn't
+    ;yet valid
+    (structural [:in data op :out results (aluresult nil)]
+      (let [intmath-op (isany? op #{:+ :- :* :/})
+            cordic-op (bit-not intmath-op)
+            ;isany? and bit-not can be used in guarded-with clauses
+            ;since they can be synthesized as combinational logic
+            ;noncombinational logic cannot be used as the guard
+            intpipe (mkintmath op
+                               (guarded-with intmath-op
+                                             data))
+            ;the expr (valid? [guard]) is 
+            cordicpipe (mkcordic op
+                                 (guarded-with cordic-op
+                                               data))]
+        ;merge functions do arbitration
+        (connect results
+                 (priority-merge intpipe cordicpipe))
+        (backpressure (or (and intmath-op (ready? intpipe))
+                          (and cordic-op (ready? cordic-pipe))))))))
 
-        If the output node is asserting stall backwards, then we
-        must not produce more results. Do this by having the stall
-        propagate through the pipeline backward. We'll need to
-        write the logic that explains when we're stalled to our
-        inputs, however.
+(defn mkalu-no-guards [data op]
+  (:out
+    (structural [:in data op :out results (aluresult nil)]
+      (let [intmath-op (isany? op #{:+ :- :* :/})
+            cordic-op (bit-not intmath-op)
+            intpipe (guarded-with intmath-op
+                                  (mkintmath op data))
+            cordicpipe (guarded-with cordic-op
+                                     (mkcordic op data))]
+        (connect results
+                 (priority-merge intpipe cordicpipe))
+        (backpressure (or (and intmath-op (ready? intpipe))
+                          (and cordic-op (ready? cordic-pipe))))))))
 
-        )
-      (backpressure (or (and intmath-op (ready? intpipe))
-                        (and cordic-op (ready? cordic-pipe)))))))
+(comment
+  Given the power of guard-with and stall-with, we only need one more
+  piece, and then even structural can be defined in terms of it:
+  feedback. This form will be used to connect a loop. It is the only
+  type of mandatory pipeline reg, but it could be flexibly determined
+  where in the feedback loop the pipeline reg is placed.
+
+  (feedback
+    [a 0
+     (inc a)]
+    [b init-val
+     (f b)]) ;=> a map of the feedback outputs
+
+  is the feedback primitive. Hierarchy flattening allows for synthesis.
+  )
+
+(defn mkmult [x y]
+  "by repeated addition, requires that x-in not change during computation"
+  (:out
+    (structural [:in x-in y-in ;inputs are guarded with the and of their valids
+                 :out r (instance (type x) nil) remain (instance (type y) nil)]
+      (let [done (= remain 0)]
+        (connect remain
+                 (if-not done
+                   (dec remain)
+                   y-in)) ;y-in is already guarded-with (valid? x) as well
+        (connect r ;can't compute if x-in isn't held; perhaps should save x?
+                 (if-not done
+                   (+ r x-in)
+                   x-in))
+        (backpressure (not done))))))
+
+(defn mkmult-better [x y]
+  "by repeated addition, uses x-in to stall the previous stage"
+  (:out
+    (structural [:in x-in y-in ;inputs are guarded with the and of their valids
+                 :out r (instance (type x) nil) remain (instance (type y) nil)]
+      (let [done (= remain 0)]
+        (connect remain
+                 (priority-merge (dec remain))
+                 y-in) ;y-in is already guarded-with (valid? x) as well
+        (connect r ;can't compute if x-in isn't held; perhaps should save x?
+                 (if done
+                   x-in
+                   (+ r x-in)))
+        (backpressure ((not done))))))
