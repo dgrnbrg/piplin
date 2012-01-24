@@ -47,7 +47,7 @@
   the function normally."
   [f]
   (letfn [(error-coll? [c]
-            (and (coll? c) (every? error? c)))]
+            (and (coll? c) (seq c) (every? error? c)))]
     (fn [& args]
       (if-let [errors (seq (filter
                              #(or (error? %)
@@ -61,10 +61,10 @@
   the predicate error?, the let is short-circuited
   and the error is returned"
   ([bindings & body]
-   (if (> 2 (count bindings))
+   (if (> (count bindings) 2)
      `(let-safe [~@(take 2 bindings)]
-        (let-safe [~@(drop 2 bindings)]
-          ~@body))
+                (let-safe [~@(drop 2 bindings)]
+                          ~@body))
      (let [[vars expr] bindings]
        `(let [result# ~expr]
           (if-not (error? result#)
