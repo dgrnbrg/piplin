@@ -1,43 +1,46 @@
 (ns piplin.types)
 
-(defprotocol IPromotable
-  "Used for instance objects"
-  (dopromote [type obj]
-             "Produces an instance of the given "
-             "obj with the type changed"))
+(def types (atom (make-hierarchy)))
 
-(defprotocol IType
-  "Used for type objects"
-  (kindof [this] "Returns kind of this type."))
+(defn kindof [a]
+  (or (:kind a) (class a)))
 
-(defprotocol ITyped
-  "Used for instance objects"
-  (type [this] "Returns type instance. "
-        "Any parameters have concrete values")
-  (kind [this] "Returns kind. Parameters "
-        "are ignored"))
+(defmulti dopromote
+  "Produces an instance of the given
+  obj with the type changed. Takes
+  a type instance and an object to be
+  casted."
+  (fn [type obj] (kindof type))
+  :hierarchy types)
 
-(def ^:dynamic *filename*)
-(def ^:dynamic *lineno*)
+(defrecord CompilerError [msg filename lineno])
 
-(defrecord CompilerError [msg filename lineno]
-  ITyped
-  (type [this] :error)
-  (kind [this] :error))
+(defn derive-type
+  [child parent]
+  (swap! types derive child parent))
+
+(defn isa-type?
+  [unknown type]
+  (isa? @types unknown type))
+
+(derive-type CompilerError :error)
 
 (defn error
   "Convenience function to define a compiler error"
   [& args]
-  (CompilerError. (apply print-str args) *filename* *lineno*))
+  (CompilerError. (apply print-str args) 0 0))
+
+(defmethod dopromote :default
+  [type obj]
+  (error type "is not a valid type instance"))
 
 (defn error?
   "True iff a is a reportable error"
   [a]
-  (and (satisfies? ITyped a)
-       (= (kind a) :error)))
+  (isa-type? (class a) :error))
 
 (defn unify-error-args
-  "Takes a function a function and produces 
+  "Takes a function and produces 
   a new function that returns a set of errors 
   if any of the arguments were errors, and 
   otherwise returns the result of invoking 
@@ -57,13 +60,7 @@
   "Promotes an object to a type. If it's not
   promotable, returns an error."
   [typeinst obj]
-  (cond 
-    (not (satisfies? IPromotable typeinst))
-    (error typeinst "is not a valid type instance")
-    (not (satisfies? ITyped obj))
-    (error "Cannot promote" obj "to" typeinst)
-    :else
-    (dopromote typeinst obj)))
+    (dopromote typeinst obj))
 
 (defmacro let-safe
   "Similar to let, but if any expression satisfies
@@ -92,17 +89,13 @@
   ((unify-error-args
      (fn [target-kind a b]
        (cond
-         (not (satisfies? ITyped a))
-         (error a "doesn't have a type")
-         (not (satisfies? ITyped b))
-         (error b "doesn't have a type")
-         (= (kind a) target-kind);
-         (let [b (promote (type a) b)]
+         (= (:kind a) target-kind)
+         (let-safe [b (promote (:type a) b)]
            (if-not (error? b)
              [a b]
              b))
-         (= (kind b) target-kind)
-         (let [[b a] (type-unify target-kind b a)]
+         (= (:kind b) target-kind)
+         (let-safe [[b a] (type-unify target-kind b a)]
            [a b])
          :else
          (error "Neither" a "nor" b "is of kind" target-kind))))

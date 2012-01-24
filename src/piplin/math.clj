@@ -1,64 +1,92 @@
 (ns piplin.math
   (:use (piplin types)))
 
-(declare java-long)
+(derive-type Long :j-long)
+(defmethod dopromote 
+  :j-long
+  [type obj]
+  (if (isa-type? obj :j-long)
+    obj
+    (error "Cannot promote" obj "to Long")))
 
-(defrecord JavaLong []
-  IPromotable
-  (dopromote [this obj]
-    (if (= java-long (type obj))
-      obj
-      (error "Cannot promote " obj "to Long"))))
+(defmulti constrain
+  "Takes a type and a value and constrains the value to
+  the type's range."
+  (fn [type val] (kindof type))
+  :hierarchy types)
 
-(def java-long (JavaLong.))
+(defmethod constrain
+  :default
+  [a b] b)
 
-;TODO: port all to multimethods for easier development
-(extend-protocol ITyped
-  Long
-  (type [this] java-long)
-  (kind [this] :j-long))
+(defmulti check
+  "Takes an instance and verifies that it meets the
+  constraints of its type"
+  kindof
+  :hierarchy types)
 
-;TODO: enforce that all instances are positive
-(defrecord Instance [type val]
-  ITyped
-  (type [this] type)
-  (kind [this] (kindof type)))
+(defmethod check
+  :default
+  [a] a)
 
+(defrecord Instance [type val])
 (defn instance
   "Creates an instance of the type with value val"
-  [type val]
-  (Instance. type val))
+  [type val & more]
+  (let-safe [val (if (some #{:constrain} more)
+                   (constrain type val)
+                   val)]
+            (check
+              (merge (Instance. type val)
+                     {:type type :kind (:kind type)}))))
 
-(defrecord UIntM [n]
-  clojure.lang.IFn
-  (invoke [this init-val]
-    (let [maxval (dec (bit-shift-left 1 n))]
-      (loop [init-val init-val]
-        (if (neg? init-val)
-          (recur (- maxval init-val))
-          (instance this (bit-and init-val maxval))))))
-    ;(instance this init-val))
-  IType
-  (kindof [this] :uintm)
-  IPromotable
-  (dopromote [this obj]
-      (cond
-        (= (type obj) this) obj ;Already correct
-        (= (kind obj) (kindof this)) (error
-                                       "Incompatible type instances: " this
-                                       "and" (type obj))
-        (= (type obj) java-long) (this obj)
-        :else (error "Don't know how to promote from" (type obj)))))
-
+(defrecord UIntM [n])
 (defn uintm [n]
   "Make a new uintm type object"
-  (UIntM. n))
+  (merge (UIntM. n)
+         {:kind :uintm}))
+
+(defmethod constrain
+  :uintm
+  [this init-val]
+  "Takes a uintm (this) and the value
+  to initialize the new instance with,
+  and constrains the number to be in the
+  range of uintm"
+  (mod init-val (bit-shift-left 1 (:n this))))
+
+(defmethod check
+  :uintm
+  [inst]
+  (let [n (get-in inst [:type :n])
+        v (:val inst)
+        maxval (dec (bit-shift-left 1 n))]
+    (if (< v 0)
+      (error "uintm must be positive:" v)
+      (if (> v maxval)
+        (error "uintm" n "must be less than" maxval
+               ", got:" v)
+        inst))))
+
+(defmethod dopromote
+  :uintm
+  [this obj]
+  (cond
+    (= (:type obj) this) obj ;Already correct
+    (= (:kind obj)
+       (:kind this)) (error
+                       "Incompatible type instances: " this
+                       "and" (type obj))
+    (isa-type? (kindof obj) :j-long) (instance this obj)
+    :else (error "Don't know how to promote to :uintm from"
+                 (type obj))))
+
 
 (defn nary-dispatch
   "Dispatching logic used by binary math operations"
   ([] ::nullary)
-  ([x] (kind x))
-  ([x y] [(kind x) (kind y)])
+  ([x] (kindof x))
+  ([x y] [(kindof x) (kindof y)])
   ([x y & more] ::n-ary))
 
 (defmacro defbinop
@@ -70,7 +98,7 @@
   [op zero]
   (let [core-op (gensym (str (name op) "core"))]
     `(do
-       (defmulti ~op nary-dispatch)
+       (defmulti ~op nary-dispatch :hierarchy types)
        (defmethod ~op ::nullary [] ~zero)
        (defmethod ~op ::n-ary
          [~'x ~'y & ~'more]
@@ -120,27 +148,27 @@
 
 (defbinopimpl + :uintm [:j-long]
   [x y]
-  ((type x) (+ (:val x) (:val y))))
+  (instance (:type x) (+ (:val x) (:val y)) :constrain))
 
 (defbinopimpl - :uintm [:j-long]
   [x y]
-  ((type x) (- (:val x) (:val y))))
+  (instance (:type x) (- (:val x) (:val y)) :constrain))
 
 (defbinopimpl * :uintm [:j-long]
   [x y]
-  ((type x) (bit-and (* (:val x) (:val y) ))))
+  (instance (:type x) (bit-and (* (:val x) (:val y) )) :constrain))
 
 (defbinopimpl bit-and :uintm [:j-long]
   [x y]
-  ((type x) (bit-and (:val x) (:val y))))
+  (instance (:type x) (bit-and (:val x) (:val y)) :constrain))
 
 (defbinopimpl bit-or :uintm [:j-long]
   [x y]
-  ((type x) (bit-or (:val x) (:val y))))
+  (instance (:type x) (bit-or (:val x) (:val y)) :constrain))
 
 (defbinopimpl bit-xor :uintm [:j-long]
   [x y]
-  ((type x) (bit-xor (:val x) (:val y))))
+  (instance (:type x) (bit-xor (:val x) (:val y)) :constrain))
 
 ;successfully blocked
 ;(+ ((uintm 3) 3) ((uintm 4) 3))
