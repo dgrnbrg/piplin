@@ -132,7 +132,9 @@
         impl-body `(defn ~impl-name
                      [x# y#]
                      (let-safe [[x# y#] (type-unify ~k x# y#)]
-                       ((fn ~@fntail) x# y#)))
+                       (instance (:type x#)
+                                 ((fn ~@fntail) x# y#)
+                                 :constrain)))
         k-bases (map #(vector k %) bases)
         dispatches (concat k-bases
                            (map reverse k-bases)
@@ -148,27 +150,27 @@
 
 (defbinopimpl + :uintm [:j-long]
   [x y]
-  (instance (:type x) (+ (:val x) (:val y)) :constrain))
+  (+ (:val x) (:val y)))
 
 (defbinopimpl - :uintm [:j-long]
   [x y]
-  (instance (:type x) (- (:val x) (:val y)) :constrain))
+  (- (:val x) (:val y)))
 
 (defbinopimpl * :uintm [:j-long]
   [x y]
-  (instance (:type x) (bit-and (* (:val x) (:val y) )) :constrain))
+  (bit-and (* (:val x) (:val y))))
 
 (defbinopimpl bit-and :uintm [:j-long]
   [x y]
-  (instance (:type x) (bit-and (:val x) (:val y)) :constrain))
+  (bit-and (:val x) (:val y)))
 
 (defbinopimpl bit-or :uintm [:j-long]
   [x y]
-  (instance (:type x) (bit-or (:val x) (:val y)) :constrain))
+  (bit-or (:val x) (:val y)))
 
 (defbinopimpl bit-xor :uintm [:j-long]
   [x y]
-  (instance (:type x) (bit-xor (:val x) (:val y)) :constrain))
+  (bit-xor (:val x) (:val y)))
 
 ;successfully blocked
 ;(+ ((uintm 3) 3) ((uintm 4) 3))
