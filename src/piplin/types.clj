@@ -5,7 +5,7 @@
 (defn kindof [a]
   (or (:kind a) (class a)))
 
-(defmulti dopromote
+(defmulti promote
   "Produces an instance of the given
   obj with the type changed. Takes
   a type instance and an object to be
@@ -30,7 +30,7 @@
   [& args]
   (CompilerError. (apply print-str args) 0 0))
 
-(defmethod dopromote :default
+(defmethod promote :default
   [type obj]
   (error type "is not a valid type instance"))
 
@@ -55,12 +55,6 @@
                              args))]
         (flatten errors)
         (apply f args)))))
-
-(defn promote
-  "Promotes an object to a type. If it's not
-  promotable, returns an error."
-  [typeinst obj]
-    (dopromote typeinst obj))
 
 (defmacro let-safe
   "Similar to let, but if any expression satisfies

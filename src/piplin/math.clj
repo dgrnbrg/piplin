@@ -2,7 +2,7 @@
   (:use (piplin types)))
 
 (derive-type Long :j-long)
-(defmethod dopromote 
+(defmethod promote 
   :j-long
   [type obj]
   (if (isa-type? obj :j-long)
@@ -68,7 +68,7 @@
                ", got:" v)
         inst))))
 
-(defmethod dopromote
+(defmethod promote
   :uintm
   [this obj]
   (cond
