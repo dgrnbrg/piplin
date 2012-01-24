@@ -158,7 +158,7 @@
 
 (defbinopimpl * :uintm [:j-long]
   [x y]
-  (bit-and (* (:val x) (:val y))))
+  (* (:val x) (:val y)))
 
 (defbinopimpl bit-and :uintm [:j-long]
   [x y]
@@ -184,8 +184,6 @@
 (comment
   TODO
   - error reporting (file/lineno)
-; - enforce boundaries of uintm [0 ..< (2 ^ n)]
-  - implement other operations on uintm
   - implement sintm, sints, uints, etc. (e type is hard)
   - design AST
   - implement sim function, ast, and
