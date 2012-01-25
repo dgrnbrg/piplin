@@ -89,6 +89,9 @@
   ([x y] [(kindof x) (kindof y)])
   ([x y & more] ::n-ary))
 
+(defn- mangle-multi-op [op]
+  (symbol (str (name op) "multi")))
+
 (defmacro defbinop
   "Defines a generic function for a binary operation
   on numeric types. Uses the function in clojure/core
@@ -96,20 +99,23 @@
   nullary and n-ary invocations by returning zero and
   the left-associative folds, respectively."
   [op zero]
-  (let [core-op (gensym (str (name op) "core"))]
+  (let [core-op (gensym (str (name op) "core"))
+        multi-op (mangle-multi-op op)]
     `(do
-       (defmulti ~op nary-dispatch :hierarchy types)
-       (defmethod ~op ::nullary [] ~zero)
-       (defmethod ~op ::n-ary
+       (defmulti ~multi-op nary-dispatch :hierarchy types)
+       (def ~op
+         (unify-error-args ~multi-op))
+       (defmethod ~multi-op ::nullary [] ~zero)
+       (defmethod ~multi-op ::n-ary
          [~'x ~'y & ~'more]
          (if ~'more
-           (recur (~op ~'x ~'y) (first ~'more) (next ~'more))
-           (~op ~'x ~'y)))
+           (recur (~multi-op ~'x ~'y) (first ~'more) (next ~'more))
+           (~multi-op ~'x ~'y)))
        (def ~core-op (ns-resolve 'clojure.core '~op))
-       (defmethod ~op [:number :number]
+       (defmethod ~multi-op [:number :number]
          [~'x ~'y]
          (~core-op ~'x ~'y))
-       (defmethod ~op [:j-long :j-long]
+       (defmethod ~multi-op [:j-long :j-long]
          [~'x ~'y]
          (~core-op ~'x ~'y)))))
 
@@ -128,7 +134,8 @@
   The implementation will return an error if the
   unification failed."
   [op k bases & fntail]
-  (let [impl-name (gensym (str (name op) (name k)))
+  (let [op (mangle-multi-op op)
+        impl-name (gensym (str (name op) (name k)))
         impl-body `(defn ~impl-name
                      [x# y#]
                      (let-safe [[x# y#] (type-unify ~k x# y#)]
