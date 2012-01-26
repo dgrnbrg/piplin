@@ -53,7 +53,7 @@
                              #(or (error? %)
                                   (error-coll? %))
                              args))]
-        (flatten errors)
+        (mapcat #(if (error? %) [%] %) errors)
         (apply f args)))))
 
 (defmacro let-safe
