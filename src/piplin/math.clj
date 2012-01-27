@@ -134,14 +134,21 @@
   The implementation will return an error if the
   unification failed."
   [op k bases & fntail]
-  (let [op (mangle-multi-op op)
+  (let [unmangled-kw (keyword (name op))
+        op (mangle-multi-op op)
         impl-name (gensym (str (name op) (name k)))
         impl-body `(defn ~impl-name
                      [x# y#]
                      (let-safe [[x# y#] (type-unify ~k x# y#)]
-                       (instance (:type x#)
-                                 ((fn ~@fntail) x# y#)
-                                 :constrain)))
+                       (if (and (instance? Instance x#)
+                                (instance? Instance y#))
+                         (instance (:type x#)
+                                   ((fn ~@fntail) x# y#)
+                                   :constrain)
+                         {:type (:type x#)
+                          :op ~unmangled-kw
+                          :lhs x#
+                          :rhs y#})))
         k-bases (map #(vector k %) bases)
         dispatches (concat k-bases
                            (map reverse k-bases)
@@ -196,3 +203,10 @@
   - implement sim function, ast, and
     verilog module binding macro(s)
   - implement simulation with syn/ack)
+
+(comment
+;  The following is converted to AST now:
+(pprint (module [:outputs
+                        [c (instance (uintm 8) 3)]]
+                       [c (+ 1 c)]))
+)

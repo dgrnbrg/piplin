@@ -82,10 +82,11 @@
                 (explode "unknown section header:" section)))))
         (let [body body
               token (gensym "module")
-              registers (map (fn [[x y]] [x (:type y)])
+              registers (map (fn [[x y]] [x `(:type ~y)])
                              (concat outputs feedback))
               exprs (map (fn [[x y]] 
                            [x `{:type ~y
+                                :kind (:kind ~y)
                                 :port ~x
                                 :token '~token}])
                          (concat inputs registers))
