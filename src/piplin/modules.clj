@@ -3,16 +3,16 @@
 (comment
   The syntax for a module is
 
-  (module :inputs
-          [a type
-           b type]
-          :outputs
-          [o1 init-val]
-          :feedback
-          [x init-val]
-          :modules
-          [sub1 (instantiate)
-           sub2 (instantiate) :only [:port1 :port2]]
+  (module [:inputs
+           [a type
+            b type]
+           :outputs
+           [o1 init-val]
+           :feedback
+           [x init-val]
+           :modules
+           [sub1 (instantiate)
+            sub2 (instantiate) :only [:port1 :port2]]
     body...)
 
   The body should include connections for everything that
