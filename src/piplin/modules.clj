@@ -3,7 +3,7 @@
 (comment
   The syntax for a module is
 
-  (module [:inputs
+; (module [:inputs
            [a type
             b type]
            :outputs
@@ -13,7 +13,7 @@
            :modules
            [sub1 (instantiate)
             sub2 (instantiate) :only [:port1 :port2]]
-    body...)
+;   body...)
 
   The body should include connections for everything that
   needs one.
@@ -71,18 +71,33 @@
                           (explode "multiple definition of inputs" inputs)
                           (recur (rest unparsed) decls outputs feedback modules))
                 :outputs (if outputs
-                          (explode "multiple definition of outputs")
-                          (recur (rest unparsed) inputs decls feedback modules))
+                           (explode "multiple definition of outputs")
+                           (recur (rest unparsed) inputs decls feedback modules))
                 :feedback (if feedback
-                          (explode "multiple definition of feedback")
-                          (recur (rest unparsed) inputs outputs decls modules))
+                            (explode "multiple definition of feedback")
+                            (recur (rest unparsed) inputs outputs decls modules))
                 :modules (if modules
-                          (explode "multiple definition of modules")
-                          (recur (rest unparsed) inputs outputs feedback decls))
+                           (explode "multiple definition of modules")
+                           (recur (rest unparsed) inputs outputs feedback decls))
                 (explode "unknown section header:" section)))))
-        `{:type :module
-          :inputs ~inputs
-          :outputs ~outputs
-          :feedback ~feedback
-          :modules ~modules
-          :body [~@body]}))))
+        (let [body body
+              token (gensym "module")
+              registers (map (fn [[x y]] [x (:type y)])
+                             (concat outputs feedback))
+              exprs (map (fn [[x y]] 
+                           [x `{:type ~y
+                                :port ~x
+                                :token '~token}])
+                         (concat inputs registers))
+              bindings (mapcat (fn [[x y]] 
+                              [(symbol (name x))
+                               y])
+                            (concat exprs modules))]
+          `{:type :module
+            :token '~token
+            :inputs ~inputs
+            :outputs ~outputs
+            :feedback ~feedback
+            :modules ~modules
+            :body (let [~@bindings]
+                    [~@body])})))))
