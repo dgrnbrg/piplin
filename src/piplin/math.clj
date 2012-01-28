@@ -147,8 +147,8 @@
                                    :constrain)
                          {:type (:type x#)
                           :op ~unmangled-kw
-                          :lhs x#
-                          :rhs y#})))
+                          :args {:lhs x#
+                                 :rhs y#}})))
         k-bases (map #(vector k %) bases)
         dispatches (concat k-bases
                            (map reverse k-bases)

@@ -1,5 +1,9 @@
 (ns piplin.types)
 
+(comment
+;  TODO: email jim@dueys.net questions about monads
+  since the error handling is really quite monadic)
+
 (def types (atom (make-hierarchy)))
 
 (defn kindof [a]
@@ -37,7 +41,8 @@
 (defn error?
   "True iff a is a reportable error"
   [a]
-  (isa-type? (class a) :error))
+  (or (isa-type? (class a) :error)
+      (and (coll? a) (seq a) (every? error? a))))
 
 (defn unify-error-args
   "Takes a function and produces 
@@ -46,15 +51,18 @@
   otherwise returns the result of invoking 
   the function normally."
   [f]
-  (letfn [(error-coll? [c]
-            (and (coll? c) (seq c) (every? error? c)))]
-    (fn [& args]
-      (if-let [errors (seq (filter
-                             #(or (error? %)
-                                  (error-coll? %))
-                             args))]
-        (mapcat #(if (error? %) [%] %) errors)
-        (apply f args)))))
+  (fn [& args]
+      (if-let [errors (seq (filter error? args))]
+        (flatten errors)
+        (apply f args))))
+
+(defn unify-error-results
+  "takes a function that returns a seq and
+  applies unify-error to the returned seq"
+  [f]
+  (fn [& args]
+    ((unify-error-args identity)
+       (apply f args))))
 
 (defmacro let-safe
   "Similar to let, but if any expression satisfies
@@ -71,6 +79,10 @@
             (let [~vars result#]
               (do ~@body))
             result#))))))
+
+(def map-safe
+  ;"Does a map, but unifies errors."
+  (unify-error-results map))
 
 (defn type-unify
   "Takes a target kind and two other

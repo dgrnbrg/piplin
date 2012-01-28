@@ -38,22 +38,28 @@
   is for other submodules, and then all the specified ports
   (no spec = all ports) must be connected somewhere in
   the body.
+  )
 
-  The above module, of course, evaluates to the following
-
-  {:type :module
-   :inputs {:a type :b type}
-   :outputs {:o1 init-val}
-   :feedback {:x init-val}
-   :modules {:sub1 {:inst (instantiate)}
-             :sub2 {:inst (instantiate) :only [:port1 :port2]}}
-   :body [body...]}
+(comment
+  All exprs must list their subexprs that should be checked
+  as an :args map. This map's keys are used by the synth/sim
+  phases to do something specific, but the values are implied
+  to be exprs that should be walked and checked.
   )
 
 (defn explode [& msgs]
   (throw (RuntimeException. (apply str msgs))))
 
-(defmacro module [config & body]
+(defmacro module
+  "module is the fundamental structural building block in Piplin.
+  It returns an AST fragment that can be processed into a synthesizable
+  Verilog design or into a simulation. It has up to 4 declaration
+  sections: :inputs, :outputs, :feedback, and :modules. :inputs is
+  used to specify wires leading into this module. :outputs specify
+  registered outputs from this module. :feedback is similar to :outputs,
+  but they're only readable from within the module. :modules is for
+  instantiating submodules in the final design."
+  [config & body]
   (if-not (even? (count config))
     (explode "Odd number of elements in module args."))
   (let [params (partition 2 config)]
@@ -103,3 +109,11 @@
             :modules ~modules
             :body (let [~@bindings]
                     [~@body])})))))
+
+(defn connect
+  "This connects a register to an expr"
+  [reg expr]
+  {:type :connection
+   :kind :connection
+   :args {:reg reg
+          :expr expr}})
