@@ -95,6 +95,7 @@
                                y])
                             (concat exprs modules))]
           `{:type :module
+            :kind :module
             :token '~token
             :inputs ~inputs
             :outputs ~outputs
