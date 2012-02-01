@@ -38,24 +38,13 @@
 
 (defmethod promote :default
   [type obj]
-  (error type "is not a valid type instance"))
+  (throw+ (error type "is not a valid type instance")))
 
 (defn error?
   "True iff a is a reportable error"
   [a]
   (or (isa-type? (class a) :error)
       (and (coll? a) (seq a) (every? error? a))))
-
-(defn try-error
-  "Evaluates a thunk. If it returns a value,
-  try-error returns that value. If it throws
-  an error, it adds it to the error coll and
-  returns nil."
-  [thunk error-coll]
-  (try+
-    (thunk)
-    (catch error? e
-      (swap! error-coll conj e))))
 
 (defmacro join-errors
   "Takes a list of forms and evaluates them.
@@ -67,8 +56,10 @@
   [& args]
   (let [error-coll (gensym "error-coll")
         arg-thunks (map (fn [arg]
-                          `(try-error (fn [] ~arg)
-                                      ~error-coll))
+                          `(try+
+                             ~arg
+                             (catch error? ~'e
+                               (swap! ~error-coll conj ~'e))))
                         args)]
     `(let [~error-coll (atom [])
            args# [~@arg-thunks]
@@ -110,9 +101,7 @@
             (cond
               (= (:kind a) target-kind)
               (let [b (promote (:type a) b)]
-                (if-not (error? b)
-                  [a b]
-                  b))
+                [a b])
               (= (:kind b) target-kind)
               (let [[b a] (type-unify target-kind b a)]
                 [a b])

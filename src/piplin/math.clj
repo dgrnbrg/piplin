@@ -8,7 +8,7 @@
   [type obj]
   (if (isa-type? obj :j-long)
     obj
-    (error "Cannot promote" obj "to Long")))
+    (throw+ (error "Cannot promote" obj "to Long"))))
 
 (defmulti constrain
   "Takes a type and a value and constrains the value to
@@ -35,11 +35,11 @@
   "Creates an instance of the type with value val"
   [type val & more]
   (let [val (if (some #{:constrain} more)
-                   (constrain type val)
-                   val)]
-            (check
-              (merge (Instance. type val)
-                     {:type type :kind (:kind type)}))))
+              (constrain type val)
+              val)]
+    (check
+      (merge (Instance. type val)
+             {:type type :kind (:kind type)}))))
 
 (defrecord UIntM [n])
 (defn uintm [n]
@@ -63,10 +63,10 @@
         v (:val inst)
         maxval (dec (bit-shift-left 1 n))]
     (if (< v 0)
-      (error "uintm must be positive:" v)
+      (throw+ (error "uintm must be positive:" v))
       (if (> v maxval)
-        (error "uintm" n "must be less than" maxval
-               ", got:" v)
+        (throw+ (error "uintm" n "must be less than" maxval
+                       ", got:" v))
         inst))))
 
 (defmethod promote
@@ -75,12 +75,12 @@
   (cond
     (= (:type obj) this) obj ;Already correct
     (= (:kind obj)
-       (:kind this)) (error
-                       "Incompatible type instances: " this
-                       "and" (type obj))
+       (:kind this)) (throw+ (error
+                               "Incompatible type instances: " this
+                               "and" (type obj)))
     (isa-type? (kindof obj) :j-long) (instance this obj)
-    :else (error "Don't know how to promote to :uintm from"
-                 (type obj))))
+    :else (throw+ (error "Don't know how to promote to :uintm from"
+                         (type obj)))))
 
 
 (defn nary-dispatch
