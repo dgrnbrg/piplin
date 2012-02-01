@@ -1,4 +1,6 @@
-(ns piplin.types)
+(ns piplin.types
+  (:use [clojure.tools.macro :only [name-with-attributes]])
+  (:use [slingshot.slingshot :only [throw+ try+]]))
 
 (comment
 ;  TODO: email jim@dueys.net questions about monads
@@ -17,7 +19,7 @@
   (fn [type obj] (kindof type))
   :hierarchy types)
 
-(defrecord CompilerError [msg filename lineno])
+(defrecord CompilerError [msg])
 
 (defn derive-type
   [child parent]
@@ -32,7 +34,7 @@
 (defn error
   "Convenience function to define a compiler error"
   [& args]
-  (CompilerError. (apply print-str args) 0 0))
+  (CompilerError. (apply print-str args)))
 
 (defmethod promote :default
   [type obj]
@@ -44,47 +46,59 @@
   (or (isa-type? (class a) :error)
       (and (coll? a) (seq a) (every? error? a))))
 
-(defn unify-error-args
-  "Takes a function and produces 
-  a new function that returns a set of errors 
-  if any of the arguments were errors, and 
-  otherwise returns the result of invoking 
-  the function normally."
-  [f]
-  (fn [& args]
-      (if-let [errors (seq (filter error? args))]
-        (flatten errors)
-        (apply f args))))
+(defn try-error
+  "Evaluates a thunk. If it returns a value,
+  try-error returns that value. If it throws
+  an error, it adds it to the error coll and
+  returns nil."
+  [thunk error-coll]
+  (try+
+    (thunk)
+    (catch error? e
+      (swap! error-coll conj e))))
 
-(defn unify-error-results
-  "takes a function that returns a seq and
-  applies unify-error to the returned seq"
-  [f]
-  (fn [& args]
-    ((unify-error-args identity)
-       (apply f args))))
+(defmacro join-errors
+  "Takes a list of forms and evaluates them.
+  Any that throw errors will have the errors
+  caught and stored in a coll of all the thrown
+  errors. If nothing threw an error, returns
+  a seq of the values of the forms. If any
+  threw errors, rethrows the coll of errors."
+  [& args]
+  (let [error-coll (gensym "error-coll")
+        arg-thunks (map (fn [arg]
+                          `(try-error (fn [] ~arg)
+                                      ~error-coll))
+                        args)]
+    `(let [~error-coll (atom [])
+           args# [~@arg-thunks]
+           ec# (flatten @~error-coll)]
+       (if (seq ec#)
+         (throw+ ec#)
+         args#))))
 
-(defmacro let-safe
-  "Similar to let, but if any expression satisfies
-  the predicate error?, the let is short-circuited
-  and the error is returned"
-  ([bindings & body]
-   (if (> (count bindings) 2)
-     `(let-safe [~@(take 2 bindings)]
-                (let-safe [~@(drop 2 bindings)]
-                          ~@body))
-     (let [[vars expr] bindings]
-       `(let [result# ~expr]
-          (if-not (error? result#)
-            (let [~vars result#]
-              (do ~@body))
-            result#))))))
+(defmacro try-errors
+  "Executes the forms in an implicit do and
+  returns the result or errors."
+  [& forms]
+  `(try+
+     ~@forms
+     (catch error? ~'e
+       ~'e)))
 
-(def map-safe
-  ;"Does a map, but unifies errors."
-  (unify-error-results map))
+(defmacro defn-errors
+  "Like defn, but allows any number of the
+  argument to throw errors, using join-errors"
+  [name & args]
+  (let [[name [params & body]] (name-with-attributes
+                               name args)
+        param-sym (gensym "params")]
+    `(defmacro ~name [& ~param-sym]
+       `(apply (fn [~@'~params] ~@'~body)
+                           (join-errors
+                             ~@~param-sym)))))
 
-(defn type-unify
+(defn-errors type-unify
   "Takes a target kind and two other
   objects. Determines which of them is the
   target kind, then promotes the other
@@ -92,17 +106,16 @@
   objects if any errors occurred, or if
   any of the objects were errors"
   [target-kind a b]
-  ((unify-error-args
-     (fn [target-kind a b]
-       (cond
-         (= (:kind a) target-kind)
-         (let-safe [b (promote (:type a) b)]
-           (if-not (error? b)
-             [a b]
-             b))
-         (= (:kind b) target-kind)
-         (let-safe [[b a] (type-unify target-kind b a)]
-           [a b])
-         :else
-         (error "Neither" a "nor" b "is of kind" target-kind))))
-     target-kind a b))
+  (letfn [(type-unify [target-kind a b]
+            (cond
+              (= (:kind a) target-kind)
+              (let [b (promote (:type a) b)]
+                (if-not (error? b)
+                  [a b]
+                  b))
+              (= (:kind b) target-kind)
+              (let [[b a] (type-unify target-kind b a)]
+                [a b])
+              :else
+              (throw+ (error "Neither" a "nor" b "is of kind" target-kind))))]
+    (type-unify target-kind a b)))
