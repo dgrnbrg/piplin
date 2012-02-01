@@ -1,4 +1,5 @@
 (ns piplin.math
+  (:use [slingshot.slingshot :only [throw+]])
   (:use (piplin types)))
 
 (derive-type Long :j-long)
@@ -33,7 +34,7 @@
 (defn instance
   "Creates an instance of the type with value val"
   [type val & more]
-  (let-safe [val (if (some #{:constrain} more)
+  (let [val (if (some #{:constrain} more)
                    (constrain type val)
                    val)]
             (check
@@ -103,8 +104,8 @@
         multi-op (mangle-multi-op op)]
     `(do
        (defmulti ~multi-op nary-dispatch :hierarchy types)
-       (def ~op
-         (unify-error-args ~multi-op))
+       (defn-errors ~op [& ~'args]
+         (apply ~multi-op ~'args))
        (defmethod ~multi-op ::nullary [] ~zero)
        (defmethod ~multi-op ::n-ary
          [~'x ~'y & ~'more]
@@ -139,7 +140,7 @@
         impl-name (gensym (str (name op) (name k)))
         impl-body `(defn ~impl-name
                      [x# y#]
-                     (let-safe [[x# y#] (type-unify ~k x# y#)]
+                     (let [[x# y#] (type-unify ~k x# y#)]
                        (if (and (instance? Instance x#)
                                 (instance? Instance y#))
                          (instance (:type x#)
