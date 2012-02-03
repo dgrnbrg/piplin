@@ -1,7 +1,14 @@
 (ns piplin.test.modules
   (:use clojure.test)
   (:use [clojure.core.logic :only [== run fresh lvar]])
+  (:require [clojure.zip :as z])
   (:use piplin.modules))
+
+(deftest map-zipper-test
+  (let [mz (map-zipper (module [:inputs [:a 22]]
+                         (connect 2 22)))]
+    (is (= (entry :a 22)
+           (z/node (go-path-down mz [:inputs :a]))))))
 
 (deftest module-expansion
   (is (seq

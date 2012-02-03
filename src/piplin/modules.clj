@@ -1,6 +1,7 @@
 (ns piplin.modules
   (:use piplin.types)
-  (:use [slingshot.slingshot :only [throw+]]))
+  (:use [slingshot.slingshot :only [throw+]])
+  (:require [clojure.zip :as z]))
 
 (comment
   The syntax for a module is
@@ -132,3 +133,37 @@
    :kind :connection
    :args {:reg reg
           :expr expr}})
+
+(defn entry [k v]
+  (clojure.lang.MapEntry. k v))
+
+(defn map-zipper [root]
+  (z/zipper
+    #(map? (val %))
+    (fn [node]
+      (seq (val node)))
+    (fn [[nodekey nodemap] elts]
+      (throw (RuntimeException. "fuck"))
+      (entry
+        nodekey
+        (let [keys (map key elts)
+              elts (map val elts)]
+          (merge nodemap (zipmap keys elts)))))
+    (entry :root root)))
+
+(defn go-down
+  "Gets a key k from beneath the given
+  map-zipper node"
+  [mz k]
+  (loop [loc (z/down mz)]
+    (if (or (nil? loc)
+            (= (key (z/node loc)) k))
+      loc
+      (recur (z/right loc)))))
+
+(defn go-path-down
+  "Navigates a specific path from the current loc"
+  [mz path]
+  (if-let [path (seq path)]
+    (recur (go-down mz (first path)) (rest path))
+    mz))
