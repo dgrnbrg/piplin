@@ -1,4 +1,6 @@
-(ns piplin.modules)
+(ns piplin.modules
+  (:use piplin.types)
+  (:use [slingshot.slingshot :only [throw+]]))
 
 (comment
   The syntax for a module is
@@ -97,20 +99,33 @@
                                 :token '~token}])
                          (concat inputs registers))
               bindings (mapcat (fn [[x y]] 
-                              [(symbol (name x))
-                               y])
-                            (concat exprs modules))]
-          `{:type :module
-            :kind :module
-            :token '~token
-            :inputs ~inputs
-            :outputs ~outputs
-            :feedback ~feedback
-            :modules ~modules
-            :body (let [~@bindings]
-                    [~@body])})))))
+                                 [(symbol (name x))
+                                  y])
+                               (concat exprs modules))]
+          `(let [~@bindings
+                 connections# (atom [])]
+             (binding [connect (fn [~'reg ~'expr]
+                                 (swap! connections#
+                                        conj
+                                        (connect-impl
+                                          ~'reg
+                                         ~'expr)))]
 
-(defn connect
+               ~@body
+               {:type :module
+                :kind :module
+                :token '~token
+                :inputs ~inputs
+                :outputs ~outputs
+                :feedback ~feedback
+                :modules ~modules
+                :body @connections#})))))))
+
+(def ^:dynamic connect
+  (fn [reg expr]
+    (throw+ (error "Must call connect within a module"))))
+
+(defn connect-impl
   "This connects a register to an expr"
   [reg expr]
   {:type :connection

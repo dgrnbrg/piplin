@@ -15,8 +15,7 @@
                         quux 22]
                        :feedback
                        [bar "bar"]]
-                foo
-                quux
+                (connect quux foo)
                 bar)
               {:token token,
                :outputs {:baz 12 :quux 22},
@@ -26,17 +25,16 @@
                :type :module,
                :feedback {:bar "bar"},
                :body
-               [{:token token
-                 :port :foo
-                 :kind nil
-                 :type "foo"}
-                {:token token
-                 :port :quux
-                 :kind nil
-                 :type nil}
-                {:token token
-                 :kind nil
-                 :port :bar
-                 :type nil}]})))))
+               [{:type :connection
+                 :kind :connection
+                 :args {
+                        :reg {:token token
+                              :port :quux
+                              :kind nil
+                              :type nil}
+                        :expr {:token token
+                               :port :foo
+                               :kind nil
+                               :type "foo"}}}]})))))
   ;TODO: ensure error-checking works
   )
