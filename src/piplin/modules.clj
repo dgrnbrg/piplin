@@ -139,16 +139,18 @@
 
 (defn map-zipper [root]
   (z/zipper
-    #(map? (val %))
+    #(let [x (val %)]
+       (or (map? x) (vector? x)))
     (fn [node]
       (seq (val node)))
-    (fn [[nodekey nodemap] elts]
-      (throw (RuntimeException. "fuck"))
+    (fn [[nodekey nodemap :as node] elts]
       (entry
         nodekey
-        (let [keys (map key elts)
-              elts (map val elts)]
-          (merge nodemap (zipmap keys elts)))))
+        (if (map? node)
+          (let [keys (map key elts)
+                elts (map val elts)]
+            (merge nodemap (zipmap keys elts)))
+          (vector elts))))
     (entry :root root)))
 
 (defn go-down
