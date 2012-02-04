@@ -40,4 +40,17 @@
         "get reactor for cycle event")
     (is (= (set (map #(%) (:b reactors)))
            (set ["bar" "baz"]))
-        "combining reactors for same event")))
+        "combining reactors for same event"))
+  (is (thrown? AssertionError
+               (run-cycle
+                 2
+                 {:a 1 :b 2}
+                 {(fn [a b cycle]
+                    [{:c (+ a b)}
+                     {(inc cycle) [#(str "next")]
+                      :b [#(str "baz")]}])
+                  [:a :b :cycle]
+                  (fn [a]
+                    [{:a 22 :c -1}
+                     {:b [#(str "bar")]}])
+                  [:a]}))))
