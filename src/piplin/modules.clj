@@ -1,5 +1,5 @@
 (ns piplin.modules
-  (:use piplin.types)
+  (:use [piplin sim types])
   (:use [slingshot.slingshot :only [throw+]])
   (:require [clojure.zip :as z]))
 
@@ -174,15 +174,21 @@
                                (second children)))))
     root))
 
+(defn mz-val
+  "Gets a value from a mapentry zipper"
+  [loc]
+  (-> loc z/down z/right))
+
 (defn go-down
   "Gets a key k from beneath the given
   map-zipper node"
   [mz k]
   (loop [loc (z/down mz)]
-    (if (or (nil? loc)
-            (= (key (z/node loc)) k))
-      (-> loc z/down z/right) ;get val of entry
-      (recur (z/right loc)))))
+    (cond
+      (nil? loc) nil
+      ;get val of entry
+      (= (key (z/node loc)) k) (mz-val loc)
+      :else (recur (z/right loc)))))
 
 (defn go-path-down
   "Navigates a specific path from the current loc"
@@ -190,6 +196,52 @@
   (if-let [path (seq path)]
     (recur (go-down mz (first path)) (rest path))
     mz))
+
+(defn zipseq
+  "Given a node, returns a lazy seq of zippers
+  representing each node to the right (no descent)"
+  [mz]
+  (take-while (comp not nil?)
+              (iterate
+                z/right mz)))
+
+(defn walk-modules
+  "Takes a map-zipper of the ast and applies
+  the function combine as a reduce across the values
+  given by (visit module) for every module."
+  [mz visit combine]
+  (let [x (visit mz)]
+    (if-let [submodules (seq (z/node
+                               (go-down mz :modules)))]
+      (reduce combine x
+              (map (comp #(walk-modules % visit combine)
+                         mz-val)
+                   (zipseq (z/down (go-down mz :modules)))))
+      x)))
+
+(defn make-sim
+  "Takes an elaborated hierarchy of modules and returns a
+  pair of [state fns] that can be simulated with
+  exec-sim. See exec-sim for details."
+  [root]
+  (let [mz (map-zipper root)
+        get-qual-state (fn [module]
+                         (let [token (z/node (go-down module :token))
+                               regs (merge (z/node (go-down module :outputs))
+                                           (z/node (go-down module :feedback)))]
+                           (apply hash-map (mapcat (fn [[k v]]
+                                                     [[token k] v])
+                                                   regs))))
+        initial-state (walk-modules mz get-qual-state merge)]
+    initial-state))
+
+    ;first walk modules
+    ;use feedbacks and outputs to figure out initial state array
+    ;(drive) connections (formerly link) specify aliases between
+    ;  state elts. In the end, reprocess arglists to resolve names
+    ;exprs can be turned into fns w/ arglists
+
+
 
 (comment
   First make nested modules connect and information hiding
