@@ -1,123 +1,118 @@
 (ns piplin.sim)
 
-;TODO: still needs max cycle to run until
+(comment
+  A fn can be added to the schedule in K cycles or
+  when some state elt changes.
 
-(defn sim-elt [logic argnames fwd]
-  "Returns a new simulation element with a function logic "
-  "and inputs argnames and value-forwarder fwd"
-  {:dests []
-   :logic logic
-   :fwd-fn fwd
-   :inputs (zipmap argnames (repeat []))})
+  Sorted set of things that happen in K cycles to support
+  efficient addition of new events.
 
-(defn add-dest [se name dest]
-  "Adds [name dest] to the list of :dests in se"
-  (let [dests (:dests se)]
-    (assoc se :dests (conj dests [name dest]))))
+  Map to store state elts. When elts change, updates
+; are scheduled in the next cycle (enhancement: same cycle?).
 
-(defn add-input [sim-elt key val]
-  "Appends an input named key with value val to the sim-elt"
-  (let [input-key [:inputs key]
-        input-vec (get-in sim-elt input-key)]
-    (assoc-in sim-elt input-key (conj input-vec val))))
-
-(defn- map-vals [f m]
-  "takes a function of one argument and a map and returns a new map "
-  "with the same keys and whose values are the (f old-value)"
-  (reduce (fn [tmp-map old-entry]
-            (assoc tmp-map (key old-entry) (f (val old-entry))))
-          {}
-          m))
-
-(defn send-from [sim-elt val]
-  "Takes a sim-elt and a value, and sends the val to all of the sim-elt's "
-  "destinations. If a sim-elt is a pipeline stage, can be used to "
-  "initialize the stage"
-  (doseq [addr (:dests sim-elt)]
-    (apply (:fwd-fn sim-elt) val addr)))
-
-(defn process-sim-elt [sim-elt]
-  "takes a sim-elt and, if every input list has at least one element, "
-  "removes the head of each element, computes the result, and invokes "
-  "(fwd result name dest) for every destination. Returns the procesed "
-  "sim-elt."
-  (if (every? #(seq (val %)) (:inputs sim-elt)) ;all inputs are ready
-    (let [inputs (:inputs sim-elt)
-          inputs-first (map-vals first inputs)
-          inputs-rest (map-vals rest inputs)
-          result ((:logic sim-elt) inputs-first)]
-      (send-from sim-elt result)
-      (recur (assoc sim-elt :inputs inputs-rest)))
-    sim-elt))
-
-(defn add-input-process [sim-elt key val]
-  "Adds the value to the input named key for the sim-elt"
-  (process-sim-elt (add-input sim-elt key val)))
-
-(defn- agent-fwd [result name dest]
-  "fwd function for agents"
-  (send dest add-input-process name result))
+  A fn gets the state that it's dependent on as its input
+  and must return the new value of its state and a map from
+  events to the fns to run when they occur. This allows for
+  maximum flexibility to have purely combinational logic or
+  to have callbacks that send messages to other processes
+  and block on their response.
+  )
 
 (comment
-
-(def adder (sim-elt (fn [{x :x y :y}]
-                      (+ x y))
-                    [:x :y]
-                    nil))
-
-(defn mk-logger []
-                 (let [a (atom [])
-                       se (assoc (sim-elt #(swap! a conj (:a %)) [:a] nil)
-                                 :log-atom a)]
-                   se))
-
-(def logger (agent (mk-logger)))
-
-(def printer (sim-elt (fn [{a :a}]
-                        (println "printing result:" a "end result"))
-                      [:a]
-                      nil))
-
-(def p (agent (assoc printer :fwd-fn agent-fwd)))
-
-(let [agent-adder (assoc adder :fwd-fn agent-fwd)]
-  (def a1 (agent agent-adder))
-  (def a2 (agent agent-adder)))
-
-(send a1 add-dest :x a2)
-(send a2 add-dest :a p)
-
-(send a1 add-input-process :y 2)
-(send a2 add-input-process :y 7)
-
-(send a1 add-input-process :x 1)
-
-(def counter (agent (assoc adder :fwd-fn agent-fwd)))
-
-(defn mask [x] nil)
-
-(send counter add-dest :a logger)
-
-(mask (send counter add-dest :x counter))
-
-(await counter)
-
-(send-from @counter 0)
-
-(await counter)
-
-(pprint (map first (:dests @counter)))
-
-(dotimes [n 20] (send counter add-input-process :y 1))
-
-(use 'clojure.pprint)
-
-(await counter)
-
-(pprint (dissoc @counter :dests))
-
-(pprint (dissoc @logger :dests))
-
-(send p add-input-process :a "hello world")
-
+; init:
+  - cycle = 0
+  - next-state = apply initial-fns to initial-states
+  - generate events by (diff initial-states next-state)
+  - get fns by using those events + next cycle event on
+    the just-registered events
+; cycle:
+; - if cycle == last-cycle: exit
+  - next-state, new-events = apply fns state
+  - events = diff state next-state
+  - fns, old-events = schedule [cycle events] [new-events old-events]
+  - state = next-state
+  - cycle = cycle + 1
   )
+
+(defn- resolve-args
+  "Takes a map of state and a vector of keys and returns
+  a seq of the values from the map."
+  [cycle state keys]
+  (let [state (assoc state :cycle cycle)]
+    (map #(get state %) keys)))
+
+(defn run-cycle
+  "Takes a map from names to values of state elts
+  and a map from fns to vectors of the names of the
+  state elts that are their arguments.
+
+  Applies the argument to each fn, which must return
+  a map from the names of the state elts it wishes to
+  update to their new values. All the returned maps'
+  keysets must be disjoint. Each fn also returns a map
+  from cycle numbers and state names to fns to be run
+  when they're reached/changed, respectively."
+  [cycle state fns]
+  (let [fn-results (map #(apply (key %)
+                                (resolve-args
+                                  cycle
+                                  state
+                                  (val %)))
+                        fns)
+        delta-state (apply merge-with
+                           (fn [x y]
+                             (throw (AssertionError.
+                                      "nondisjoint")))
+                           (map first fn-results))
+        new-reactors (apply merge-with
+                            concat
+                            (map second fn-results))]
+    [delta-state new-reactors]))
+
+(defn what-changed
+  "Takes a complete state map and a delta state map to
+  apply to it. Computes the new state and returns it
+  along with a list of keys of which state elts changed."
+  [state delta-state]
+  (let [new-state (merge state delta-state)
+        changed-elts (->> delta-state
+                       (remove #(= (val %)
+                                      ((key %) state)))
+                       (apply concat)
+                       (apply hash-map))]
+    [new-state changed-elts]))
+
+(defn next-fns
+  "Takes a new cycle and list of events and a map of
+  reactors and returns the functions to be run next cycle
+  and the map of untriggered reactors"
+  [cycle events reactors]
+  (let [next-cycle-fns (get reactors cycle)
+        event-fns (apply merge (map #(get reactors %) events))
+        next-fns (merge event-fns next-cycle-fns)
+        unused (apply dissoc reactors cycle events)]
+    [next-fns unused]))
+
+(defn exec-sim
+  "
+  initial-state is a map from names to values of state elts.
+  
+  initial-fns is a map from fns to a vector of the names of
+  the state-elts they require (they will be applied to the
+  fn in the order they're declared).
+
+  max-cycle is the cycle to run until."
+
+  ;entry point
+  ([initial-state initial-fns max-cycle]
+   (exec-sim 0 initial-fns initial-state {}))
+
+  ([cycle fns state reactors max-cycle]
+   (let [[delta-state new-reactors] (run-cycle cycle state fns)
+         [state events] (what-changed state delta-state)
+         reactors (merge-with concat reactors new-reactors)
+         next-cycle (inc cycle)
+         [fns reactors] (next-fns next-cycle events reactors)]
+     (if (= next-cycle max-cycle)
+       state
+       (recur next-cycle fns state reactors max-cycle)))))
