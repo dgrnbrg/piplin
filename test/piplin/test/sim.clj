@@ -54,3 +54,10 @@
                     [{:a 22 :c -1}
                      {:b [#(str "bar")]}])
                   [:a]}))))
+
+(deftest exec-sim-test
+  (let [[counterfn arglist] (every-cycle (fn [x] (inc x))
+                             [:count]
+                             :count)]
+    (is (= (exec-sim {:count 0} {counterfn arglist} 10)
+           {:count 10}))))

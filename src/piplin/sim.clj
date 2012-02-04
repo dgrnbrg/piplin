@@ -105,14 +105,28 @@
 
   ;entry point
   ([initial-state initial-fns max-cycle]
-   (exec-sim 0 initial-fns initial-state {}))
+   (exec-sim 0 initial-fns initial-state {} max-cycle))
 
   ([cycle fns state reactors max-cycle]
    (let [[delta-state new-reactors] (run-cycle cycle state fns)
          [state events] (what-changed state delta-state)
          reactors (merge-with concat reactors new-reactors)
          next-cycle (inc cycle)
-         [fns reactors] (next-fns next-cycle events reactors)]
+         [fns reactors] (next-fns next-cycle (keys events) reactors)]
      (if (= next-cycle max-cycle)
        state
        (recur next-cycle fns state reactors max-cycle)))))
+
+(defn every-cycle
+  "Takes a function, vector of state names for the arguments,
+  and a state name for the return value and returns a pair
+  consisting of the function and the arglist for use with
+  exec-sim."
+  [f args return]
+  (let [fnargs (cons :cycle args)]
+    [(letfn [(every-cycle-fn
+               [cycle & args]
+               [{return (apply f args)}
+                {(inc cycle) {every-cycle-fn fnargs}}])]
+       every-cycle-fn)
+     fnargs]))
