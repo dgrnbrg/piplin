@@ -5,9 +5,13 @@
   (:use piplin.modules))
 
 (deftest map-zipper-test
-  (let [mz (map-zipper (module [:inputs [:a 22]]
-                         (connect 2 22)))]
+  (let [mz (map-zipper (module [:inputs [a 22]
+                                :feedback [b 3]]
+                         (connect b a))
+                       )]
     (is (= (entry :a 22)
+           (z/node (z/up (go-path-down mz [:inputs :a])))))
+    (is (= 22
            (z/node (go-path-down mz [:inputs :a]))))))
 
 (deftest module-expansion

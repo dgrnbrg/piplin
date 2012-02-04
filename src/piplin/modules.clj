@@ -103,14 +103,18 @@
                                  [(symbol (name x))
                                   y])
                                (concat exprs modules))]
+
           `(let [~@bindings
-                 connections# (atom [])]
+                 connections# (atom [])
+                 old-connect# connect]
              (binding [connect (fn [~'reg ~'expr]
-                                 (swap! connections#
-                                        conj
-                                        (connect-impl
-                                          ~'reg
-                                         ~'expr)))]
+                                 (if (= (:token ~'reg) '~token)
+                                   (swap! connections#
+                                          conj
+                                          (connect-impl
+                                            ~'reg
+                                            ~'expr))
+                                   (old-connect# ~'reg ~'expr)))]
 
                ~@body
                {:type :module
@@ -122,9 +126,12 @@
                 :modules ~modules
                 :body @connections#})))))))
 
-(def ^:dynamic connect
-  (fn [reg expr]
-    (throw+ (error "Must call connect within a module"))))
+(defn connect
+  {:dynamic true}
+  [reg expr]
+  (if (:token reg)
+    (throw+ (error "Must call connect within a module"))
+    (throw+ (error "Must connect to a register"))))
 
 (defn connect-impl
   "This connects a register to an expr"
@@ -137,21 +144,35 @@
 (defn entry [k v]
   (clojure.lang.MapEntry. k v))
 
-(defn map-zipper [root]
+(defn entry? [e]
+  (instance? clojure.lang.MapEntry e))
+
+(defn map-zipper
+  "The map-zipper is a nested structure
+  of vectors and maps. There are 4 kinds
+  of nodes: vectors, maps, mapentries, and
+  other objects. The former 3 have children.
+  MapEntry children "
+  [root]
   (z/zipper
-    #(let [x (val %)]
-       (or (map? x) (vector? x)))
-    (fn [node]
-      (seq (val node)))
-    (fn [[nodekey nodemap :as node] elts]
-      (entry
-        nodekey
-        (if (map? node)
-          (let [keys (map key elts)
-                elts (map val elts)]
-            (merge nodemap (zipmap keys elts)))
-          (vector elts))))
-    (entry :root root)))
+    #(or (map? %)
+         (vector? %)
+         (entry? %))
+    #(cond
+       (map? %) (seq %)
+       (vector? %) (seq %)
+       (entry? %) (seq %))
+    (fn [node children]
+      (cond
+        (map? node) (zipmap (map key children)
+                            (map val children))
+        (vector? node) (vec children)
+        (entry? node) (if-not (= (count children) 2)
+                        (throw (RuntimeException.
+                                 "MapEntry has 2 children"))
+                        (entry (first children)
+                               (second children)))))
+    root))
 
 (defn go-down
   "Gets a key k from beneath the given
@@ -160,7 +181,7 @@
   (loop [loc (z/down mz)]
     (if (or (nil? loc)
             (= (key (z/node loc)) k))
-      loc
+      (-> loc z/down z/right) ;get val of entry
       (recur (z/right loc)))))
 
 (defn go-path-down
@@ -169,3 +190,15 @@
   (if-let [path (seq path)]
     (recur (go-down mz (first path)) (rest path))
     mz))
+
+(comment
+  First make nested modules connect and information hiding
+  work properly. Next, add a semantic check to verify
+  that everything was connected.
+
+  At this point we can try for toVerilog, or we can start
+  on the simulator (cycle accurate, but can schedule in
+  any number of cycles, and that deferral is itself
+  dynamic). The simulator must work with a given protocol or
+  function or interace so that custom tasks can be written too.
+  )
