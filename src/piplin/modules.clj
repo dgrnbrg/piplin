@@ -55,6 +55,32 @@
 (defn explode [& msgs]
   (throw (RuntimeException. (apply str msgs))))
 
+(defn- parse-sections
+  "take a vector of pairs of bindings and their
+  headers (config) as well as a seq of acceptable headers.
+  Returns a map of the section header to nil if
+  undefined or to a map of keys to values of the
+  binding. Converts the binding keys to keywords."
+  ([config headers]
+   (parse-sections (partition 2 config) headers {}))
+  ([params headers result]
+   (if (seq params)
+     (let [[section decls] (first params)]
+       (if-not (vector? decls)
+         (explode "Decls must be a vector")
+         (let [keys (map keyword (take-nth 2 decls))
+               vals (take-nth 2 (rest decls))
+               decls (zipmap keys vals)]
+           ;check here that decls are in the correct form
+           (if-not (some #{section} headers)
+             (explode section " not found in " headers)
+             (if (contains? result section)
+               (explode "multiple definition of " section)
+               (recur (rest params)
+                      headers
+                      (assoc result section decls)))))))
+     result)))
+
 (defmacro module
   "module is the fundamental structural building block in Piplin.
   It returns an AST fragment that can be processed into a synthesizable
@@ -67,69 +93,47 @@
   [config & body]
   (if-not (even? (count config))
     (explode "Odd number of elements in module args."))
-  (let [params (partition 2 config)]
-    (loop [unparsed (vec params) inputs nil outputs nil feedback nil modules nil]
-      (if (seq unparsed)
-        (let [[section decls] (first unparsed)]
-          (if-not (vector? decls)
-            (explode "Decls must be a vector")
-            (let [keys (map keyword (take-nth 2 decls))
-                  vals (take-nth 2 (rest decls))
-                  decls (zipmap keys vals)]
-              ;check here that decls are in the correct form
-              (condp = section
-                :inputs (if inputs
-                          (explode "multiple definition of inputs" inputs)
-                          (recur (rest unparsed) decls outputs feedback modules))
-                :outputs (if outputs
-                           (explode "multiple definition of outputs")
-                           (recur (rest unparsed) inputs decls feedback modules))
-                :feedback (if feedback
-                            (explode "multiple definition of feedback")
-                            (recur (rest unparsed) inputs outputs decls modules))
-                :modules (if modules
-                           (explode "multiple definition of modules")
-                           (recur (rest unparsed) inputs outputs feedback decls))
-                (explode "unknown section header:" section)))))
-        (let [body body
-              token (gensym "module")
-              registers (map (fn [[x y]] [x `(:type ~y)])
-                             (concat outputs feedback))
-              exprs (map (fn [[x y]] 
-                           [x `(vary-meta
-                                 {:type ~y
-                                  :kind (:kind ~y)
-                                  :port ~x
-                                  :token '~token}
-                                 assoc :sim-factory
-                                 [#(get sim-fn-args ['~token ~x]) []])])
-                         (concat inputs registers))
-              bindings (mapcat (fn [[x y]] 
-                                 [(symbol (name x))
-                                  y])
-                               (concat exprs modules))]
+  (let [{:keys [inputs outputs feedback modules]}
+        (parse-sections config [:inputs :outputs :feedback :modules])]
+    (let [body body
+          token (gensym "module")
+          registers (map (fn [[x y]] [x `(:type ~y)])
+                         (concat outputs feedback))
+          exprs (map (fn [[x y]] 
+                       [x `(vary-meta
+                             {:type ~y
+                              :kind (:kind ~y)
+                              :port ~x
+                              :token '~token}
+                             assoc :sim-factory
+                             [#(get sim-fn-args ['~token ~x]) []])])
+                     (concat inputs registers))
+          bindings (mapcat (fn [[x y]] 
+                             [(symbol (name x))
+                              y])
+                           (concat exprs modules))]
 
-          `(let [~@bindings
-                 connections# (atom [])
-                 old-connect# connect]
-             (binding [connect (fn [~'reg ~'expr]
-                                 (if (= (:token ~'reg) '~token)
-                                   (swap! connections#
-                                          conj
-                                          (connect-impl
-                                            ~'reg
-                                            ~'expr))
-                                   (old-connect# ~'reg ~'expr)))]
+      `(let [~@bindings
+             connections# (atom [])
+             old-connect# connect]
+         (binding [connect (fn [~'reg ~'expr]
+                             (if (= (:token ~'reg) '~token)
+                               (swap! connections#
+                                      conj
+                                      (connect-impl
+                                        ~'reg
+                                        ~'expr))
+                               (old-connect# ~'reg ~'expr)))]
 
-               ~@body
-               {:type :module
-                :kind :module
-                :token '~token
-                :inputs ~inputs
-                :outputs ~outputs
-                :feedback ~feedback
-                :modules ~modules
-                :body @connections#})))))))
+           ~@body
+           {:type :module
+            :kind :module
+            :token '~token
+            :inputs ~inputs
+            :outputs ~outputs
+            :feedback ~feedback
+            :modules ~modules
+            :body @connections#})))))
 
 (defn connect
   {:dynamic true}
@@ -255,6 +259,18 @@
                      subexprs)))
       x)))
 
+(comment
+  How to get the combinational function for ports.
+
+  We find all ports and build the arglist.
+  The arglist is going to get used to fill in a map that'll
+  be set into a binding when the function is executed.
+  As the function is built, all termini will be const or
+  ports. The ports' access fn will read the value from
+  the binding.
+  
+  This is done by make-connection and make-sim-fn.)
+
 (defn make-sim-fn
   "Takes a map-zipper of the ast of an expr
   and walks along the expr. It returns a pair whose
@@ -330,15 +346,6 @@
     ;exprs can be turned into fns w/ arglists
 
 
-(comment
-  How to get the combinational function for ports.
-
-  We find all ports and build the arglist.
-  The arglist is going to get used to fill in a map that'll
-  be set into a binding when the function is executed.
-  As the function is built, all termini will be const or
-  ports. The ports' access fn will read the value from
-  the binding.)
 
 
 (comment
