@@ -66,7 +66,9 @@
         sim (make-sim mod)
         init-state (first sim)
         init-fns (ffirst (second sim))]
-    (is (= (get (exec-sim init-state init-fns 10)
+    (is (= (get (exec-sim init-state
+                          (apply hash-map init-fns)
+                          10)
                 [(:token mod) :c])
-           10)
+           (instance (uintm 8) 10))
         "ran and counted up to 10")))

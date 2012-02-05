@@ -77,7 +77,7 @@
   (let [new-state (merge state delta-state)
         changed-elts (->> delta-state
                        (remove #(= (val %)
-                                      ((key %) state)))
+                                      (get (key %) state)))
                        (apply concat)
                        (apply hash-map))]
     [new-state changed-elts]))

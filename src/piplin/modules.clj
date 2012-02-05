@@ -300,7 +300,7 @@
          (binding [sim-fn-args (zipmap ports vals)]
            (sim-fn)))
        ports
-       (z/node reg-state))]))
+       reg-state)]))
 
 (defn make-sim
   "Takes an elaborated hierarchy of modules and returns a
