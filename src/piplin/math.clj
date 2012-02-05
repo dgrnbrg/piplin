@@ -36,15 +36,16 @@
   [type val & more]
   (let [val (if (some #{:constrain} more)
               (constrain type val)
-              val)]
-    (check
-      (merge (Instance. type val)
-             {:type type
-              :kind (:kind type)
-              :sim-factory [#(apply instance
-                                    type
-                                    val
-                                    more) []]}))))
+              val)
+        inst (merge (Instance. type val)
+               {:type type
+                :kind (:kind type)})]
+    (vary-meta
+      (check inst)
+      assoc :sim-factory [#(apply instance
+                                      type
+                                      val
+                                      more) []])))
 
 (defrecord UIntM [n])
 (defn uintm [n]
@@ -154,11 +155,12 @@
                        (if (and (instance? Instance x#)
                                 (instance? Instance y#))
                          (f# x# y#)
-                         {:type (:type x#)
-                          :op ~unmangled-kw
-                          :sim-factory [~op [:lhs :rhs]]
-                          :args {:lhs x#
-                                 :rhs y#}})))
+                         (vary-meta
+                           {:type (:type x#)
+                            :op ~unmangled-kw
+                            :args {:lhs x#
+                                   :rhs y#}}
+                           assoc :sim-factory [~op [:lhs :rhs]]))))
         k-bases (map #(vector k %) bases)
         dispatches (concat k-bases
                            (map reverse k-bases)

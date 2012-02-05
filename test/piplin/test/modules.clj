@@ -41,12 +41,10 @@
                  :args {
                         :reg {:token token
                               :port :quux
-                              :sim-factory (lvar)
                               :kind nil
                               :type nil}
                         :expr {:token token
                                :port :foo
-                               :sim-factory (lvar)
                                :kind nil
                                :type "foo"}}}]})))))
   ;TODO: ensure error-checking works

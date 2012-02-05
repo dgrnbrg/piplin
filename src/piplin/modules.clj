@@ -96,11 +96,13 @@
               registers (map (fn [[x y]] [x `(:type ~y)])
                              (concat outputs feedback))
               exprs (map (fn [[x y]] 
-                           [x `{:type ~y
-                                :kind (:kind ~y)
-                                :port ~x
-                                :sim-factory [#(get sim-fn-args ['~token ~x]) []]
-                                :token '~token}])
+                           [x `(vary-meta
+                                 {:type ~y
+                                  :kind (:kind ~y)
+                                  :port ~x
+                                  :token '~token}
+                                 assoc :sim-factory
+                                 [#(get sim-fn-args ['~token ~x]) []])])
                          (concat inputs registers))
               bindings (mapcat (fn [[x y]] 
                                  [(symbol (name x))
@@ -263,8 +265,9 @@
   ports can get their values at the bottom."
   [mz]
   (let [[my-sim-fn my-args] (-> mz
-                              (go-down :sim-factory)
-                              z/node)]
+                              z/node
+                              meta
+                              :sim-factory)]
     (if-let [args (go-down mz :args)]
       (let [args (-> args z/down zipseq)
             arg-fns (map #(make-sim-fn (mz-val %)) args)
