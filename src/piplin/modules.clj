@@ -81,50 +81,82 @@
                       (assoc result section decls)))))))
      result)))
 
+(defn- make-port
+  "Takes a keyword name, an owning module token, and
+  a list which can be (eval)ed to get the port's type
+  and returns a list which can be (eval)ed to get
+  the port."
+  [name token type-syntax]
+  `(vary-meta
+     {:type ~type-syntax
+      :kind (:kind ~type-syntax)
+      :port ~name
+      :token '~token}
+     assoc :sim-factory
+     [#(get sim-fn-args ['~token ~name]) []]))
+
+(defn- tuplefn
+  "Takes a function of n arguments and an index <n
+  and returns a function of 1 argument that returns
+  the n-element tuple that was passed in with the
+  index element replaced by the return value of
+  applying the tuple to the given function."
+  [index f]
+  (fn [tuple]
+    (assoc tuple index (apply f tuple))))
+
+(defn make-connect-impl
+  "Takes a token of the module at hand and the symbol
+  that will be bound to the (atom []) of connections
+  that will be made and a symbol that will be bound to
+  the parent module's connect fn and returns the syntax
+  of the connect function that should be bound for
+  that module."
+  [token connections old-connect]
+  `(fn [~'reg ~'expr]
+    (if (= (:token ~'reg) '~token)
+      (swap! ~connections
+             conj
+             (connect-impl
+               ~'reg
+               ~'expr))
+      (~old-connect ~'reg ~'expr))))
+
 (defmacro module
-  "module is the fundamental structural building block in Piplin.
-  It returns an AST fragment that can be processed into a synthesizable
-  Verilog design or into a simulation. It has up to 4 declaration
-  sections: :inputs, :outputs, :feedback, and :modules. :inputs is
-  used to specify wires leading into this module. :outputs specify
-  registered outputs from this module. :feedback is similar to :outputs,
-  but they're only readable from within the module. :modules is for
+  "module is the fundamental structural building block
+  in Piplin. It returns an AST fragment that can be
+  processed into a synthesizable Verilog design or into
+  a simulation. It has up to 4 declaration sections:
+  :inputs, :outputs, :feedback, and :modules. :inputs
+  is used to specify wires leading into this module.
+  :outputs specify registered outputs from this module.
+  :feedback is similar to :outputs, but they're only
+  readable from within the module. :modules is for
   instantiating submodules in the final design."
   [config & body]
   (if-not (even? (count config))
     (explode "Odd number of elements in module args."))
   (let [{:keys [inputs outputs feedback modules]}
-        (parse-sections config [:inputs :outputs :feedback :modules])]
-    (let [body body
-          token (gensym "module")
-          registers (map (fn [[x y]] [x `(:type ~y)])
+        (parse-sections
+          config [:inputs :outputs :feedback :modules])]
+    (let [token (gensym "module")
+          connections (gensym "connections")
+          old-connect (gensym "old-connect")
+          registers (map (tuplefn 1
+                           #(identity `(:type ~%2)))
                          (concat outputs feedback))
-          exprs (map (fn [[x y]] 
-                       [x `(vary-meta
-                             {:type ~y
-                              :kind (:kind ~y)
-                              :port ~x
-                              :token '~token}
-                             assoc :sim-factory
-                             [#(get sim-fn-args ['~token ~x]) []])])
+          exprs (map (tuplefn 1
+                       #(make-port %1 token %2))
                      (concat inputs registers))
-          bindings (mapcat (fn [[x y]] 
-                             [(symbol (name x))
-                              y])
+          bindings (mapcat (tuplefn 0
+                             (fn [x y] (symbol (name x))))
                            (concat exprs modules))]
-
       `(let [~@bindings
-             connections# (atom [])
-             old-connect# connect]
-         (binding [connect (fn [~'reg ~'expr]
-                             (if (= (:token ~'reg) '~token)
-                               (swap! connections#
-                                      conj
-                                      (connect-impl
-                                        ~'reg
-                                        ~'expr))
-                               (old-connect# ~'reg ~'expr)))]
-
+             ~connections (atom [])
+             ~old-connect connect]
+         (binding [connect ~(make-connect-impl
+                              token connections
+                              old-connect)]
            ~@body
            {:type :module
             :kind :module
@@ -133,7 +165,7 @@
             :outputs ~outputs
             :feedback ~feedback
             :modules ~modules
-            :body @connections#})))))
+            :body @~connections})))))
 
 (defn connect
   {:dynamic true}
