@@ -1,5 +1,5 @@
 (ns piplin.test.sim
-  (:use piplin.sim)
+  (:use [piplin sim modules math])
   (:use clojure.test))
 
 (deftest what-changed-test
@@ -60,4 +60,13 @@
                              [:count]
                              :count)]
     (is (= (exec-sim {:count 0} {counterfn arglist} 10)
-           {:count 10}))))
+           {:count 10})))
+  (let [mod (module [:outputs [c (instance (uintm 8) 0)]]
+                        (connect c (+ c 1)))
+        sim (make-sim mod)
+        init-state (first sim)
+        init-fns (ffirst (second sim))]
+    (is (= (get (exec-sim init-state init-fns 10)
+                [(:token mod) :c])
+           10)
+        "ran and counted up to 10")))

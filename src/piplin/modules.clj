@@ -242,6 +242,17 @@
                    (zipseq (z/down (go-down mz :body))))))
     combine))
 
+(defn walk-expr
+  [exprz visit combine]
+  (let [x (visit exprz)]
+    (if-let [argsz (go-down exprz :args)]
+      (let [subexprs (-> argsz z/down zipseq)]
+        (reduce combine x
+                (map (comp #(walk-expr % visit combine)
+                           mz-val)
+                     subexprs)))
+      x)))
+
 (defn make-sim-fn
   "Takes a map-zipper of the ast of an expr
   and walks along the expr. It returns a pair whose
@@ -267,6 +278,30 @@
           (throw (AssertionError. (str "lol" my-args)))
           (fn [] (my-sim-fn))))))
 
+(defn make-connection
+  "Takes a map-zipper of the ast of a connection
+  and returns a pair of [f states]. f is a function
+  that takes the needed ports as arguments (listed in
+  states), binds them to the sim-fn-arg binding, and
+  invokes the no-arg sim-fn to get the result."
+  [mz]
+  (let [reg (z/node (go-path-down mz [:args :reg]))
+        expr (go-path-down mz [:args :expr])
+        sim-fn (make-sim-fn expr)
+        reg-state [(:token reg) (:port reg)]
+        ports (walk-expr mz
+                         #(let [n (z/node %)]
+                            (if-let [port (:port n)]
+                              [[(:token n) port]]
+                              nil))
+                         concat)]
+    [(every-cycle
+       (fn [& vals]
+         (binding [sim-fn-args (zipmap ports vals)]
+           (sim-fn)))
+       ports
+       (z/node reg-state))]))
+
 (defn make-sim
   "Takes an elaborated hierarchy of modules and returns a
   pair of [state fns] that can be simulated with
@@ -281,8 +316,8 @@
                                                      [[token k] v])
                                                    regs))))
         initial-state (walk-modules mz get-qual-state merge)
-        initial-connections (walk-connects mz z/node concat)]
-    initial-connections))
+        connections (walk-connects mz make-connection concat)]
+    [initial-state connections]))
 
     ;first walk modules
     ;use feedbacks and outputs to figure out initial state array
