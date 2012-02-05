@@ -298,12 +298,12 @@
                               [[(:token n) port]]
                               nil))
                          concat)]
-    [(every-cycle
+    (every-cycle
        (fn [& vals]
          (binding [sim-fn-args (zipmap ports vals)]
            (sim-fn)))
        ports
-       reg-state)]))
+       reg-state)))
 
 (defn make-sim
   "Takes an elaborated hierarchy of modules and returns a
@@ -319,7 +319,8 @@
                                                      [[token k] v])
                                                    regs))))
         initial-state (walk-modules mz get-qual-state merge)
-        connections (walk-connects mz make-connection concat)]
+        connections (walk-connects mz make-connection concat)
+        connections (->> connections (apply concat) (apply hash-map))]
     [initial-state connections]))
 
     ;first walk modules

@@ -57,18 +57,34 @@
 
 (deftest exec-sim-test
   (let [[counterfn arglist] (every-cycle (fn [x] (inc x))
-                             [:count]
-                             :count)]
+                                         [:count]
+                                         :count)]
     (is (= (exec-sim {:count 0} {counterfn arglist} 10)
            {:count 10})))
   (let [mod (module [:outputs [c (instance (uintm 8) 0)]]
-                        (connect c (+ c 1)))
+                    (connect c (+ c 1)))
         sim (make-sim mod)
         init-state (first sim)
-        init-fns (ffirst (second sim))]
+        init-fns (second sim)]
     (is (= (get (exec-sim init-state
-                          (apply hash-map init-fns)
+                          init-fns
                           10)
                 [(:token mod) :c])
            (instance (uintm 8) 10))
-        "ran and counted up to 10")))
+        "ran and counted up to 10"))
+  (let [mod (module [:outputs [c (instance (uintm 4) 0)]
+                     :modules [sub (module [:outputs [x (instance (uintm 4) 1)]]
+                                           (connect x (+ x 2)))]]
+                    (connect c (+ c 1)))
+        sim (make-sim mod)
+        state (first sim)
+        fns (second sim)
+        u4 #(instance (uintm 4) %)]
+    (is (= (reduce #(apply assoc %1 %2) {}
+                   (map (fn [[k v]] [(second k) v])
+                        (select-keys (exec-sim state fns 7)
+                                     [[(:token mod) :c]
+                                      [(:token (get-in mod [:modules :sub])) :x]])))
+           {:c (u4 7) :x (u4 15)}))))
+           
+
