@@ -50,8 +50,6 @@
   to be exprs that should be walked and checked.
   )
 
-(def ^:dynamic sim-fn-args {})
-
 (defn explode [& msgs]
   (throw (RuntimeException. (apply str msgs))))
 
@@ -322,12 +320,14 @@
             arg-map (zipmap (map (comp z/node mz-key)
                                  args)
                             arg-fns)
-            fn-vec (map #(get arg-map % ) my-args)]
+            fn-vec (map #(get arg-map %) my-args)]
         (fn []
           (apply my-sim-fn (map #(%) fn-vec))))
         (if (seq my-args)
           (throw (AssertionError. (str "lol" my-args)))
           (fn [] (my-sim-fn))))))
+
+(def ^:dynamic sim-fn-args {})
 
 (defn make-connection
   "Takes a map-zipper of the ast of a connection
@@ -353,43 +353,48 @@
        ports
        reg-state)))
 
+(defn- get-qual-state
+  "This function takes a module and returns a
+  map whose keys are [token port] pairs (token
+  is a gensym unique to the module instance and
+  port is a keyword) and whose values are the
+  initial values of the registers of the module
+  (from the :feedback and :outputs sections).
+  This state can be used by the simulation
+  engine."
+  [module]
+  (let [token (z/node (go-down module :token))
+        regs (merge (z/node (go-down module :outputs))
+                    (z/node (go-down module :feedback)))]
+    (apply hash-map (mapcat (fn [[k v]]
+                              [[token k] v])
+                            regs))))
+
 (defn make-sim
   "Takes an elaborated hierarchy of modules and returns a
   pair of [state fns] that can be simulated with
   exec-sim. See exec-sim for details."
   [root]
   (let [mz (map-zipper root)
-        get-qual-state (fn [module]
-                         (let [token (z/node (go-down module :token))
-                               regs (merge (z/node (go-down module :outputs))
-                                           (z/node (go-down module :feedback)))]
-                           (apply hash-map (mapcat (fn [[k v]]
-                                                     [[token k] v])
-                                                   regs))))
-        initial-state (walk-modules mz get-qual-state merge)
-        connections (walk-connects mz make-connection concat)
-        connections (->> connections (apply concat) (apply hash-map))]
+        initial-state (walk-modules mz get-qual-state
+                                    merge)
+        connections (walk-connects mz make-connection
+                                   concat)
+        connections (->> connections
+                      (apply concat)
+                      (apply hash-map))]
     [initial-state connections]))
-
-    ;first walk modules
-    ;use feedbacks and outputs to figure out initial state array
-    ;(drive) connections (formerly link) specify aliases between
-    ;  state elts. In the end, reprocess arglists to resolve names
-    ;exprs can be turned into fns w/ arglists
-
-
-
 
 (comment
   First make nested modules connect and information hiding
   work properly. Next, add a semantic check to verify
-  that everything was connected. This should involve several
-  semantic checks and useful errors.
+  that everything was connected. This should involve
+  several semantic checks and useful errors.
 
   Next, I must write more functions, like inc, dec, slice,
   bits, concat, and the bits type. I'll also need to write
 ; if/mux and case.
 
-  At this point we can either try for toVerilog or implement
-  structs or vectors, including pattern matching aka
-  destructuring. )
+  At this point we can either try for toVerilog or
+  implement structs or vectors, including pattern
+  matching aka destructuring. )
