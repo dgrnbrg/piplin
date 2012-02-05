@@ -213,7 +213,7 @@
   [mz]
   (take-while (comp not nil?)
               (iterate
-                z/right mz)))
+                z/right (z/down mz))))
 
 (defn walk-modules
   "Takes a map-zipper of the ast and applies
@@ -226,7 +226,7 @@
       (reduce combine x
               (map (comp #(walk-modules % visit combine)
                          mz-val)
-                   (zipseq (z/down (go-down mz :modules)))))
+                   (zipseq (go-down mz :modules))))
       x)))
 
 (defn walk-connects
@@ -241,14 +241,14 @@
       (map visit
            (filter #(= (-> % z/node :type)
                        :connection)
-                   (zipseq (z/down (go-down mz :body))))))
+                   (zipseq (go-down mz :body)))))
     combine))
 
 (defn walk-expr
   [exprz visit combine]
   (let [x (visit exprz)]
     (if-let [argsz (go-down exprz :args)]
-      (let [subexprs (-> argsz z/down zipseq)]
+      (let [subexprs (zipseq argsz)]
         (reduce combine x
                 (map (comp #(walk-expr % visit combine)
                            mz-val)
@@ -269,7 +269,7 @@
                               meta
                               :sim-factory)]
     (if-let [args (go-down mz :args)]
-      (let [args (-> args z/down zipseq)
+      (let [args (zipseq args)
             arg-fns (map #(make-sim-fn (mz-val %)) args)
             arg-map (zipmap (map (comp z/node mz-key)
                                  args)
