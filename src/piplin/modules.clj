@@ -219,6 +219,21 @@
                    (zipseq (z/down (go-down mz :modules)))))
       x)))
 
+(defn walk-connects
+  "Takes a map-zipper of the ast and applies
+  the function combine as a reduce operation
+  across the values given by (visit connect)
+  for every connection in every module"
+  [mz visit combine]
+  (walk-modules
+    mz
+    (fn [mz]
+      (map visit
+           (filter #(= (-> % z/node :type)
+                       :connection)
+                   (zipseq (z/down (go-down mz :body))))))
+    combine))
+
 (defn make-sim
   "Takes an elaborated hierarchy of modules and returns a
   pair of [state fns] that can be simulated with
@@ -232,8 +247,9 @@
                            (apply hash-map (mapcat (fn [[k v]]
                                                      [[token k] v])
                                                    regs))))
-        initial-state (walk-modules mz get-qual-state merge)]
-    initial-state))
+        initial-state (walk-modules mz get-qual-state merge)
+        initial-connections (walk-connects mz z/node concat)]
+    initial-connections))
 
     ;first walk modules
     ;use feedbacks and outputs to figure out initial state array
