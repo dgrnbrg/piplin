@@ -87,7 +87,6 @@
   [name token type-syntax]
   `(vary-meta
      {:type ~type-syntax
-      :kind (:kind ~type-syntax)
       :port ~name
       :token '~token}
      assoc :sim-factory
@@ -157,7 +156,6 @@
                               old-connect)]
            ~@body
            {:type :module
-            :kind :module
             :token '~token
             :inputs ~inputs
             :outputs ~outputs
@@ -176,7 +174,6 @@
   "This connects a register to an expr"
   [reg expr]
   {:type :connection
-   :kind :connection
    :args {:reg reg
           :expr expr}})
 

@@ -32,20 +32,16 @@
                :outputs {:baz 12 :quux 22},
                :inputs {:foo "foo"},
                :modules nil,
-               :kind :module,
                :type :module,
                :feedback {:bar "bar"},
                :body
                [{:type :connection
-                 :kind :connection
                  :args {
                         :reg {:token token
                               :port :quux
-                              :kind nil
                               :type nil}
                         :expr {:token token
                                :port :foo
-                               :kind nil
                                :type "foo"}}}]})))))
   ;TODO: ensure error-checking works
   )

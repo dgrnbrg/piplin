@@ -13,7 +13,7 @@
 (defmulti constrain
   "Takes a type and a value and constrains the value to
   the type's range."
-  (fn [type val] (kindof type))
+  (fn [type val] (:kind type))
   :hierarchy types)
 
 (defmethod constrain
@@ -38,8 +38,7 @@
               (constrain type val)
               val)
         inst (merge (Instance. type val)
-               {:type type
-                :kind (:kind type)})]
+               {:type type})]
     (vary-meta
       (check inst)
       assoc :sim-factory [#(apply instance
@@ -80,7 +79,7 @@
   [this obj]
   (cond
     (= (:type obj) this) obj ;Already correct
-    (= (:kind obj)
+    (= (kindof obj)
        (:kind this)) (throw+ (error
                                "Incompatible type instances: " this
                                "and" (type obj)))
@@ -133,6 +132,29 @@
 (defbinop bit-or 0)
 (defbinop bit-xor 0)
 
+(defn- make-binop-impl-fn
+  "Takes a kind, fntail, and an symbol for the op
+  and returns a function which should be invoked
+  with 2 arguments of the appropriate kind, and
+  it will evaluate them if the arguments are
+  immediate and it will return an AST expr if one
+  or more of the arguments aren't immediates."
+  [op unmangled-kw impl-name k fntail]
+  `(defn ~impl-name
+     [x# y#]
+     (let [[x# y#] (type-unify ~k x# y#)]
+       (if (and (instance? Instance x#)
+                (instance? Instance y#))
+         (instance (:type x#)
+                   ((fn ~@fntail) x# y#)
+                   :constrain)
+         (vary-meta
+           {:type (:type x#)
+            :op ~unmangled-kw
+            :args {:lhs x#
+                   :rhs y#}}
+           assoc :sim-factory [~op [:lhs :rhs]])))))
+
 (defmacro defbinopimpl
   "Defines implementation of a binop on a piplin kind.
   Requires the kind to attempt to unify to, the list
@@ -141,26 +163,11 @@
   The implementation will return an error if the
   unification failed."
   [op k bases & fntail]
-  (let [unmangled-op op
-        unmangled-kw (keyword (name unmangled-op))
+  (let [unmangled-kw (keyword (name op))
         op (mangle-multi-op op)
         impl-name (gensym (str (name op) (name k)))
-        impl-body `(defn ~impl-name
-                     [x# y#]
-                     (let [[x# y#] (type-unify ~k x# y#)
-                           f# (fn [~'x ~'y]
-                               (instance (:type ~'x)
-                                         ((fn ~@fntail) ~'x ~'y)
-                                         :constrain))]
-                       (if (and (instance? Instance x#)
-                                (instance? Instance y#))
-                         (f# x# y#)
-                         (vary-meta
-                           {:type (:type x#)
-                            :op ~unmangled-kw
-                            :args {:lhs x#
-                                   :rhs y#}}
-                           assoc :sim-factory [~op [:lhs :rhs]]))))
+        impl-body (make-binop-impl-fn op unmangled-kw
+                                      impl-name k fntail)
         k-bases (map #(vector k %) bases)
         dispatches (concat k-bases
                            (map reverse k-bases)

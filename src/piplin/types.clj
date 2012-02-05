@@ -9,14 +9,14 @@
 (def types (atom (make-hierarchy)))
 
 (defn kindof [a]
-  (or (:kind a) (class a)))
+  (or (get-in a [:type :kind]) (class a)))
 
 (defmulti promote
   "Produces an instance of the given
   obj with the type changed. Takes
   a type instance and an object to be
   casted."
-  (fn [type obj] (kindof type))
+  (fn [type obj] (:kind type))
   :hierarchy types)
 
 (defrecord CompilerError [msg])
@@ -99,10 +99,10 @@
   [target-kind a b]
   (letfn [(type-unify [target-kind a b]
             (cond
-              (= (:kind a) target-kind)
+              (= (kindof a) target-kind)
               (let [b (promote (:type a) b)]
                 [a b])
-              (= (:kind b) target-kind)
+              (= (kindof b) target-kind)
               (let [[b a] (type-unify target-kind b a)]
                 [a b])
               :else
