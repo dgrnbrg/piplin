@@ -344,11 +344,13 @@
 (comment
   First make nested modules connect and information hiding
   work properly. Next, add a semantic check to verify
-  that everything was connected.
+  that everything was connected. This should involve several
+  semantic checks and useful errors.
 
-  At this point we can try for toVerilog, or we can start
-  on the simulator (cycle accurate, but can schedule in
-  any number of cycles, and that deferral is itself
-  dynamic). The simulator must work with a given protocol or
-  function or interace so that custom tasks can be written too.
-  )
+  Next, I must write more functions, like inc, dec, slice,
+  bits, concat, and the bits type. I'll also need to write
+; if/mux and case.
+
+  At this point we can either try for toVerilog or implement
+  structs or vectors, including pattern matching aka
+  destructuring. )

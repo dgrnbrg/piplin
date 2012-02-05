@@ -71,7 +71,13 @@
                           10)
                 [(:token mod) :c])
            (instance (uintm 8) 10))
-        "ran and counted up to 10"))
+        "ran and counted up to 10")
+    (is (= (get (exec-sim init-state
+                          init-fns
+                          257)
+                [(:token mod) :c])
+           (instance (uintm 8) 1))
+        "ran and counted up to 257/1 (numeric type must work)"))
   (let [mod (module [:outputs [c (instance (uintm 4) 0)]
                      :modules [sub (module [:outputs [x (instance (uintm 4) 1)]]
                                            (connect x (+ x 2)))]]
