@@ -39,7 +39,12 @@
               val)]
     (check
       (merge (Instance. type val)
-             {:type type :kind (:kind type)}))))
+             {:type type
+              :kind (:kind type)
+              :sim-factory [#(apply instance
+                                    type
+                                    val
+                                    more) []]}))))
 
 (defrecord UIntM [n])
 (defn uintm [n]
@@ -135,19 +140,23 @@
   The implementation will return an error if the
   unification failed."
   [op k bases & fntail]
-  (let [unmangled-kw (keyword (name op))
+  (let [unmangled-op op
+        unmangled-kw (keyword (name unmangled-op))
         op (mangle-multi-op op)
         impl-name (gensym (str (name op) (name k)))
         impl-body `(defn ~impl-name
                      [x# y#]
-                     (let [[x# y#] (type-unify ~k x# y#)]
+                     (let [[x# y#] (type-unify ~k x# y#)
+                           f# (fn [~'x ~'y]
+                               (instance (:type ~'x)
+                                         ((fn ~@fntail) ~'x ~'y)
+                                         :constrain))]
                        (if (and (instance? Instance x#)
                                 (instance? Instance y#))
-                         (instance (:type x#)
-                                   ((fn ~@fntail) x# y#)
-                                   :constrain)
+                         (f# x# y#)
                          {:type (:type x#)
                           :op ~unmangled-kw
+                          :sim-factory [~op [:lhs :rhs]]
                           :args {:lhs x#
                                  :rhs y#}})))
         k-bases (map #(vector k %) bases)
@@ -186,6 +195,14 @@
 (defbinopimpl bit-xor :uintm [:j-long]
   [x y]
   (bit-xor (:val x) (:val y)))
+
+(comment
+  How to get the combinational function for ops.
+
+  We have an op & args, and we need to look up
+  the function that does this thing and the way
+  to bind the args. Then we recur on the args.
+  )
 
 ;successfully blocked
 ;(+ ((uintm 3) 3) ((uintm 4) 3))

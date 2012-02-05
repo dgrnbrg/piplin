@@ -50,6 +50,8 @@
   to be exprs that should be walked and checked.
   )
 
+(def ^:dynamic sim-fn-args {})
+
 (defn explode [& msgs]
   (throw (RuntimeException. (apply str msgs))))
 
@@ -97,6 +99,7 @@
                            [x `{:type ~y
                                 :kind (:kind ~y)
                                 :port ~x
+                                :sim-factory [#(get sim-fn-args ['~token ~x]) []]
                                 :token '~token}])
                          (concat inputs registers))
               bindings (mapcat (fn [[x y]] 
@@ -174,6 +177,11 @@
                                (second children)))))
     root))
 
+(defn mz-key
+  "Gets a key from a mapentry zipper"
+  [loc]
+  (-> loc z/down))
+
 (defn mz-val
   "Gets a value from a mapentry zipper"
   [loc]
@@ -234,6 +242,31 @@
                    (zipseq (z/down (go-down mz :body))))))
     combine))
 
+(defn make-sim-fn
+  "Takes a map-zipper of the ast of an expr
+  and walks along the expr. It returns a pair whose
+  first element is a function that computes the expr
+  and takes no args (needed ports come via binding).
+  The function collects its args into a map which it
+  binds before invoking the function so that the
+  ports can get their values at the bottom."
+  [mz]
+  (let [[my-sim-fn my-args] (-> mz
+                              (go-down :sim-factory)
+                              z/node)]
+    (if-let [args (go-down mz :args)]
+      (let [args (-> args z/down zipseq)
+            arg-fns (map #(make-sim-fn (mz-val %)) args)
+            arg-map (zipmap (map (comp z/node mz-key)
+                                 args)
+                            arg-fns)
+            fn-vec (map #(get arg-map % ) my-args)]
+        (fn []
+          (apply my-sim-fn (map #(%) fn-vec))))
+        (if (seq my-args)
+          (throw (AssertionError. (str "lol" my-args)))
+          (fn [] (my-sim-fn))))))
+
 (defn make-sim
   "Takes an elaborated hierarchy of modules and returns a
   pair of [state fns] that can be simulated with
@@ -257,6 +290,16 @@
     ;  state elts. In the end, reprocess arglists to resolve names
     ;exprs can be turned into fns w/ arglists
 
+
+(comment
+  How to get the combinational function for ports.
+
+  We find all ports and build the arglist.
+  The arglist is going to get used to fill in a map that'll
+  be set into a binding when the function is executed.
+  As the function is built, all termini will be const or
+  ports. The ports' access fn will read the value from
+  the binding.)
 
 
 (comment
