@@ -29,11 +29,19 @@
     (is (= (try-errors (+ (throw+ e) 0)) [e]))
     (is (= (try-errors (+ (throw+ e) (throw+ e))) [e e]))))
 
+(deftest bits-test
+  (let [b8 #(instance (bits 8) (long-to-bitvec % 8))]
+    (is (= (:val (b8 0xa0)) [1 0 1 0 0 0 0 0]))
+    (is (= (:val (bit-cat (b8 0xa0) (bit-cat (b8 0xfe))))
+           [1 0 1 0 0 0 0 0 1 1 1 1 1 1 1 0]))
+    (is (= (:val (bit-slice (bit-cat (b8 0xf) (b8 0xf0)) 4 12)
+                 [1 1 1 1 1 1 1 1])))))
+
 (deftest sim-uintm-bits-test
   (let [mod (module [:outputs [c (instance (uintm 8) 0)
                                d (instance (bits 8) 0)]]
                     (connect c (+ c 1))
-                    (connect d (slice (get-bits c) 0 4)))
+                    (connect d (bit-slice (get-bits c) 0 4)))
         sim (make-sim mod)
         init-state (first sim)
         init-fns (second sim)]

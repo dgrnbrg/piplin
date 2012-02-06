@@ -101,15 +101,28 @@
 (defn- mangle-multi-op [op]
   (symbol (str (name op) "multi")))
 
+(defn- make-core-binop-fn
+  "Makes syntax for a binop using the core
+  implementation for a given hierarchy key"
+  [multi-op core-op key]
+  `(defmethod ~multi-op [~key ~key]
+     [~'x ~'y]
+     (~core-op ~'x ~'y)))
+
 (defmacro defbinop
   "Defines a generic function for a binary operation
   on numeric types. Uses the function in clojure/core
   to provide implementations for Numbers. Handles
   nullary and n-ary invocations by returning zero and
-  the left-associative folds, respectively."
-  [op zero]
+  the left-associative folds, respectively. Existing-types
+  is a vector of hierarchy elements whose implementations
+  in clojure.core should be integrated."
+  [op zero existing-types]
   (let [core-op (gensym (str (name op) "core"))
-        multi-op (mangle-multi-op op)]
+        multi-op (mangle-multi-op op)
+        core-methods (map #(make-core-binop-fn
+                             multi-op core-op %)
+                          existing-types)]
     `(do
        (defmulti ~multi-op nary-dispatch :hierarchy types)
        (defn-errors ~op [& ~'args]
@@ -121,19 +134,14 @@
            (recur (~multi-op ~'x ~'y) (first ~'more) (next ~'more))
            (~multi-op ~'x ~'y)))
        (def ~core-op (ns-resolve 'clojure.core '~op))
-       (defmethod ~multi-op [:number :number]
-         [~'x ~'y]
-         (~core-op ~'x ~'y))
-       (defmethod ~multi-op [:j-long :j-long]
-         [~'x ~'y]
-         (~core-op ~'x ~'y)))))
+       ~@core-methods)))
 
-(defbinop + 0)
-(defbinop - 0)
-(defbinop * 0)
-(defbinop bit-and 0)
-(defbinop bit-or 0)
-(defbinop bit-xor 0)
+(defbinop + 0 [:j-long])
+(defbinop - 0 [:j-long])
+(defbinop * 0 [:j-long])
+(defbinop bit-and 0 [:j-long])
+(defbinop bit-or 0 [:j-long])
+(defbinop bit-xor 0 [:j-long])
 
 (defn- make-binop-impl-fn
   "Takes a kind, fntail, and an symbol for the op
@@ -277,7 +285,7 @@
                      vec))))
 
 ;This might not need to be defn-errors
-(defn slice
+(defn bit-slice
   "Takes an expr of type bits and returns a subrange
   of the bits."
   [expr low high]
@@ -293,6 +301,22 @@
            :high high
            :args {:expr expr}}
           assoc :sim-factory [#(slice-impl % low high) [:expr]])))))
+
+(defn bit-cat
+  "Takes any number of bits and returns them concatenated"
+  ([]
+   (instance (bits 0) []))
+  ([bs]
+   bs)
+  ([b1 b2]
+   (instance (bits (+ (get-in b1 [:type :n])
+                      (get-in b2 [:type :n])))
+             (vec (concat (:val b1) (:val b2)))))
+  ([b1 b2 & more]
+   (if more
+     (recur (bit-cat b1 b2) (first more) (next more))
+     (bit-cat b1 b2))))
+
 
 (comment
   How to get the combinational function for ops.
