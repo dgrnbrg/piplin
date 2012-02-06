@@ -27,7 +27,8 @@
     (is (= (try-errors (+ 0 1 2 3 (throw+ e))) [e]))
     (is (= (try-errors (+ 0 1 (throw+ e) 3 (throw+ e))) [e e]))
     (is (= (try-errors (+ (throw+ e) 0)) [e]))
-    (is (= (try-errors (+ (throw+ e) (throw+ e))) [e e]))))
+    (is (= (try-errors (+ (throw+ e) (throw+ e))) [e e]))
+    (is (= (try-errors (bit-cat (throw+ e) (throw+ e))) [e e]))))
 
 (deftest bits-test
   (let [b8 #(instance (bits 8) (long-to-bitvec % 8))]

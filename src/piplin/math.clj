@@ -143,6 +143,16 @@
 (defbinop bit-or 0 [:j-long])
 (defbinop bit-xor 0 [:j-long])
 
+(defn inc
+  "Increments x"
+  [x]
+  (+ x 1))
+
+(defn dec
+  "Decrements x"
+  [x]
+  (- x 1))
+
 (defn- make-binop-impl-fn
   "Takes a kind, fntail, and an symbol for the op
   and returns a function which should be invoked
@@ -216,14 +226,37 @@
   [x y]
   (bit-xor (:val x) (:val y)))
 
+(defn long-to-bitvec
+  "Takes a long and returns a bitvec with the first n bits"
+  [l n]
+  (->> (iterate #(bit-shift-right % 1) l)
+    (map #(bit-and 1 %))
+    (take n)
+    reverse
+    (apply vector-of :byte)))
+
+(defn bitvec-to-long
+  "Takes a bitvec and returns a long"
+  [bv]
+  (if (> (count bv) 64)
+    (throw (RuntimeException. "bitvec too long"))
+    (reduce #(bit-or (bit-shift-left %1 1) (long %2))
+            0 bv)))
+
 (defmethod promote
   :bits
   [type obj]
-  (if-not (isa-type? obj :bits)
-    (throw+ (error obj "is not a finite number"))
-    (if-not (= (:n type) (get-in obj [:type :n]))
-      (throw+ (error "Bit size mismatch"))
-      (instance type obj))))
+  (when (and (isa-type? (kindof obj) :bits)
+             (not= (:n type) (get-in obj [:type :n])))
+    (throw+ (error "Bit size mismatch")))
+  (condp = (kindof obj)
+    :bits obj
+    :uintm (instance type
+                     (long-to-bitvec (:val obj)
+                                     (:n type)))
+    Long (instance type
+                      (long-to-bitvec obj
+                                      (:n type)))))
 
 ;TODO: needs check & constrain, and a better backing
 ;impl (bitset instead of 64 bit number)
@@ -242,23 +275,6 @@
   :default
   [expr]
   (throw+ (error "Cannot convert " expr " to bits")))
-
-(defn long-to-bitvec
-  "Takes a long and returns a bitvec with the first n bits"
-  [l n]
-  (->> (iterate #(bit-shift-right % 1) l)
-    (map #(bit-and 1 %))
-    (take n)
-    reverse
-    (apply vector-of :byte)))
-
-(defn bitvec-to-long
-  "Takes a bitvec and returns a long"
-  [bv]
-  (if (> (count bv) 64)
-    (throw (RuntimeException. "bitvec too long"))
-    (reduce #(bit-or (bit-shift-left %1 1) (long %2))
-            0 bv)))
 
 (defmethod get-bits
   :uintm
@@ -302,8 +318,7 @@
            :args {:expr expr}}
           assoc :sim-factory [#(slice-impl % low high) [:expr]])))))
 
-(defn bit-cat
-  "Takes any number of bits and returns them concatenated"
+(defn bit-cat-impl
   ([]
    (instance (bits 0) []))
   ([bs]
@@ -314,9 +329,19 @@
              (vec (concat (:val b1) (:val b2)))))
   ([b1 b2 & more]
    (if more
-     (recur (bit-cat b1 b2) (first more) (next more))
-     (bit-cat b1 b2))))
+     (recur (bit-cat-impl b1 b2) (first more) (next more))
+     (bit-cat-impl b1 b2))))
 
+(defn-errors bit-cat
+  "Takes any number of bits and returns them concatenated"
+  [& args]
+  (apply bit-cat-impl args))
+
+(defbinopimpl bit-and :bits [:uintm :j-long]
+  [x y]
+  (println (print-str "x is " x " and y is " y))
+  (vec (map #(bit-and %1 %2)
+            (:val x) (:val y))))
 
 (comment
   How to get the combinational function for ops.
