@@ -47,11 +47,11 @@
                           init-fns
                           10)
                 [(:token mod) :d])
-           (instance (bits 4) 9))
+           (instance (bits 4) [1 0 0 1]))
         "ran and counted up to 10 bits")
     (is (= (get (exec-sim init-state
                           init-fns
                           18)
                 [(:token mod) :d])
-           (instance (bits 4) 1))
+           (instance (bits 4) [0 0 0 1]))
         "ran and counted up to 10 bits")))

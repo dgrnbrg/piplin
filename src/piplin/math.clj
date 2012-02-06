@@ -235,17 +235,46 @@
   [expr]
   (throw+ (error "Cannot convert " expr " to bits")))
 
+(defn long-to-bitvec
+  "Takes a long and returns a bitvec with the first n bits"
+  [l n]
+  (->> (iterate #(bit-shift-right % 1) l)
+    (map #(bit-and 1 %))
+    (take n)
+    reverse
+    (apply vector-of :byte)))
+
+(defn bitvec-to-long
+  "Takes a bitvec and returns a long"
+  [bv]
+  (if (> (count bv) 64)
+    (throw (RuntimeException. "bitvec too long"))
+    (reduce #(bit-or (bit-shift-left %1 1) (long %2))
+            0 bv)))
+
 (defmethod get-bits
   :uintm
   [expr]
-  (let [type (bits (get-in expr [:type :n]))]
+  (let [n (get-in expr [:type :n])
+        type (bits n)]
     (if (instance? Instance expr)
-      (instance type (:val expr))
+      (instance type (long-to-bitvec (:val expr) n))
       (vary-meta
         {:type type
          :op :get-bits
          :args {:expr expr}}
         assoc :sim-factory [get-bits [:expr]]))))
+
+(defn slice-impl
+  "Does slicing of bits"
+  [expr low high]
+  (let [type (bits (- high low))]
+    (instance type (-> (:val expr)
+                     reverse
+                     vec
+                     (subvec  low high)
+                     reverse
+                     vec))))
 
 ;This might not need to be defn-errors
 (defn slice
@@ -255,20 +284,15 @@
   (if-not (= (kindof expr) :bits)
     (throw+ (error "Can only slice bits, not " expr))
     (let [type (bits (- high low))]
-      (letfn [(slice-impl [expr low high]
-                (let [mask (dec (bit-shift-left 1 (- high low)))]
-                  (instance type (-> (:val expr)
-                                   (bit-shift-right low)
-                                   (bit-and mask)))))]
-        (if (instance? Instance expr)
-          (slice-impl expr low high)
-          (vary-meta
-            {:type type
-             :op :slice
-             :low low
-             :high high
-             :args {:expr expr}}
-            assoc :sim-factory [#(slice-impl % low high) [:expr]]))))))
+      (if (instance? Instance expr)
+        (slice-impl expr low high)
+        (vary-meta
+          {:type type
+           :op :slice
+           :low low
+           :high high
+           :args {:expr expr}}
+          assoc :sim-factory [#(slice-impl % low high) [:expr]])))))
 
 (comment
   How to get the combinational function for ops.
