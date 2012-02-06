@@ -47,10 +47,13 @@
                                       more) []])))
 
 (defrecord UIntM [n])
-(defn uintm [n]
-  "Make a new uintm type object"
+(defn uintm
+  "Make a new uintm type object."
+  [n]
   (merge (UIntM. n)
          {:kind :uintm}))
+
+(derive-type :uintm :bits)
 
 (defmethod constrain
   :uintm
@@ -204,6 +207,68 @@
 (defbinopimpl bit-xor :uintm [:j-long]
   [x y]
   (bit-xor (:val x) (:val y)))
+
+(defmethod promote
+  :bits
+  [type obj]
+  (if-not (isa-type? obj :bits)
+    (throw+ (error obj "is not a finite number"))
+    (if-not (= (:n type) (get-in obj [:type :n]))
+      (throw+ (error "Bit size mismatch"))
+      (instance type obj))))
+
+;TODO: needs check & constrain, and a better backing
+;impl (bitset instead of 64 bit number)
+(defrecord Bits [n])
+(defn bits
+  "Make a new bits type object."
+  [n]
+  (merge (Bits. n)
+         {:kind :bits}))
+
+(defmulti get-bits
+  (fn [expr] (kindof expr))
+  :hierarchy types)
+
+(defmethod get-bits
+  :default
+  [expr]
+  (throw+ (error "Cannot convert " expr " to bits")))
+
+(defmethod get-bits
+  :uintm
+  [expr]
+  (let [type (bits (get-in expr [:type :n]))]
+    (if (instance? Instance expr)
+      (instance type (:val expr))
+      (vary-meta
+        {:type type
+         :op :get-bits
+         :args {:expr expr}}
+        assoc :sim-factory [get-bits [:expr]]))))
+
+;This might not need to be defn-errors
+(defn slice
+  "Takes an expr of type bits and returns a subrange
+  of the bits."
+  [expr low high]
+  (if-not (= (kindof expr) :bits)
+    (throw+ (error "Can only slice bits, not " expr))
+    (let [type (bits (- high low))]
+      (letfn [(slice-impl [expr low high]
+                (let [mask (dec (bit-shift-left 1 (- high low)))]
+                  (instance type (-> (:val expr)
+                                   (bit-shift-right low)
+                                   (bit-and mask)))))]
+        (if (instance? Instance expr)
+          (slice-impl expr low high)
+          (vary-meta
+            {:type type
+             :op :slice
+             :low low
+             :high high
+             :args {:expr expr}}
+            assoc :sim-factory [#(slice-impl % low high) [:expr]]))))))
 
 (comment
   How to get the combinational function for ops.
