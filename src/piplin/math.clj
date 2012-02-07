@@ -233,7 +233,7 @@
     (map #(bit-and 1 %))
     (take n)
     reverse
-    (apply vector-of :byte)))
+    vec))
 
 (defn bitvec-to-long
   "Takes a bitvec and returns a long"
@@ -339,8 +339,17 @@
 
 (defbinopimpl bit-and :bits [:uintm :j-long]
   [x y]
-  (println (print-str "x is " x " and y is " y))
   (vec (map #(bit-and %1 %2)
+            (:val x) (:val y))))
+
+(defbinopimpl bit-or :bits [:uintm :j-long]
+  [x y]
+  (vec (map #(bit-or %1 %2)
+            (:val x) (:val y))))
+
+(defbinopimpl bit-xor :bits [:uintm :j-long]
+  [x y]
+  (vec (map #(bit-xor %1 %2)
             (:val x) (:val y))))
 
 (comment

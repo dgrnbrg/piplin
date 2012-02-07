@@ -36,7 +36,11 @@
     (is (= (:val (bit-cat (b8 0xa0) (bit-cat (b8 0xfe))))
            [1 0 1 0 0 0 0 0 1 1 1 1 1 1 1 0]))
     (is (= (:val (bit-slice (bit-cat (b8 0xf) (b8 0xf0)) 4 12)
-                 [1 1 1 1 1 1 1 1])))))
+                 [1 1 1 1 1 1 1 1])))
+    (is (= (bit-and (b8 0xf) 0x3c) (b8 0xc)))
+    (is (= (bit-or 0xf0 (b8 0xf)) (b8 0xff)))
+    (is (= (bit-xor (instance (uintm 8) 0x3c) (b8 0xf))
+           (b8 0x33)))))
 
 (deftest sim-uintm-bits-test
   (let [mod (module [:outputs [c (instance (uintm 8) 0)
