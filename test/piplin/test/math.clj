@@ -68,3 +68,32 @@
                 [(:token mod) :d])
            (instance (bits 4) [0 0 0 1]))
         "ran and counted up to 10 bits")))
+
+(deftest sim-mux2-test
+  (let [mod (module [:outputs [odd (promote boolean false)
+                               c (promote (uintm 3) 0)]]
+                    (let [new-c (inc c)]
+                      (connect odd (cast boolean
+                                             (bit-slice (get-bits new-c) 0 1)))
+                      (connect c new-c)))
+        [state fns] (make-sim mod)]
+    (is (= (get (exec-sim state fns 1)
+               [(:token mod) :c])
+           (promote (uintm 3) 1)))
+
+    (is (= (get (exec-sim state fns 1)
+               [(:token mod) :odd])
+           (promote boolean true)))
+    (is (= (get (exec-sim state fns 2)
+               [(:token mod) :odd])
+           (promote boolean false)))
+    (is (= (get (exec-sim state fns 3)
+               [(:token mod) :odd])
+           (promote boolean true)))
+
+    (is (= (get (exec-sim state fns 30)
+               [(:token mod) :c])
+           (instance (uintm 3) 30 :constrain)))
+    (is (= (get (exec-sim state fns 30)
+               [(:token mod) :odd])
+           (promote boolean false)))))

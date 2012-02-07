@@ -256,7 +256,8 @@
                                      (:n type)))
     Long (instance type
                       (long-to-bitvec obj
-                                      (:n type)))))
+                                      (:n type)))
+    (throw+ (error "Cannot promote" obj "to bits"))))
 
 ;TODO: needs check & constrain, and a better backing
 ;impl (bitset instead of 64 bit number)
@@ -351,6 +352,57 @@
   [x y]
   (vec (map #(bit-xor %1 %2)
             (:val x) (:val y))))
+
+(defrecord Bool [])
+(def boolean (merge (Bool.) {:kind :boolean}))
+
+(defn mux2-impl
+  [sel v1 v2]
+  (when-not (= (:type v1) (:type v2))
+    (throw+ (error v1 "and" v1 "are different types")))
+  (println (str "muxing on " sel))
+  (let [sel (promote boolean sel)]
+    (if (instance? Instance sel)
+      (if (:val sel) v1 v2)
+      (vary-meta
+        {:type (:type v1)
+         :op :mux2
+         :args {:sel sel
+                :v1 v1
+                :v2 v2}}
+        assoc :sim-factory [mux2-impl [:sel :v1 :v2]]))))
+
+(defn-errors mux2
+  "Takes a boolean input and selects between
+  2 values: true for the first, false for the
+  second."
+  [sel v1 v2]
+  (mux2-impl sel v1 v2))
+
+(defn cast
+  "Converts the expr to the type."
+  [type expr]
+  (if (instance? Instance expr)
+    (promote type expr)
+    (vary-meta
+      {:type type
+       :op :cast
+       :args {:expr expr}}
+      assoc :sim-factory [(partial cast type) [:expr]])))
+
+(defmethod promote
+  :boolean
+  [type obj]
+  (instance boolean
+    (= 1
+       (cond
+         (or (= true obj) (= false obj)) (if obj 1 0)
+         (= (:type obj) (bits 1)) (first (:val obj))
+         (and (= (kindof obj) :uintm)
+              (= (get-in obj [:type :n]) 1)) (:val obj)
+         :else
+         (throw+ (error "Cannot promote" obj "to boolean"))))))
+
 
 (comment
   How to get the combinational function for ops.
