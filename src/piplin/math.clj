@@ -107,12 +107,16 @@
     :else (throw+ (error "Don't know how to promote to :uintm from"
                          (type obj)))))
 
+(defn binary-dispatch
+  "Simplified binary dispatch logic."
+  [x y]
+  [(kindof x) (kindof y)])
 
 (defn nary-dispatch
   "Dispatching logic used by binary math operations"
   ([] ::nullary)
   ([x] (kindof x))
-  ([x y] [(kindof x) (kindof y)])
+  ([x y] (binary-dispatch x y))
   ([x y & more] ::n-ary))
 
 (defn- make-core-binop-fn
@@ -123,7 +127,7 @@
      [~'x ~'y]
      ('~(ns-resolve 'clojure.core op) ~'x ~'y)))
 
-(defmacro defbinop
+(defmacro def-n-ary-binop
   "Defines a generic function for a binary operation
   on numeric types. Uses the function in clojure/core
   to provide implementations for Numbers. Handles
@@ -145,12 +149,23 @@
            (~op ~'x ~'y)))
        ~@core-methods)))
 
-(defbinop + 0 [:j-num])
-(defbinop - 0 [:j-num])
-(defbinop * 0 [:j-num])
-(defbinop bit-and 0 [:j-num])
-(defbinop bit-or 0 [:j-num])
-(defbinop bit-xor 0 [:j-num])
+(defmacro def-binary-binop
+  "Like def-n-ary-binop, but without nullary or left-associative
+  folds."
+  [op existing-types]
+  (let [core-methods (map #(make-core-binop-fn
+                             op %)
+                          existing-types)]
+    `(do
+       (defmulti ~op binary-dispatch :hierarchy types)
+       ~@core-methods)))
+
+(def-n-ary-binop + 0 [:j-num])
+(def-n-ary-binop - 0 [:j-num])
+(def-n-ary-binop * 0 [:j-num])
+(def-n-ary-binop bit-and 0 [:j-num])
+(def-n-ary-binop bit-or 0 [:j-num])
+(def-n-ary-binop bit-xor 0 [:j-num])
 
 (defn inc
   "Increments x"
@@ -161,6 +176,27 @@
   "Decrements x"
   [x]
   (- x 1))
+
+(def-binary-binop > [:j-num])
+(def-binary-binop < [:j-num])
+(def-binary-binop >= [:j-num])
+(def-binary-binop <= [:j-num])
+(comment
+(defmulti = nary-dispatch :hierarchy types)
+(defmethod = :default [x y]
+  (clojure.core/= x y))
+(defmethod = ::n-ary
+  [x y & more]
+  (if (= x y)
+    (if more
+      (recur x (first more) (rest more))
+      true)
+    false)))
+
+(defn not=
+  ([x] false)
+  ([x y] (not (= x y)))
+  ([x y & more] (not (apply = x y more))))
 
 (defn- make-binop-impl-fn
   "Takes a kind, fntail, and an symbol for the op

@@ -12,6 +12,12 @@
 (deftest float-test
   (is (= 3.5 (+ 1.5 2))))
 
+(deftest =test
+  (is (= 1 1 1))
+  (is (not (= 1 1 2)))
+  (is (= "hello" "hello"))
+  (is (= [1 \a] [1 \a])))
+
 (deftest uintm-test
   (letfn [(um8 [v] (instance (uintm 8) v))]
     (is (= (+ (um8 200) 1) (um8 201)))
