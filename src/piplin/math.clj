@@ -371,22 +371,16 @@
   [sel v1 v2]
   (when-not (= (:type v1) (:type v2))
     (throw+ (error v1 "and" v1 "are different types")))
-  (println (print-str "muxing on " sel "v1 =" v1))
   (let [sel (cast boolean sel)]
-    (println "done cast")
     (if (instance? Instance sel)
-      (do
-        (println "evaling" (:val sel))
-        (if (:val sel) v1 v2))
-      (do
-        (println (print-str "v1 init=" v1 "v2 init=" v2))
-        (vary-meta
-          {:type (:type v1)
-           :op :mux2
-           :args {:sel sel
-                  :v1 v1
-                  :v2 v2}}
-          assoc :sim-factory [mux2-impl [:sel :v1 :v2]])))))
+      (if (:val sel) v1 v2)
+      (vary-meta
+        {:type (:type v1)
+         :op :mux2
+         :args {:sel sel
+                :v1 v1
+                :v2 v2}}
+        assoc :sim-factory [mux2-impl [:sel :v1 :v2]]))))
 
 (defn mux2
   "Takes a boolean input and selects between
@@ -409,6 +403,17 @@
          :else
          (throw+ (error "Cannot promote" obj "to boolean"))))))
 
+(defn trace
+  "Takes a function and an expr and returns an
+  expr whose value is the expr, but when simulated
+  will run the given function for its side effects
+  every time this value is used."
+  [f expr]
+  (vary-meta
+    {:type (:type expr)
+     :op :noop
+     :args {:expr expr}}
+    assoc :sim-factory [#(do (f %) %) [:expr]]))
 
 (comment
   How to get the combinational function for ops.
