@@ -19,6 +19,11 @@
     obj
     (throw+ (error "Cannot promote" obj "to Long"))))
 
+(derive-type :j-byte :j-num)
+(derive-type :j-long :j-num)
+(derive-type Double :j-num)
+(derive-type Float :j-num)
+
 (defmulti constrain
   "Takes a type and a value and constrains the value to
   the type's range."
@@ -136,12 +141,12 @@
            (~op ~'x ~'y)))
        ~@core-methods)))
 
-(defbinop + 0 [:j-long])
-(defbinop - 0 [:j-long])
-(defbinop * 0 [:j-long])
-(defbinop bit-and 0 [:j-long])
-(defbinop bit-or 0 [:j-long])
-(defbinop bit-xor 0 [:j-long])
+(defbinop + 0 [:j-num])
+(defbinop - 0 [:j-num])
+(defbinop * 0 [:j-num])
+(defbinop bit-and 0 [:j-num])
+(defbinop bit-or 0 [:j-num])
+(defbinop bit-xor 0 [:j-num])
 
 (defn inc
   "Increments x"

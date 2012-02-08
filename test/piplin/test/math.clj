@@ -9,6 +9,9 @@
   (is (= 6 (* 2 3)))
   (is (thrown? ExceptionInfo (promote :j-long "lx"))))
 
+(deftest float-test
+  (is (= 3.5 (+ 1.5 2))))
+
 (deftest uintm-test
   (letfn [(um8 [v] (instance (uintm 8) v))]
     (is (= (+ (um8 200) 1) (um8 201)))
