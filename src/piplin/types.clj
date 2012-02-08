@@ -10,6 +10,13 @@
 (defn kindof [a]
   (or (get-in a [:type :kind]) (class a)))
 
+(defn anontype
+  "Returns an anonymous type of
+  the given kind. Useful to promote
+  to jvm types."
+  [kind]
+  {:kind kind})
+
 (defmulti promote
   "Produces an instance of the given
   obj with the type changed. Takes

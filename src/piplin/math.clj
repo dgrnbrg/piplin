@@ -2,27 +2,28 @@
   (:use [slingshot.slingshot :only [throw+]])
   (:use (piplin types)))
 
-(derive-type Long :j-long)
 (defmethod promote 
-  :j-long
+  :j-integral
   [type obj]
-  (condp isa-type? obj
-    :j-long obj
-    :j-byte (clojure.core/long obj)
+  (condp isa-type? (kindof obj)
+    :j-integral (clojure.core/long obj)
+    :uintm (:val obj)
     (throw+ (error "Cannot promote" obj "to Long"))))
 
-(derive-type Byte :j-byte)
-(defmethod promote 
-  :j-byte
-  [type obj]
-  (if (isa-type? :j-byte obj)
-    obj
-    (throw+ (error "Cannot promote" obj "to Long"))))
+(derive-type :j-integral :j-num)
 
-(derive-type :j-byte :j-num)
-(derive-type :j-long :j-num)
 (derive-type Double :j-num)
 (derive-type Float :j-num)
+
+(derive-type Byte :j-byte)
+(derive-type Short :j-short)
+(derive-type Short :j-int)
+(derive-type Long :j-long)
+
+(derive-type :j-byte :j-integral)
+(derive-type :j-int :j-integral)
+(derive-type :j-short :j-integral)
+(derive-type :j-long :j-integral)
 
 (defmulti constrain
   "Takes a type and a value and constrains the value to
@@ -95,11 +96,14 @@
   (cond
     (= (:type obj) this) obj ;Already correct
     (= (kindof obj)
-       (:kind this)) (throw+ (error
-                               "Incompatible type instances: " this
-                               "and" (type obj)))
-    (isa-type? :j-long (kindof obj)) (instance this obj)
-    (isa-type? :j-byte (kindof obj)) (instance this (promote :j-long obj))
+       (:kind this)) (throw+
+                       (error
+                         "Incompatible type instances: " this
+                         "and" (type obj)))
+    (isa-type? :j-integral (kindof obj)) (instance
+                                           this
+                                           (promote (anontype :j-long)
+                                                    obj))
     :else (throw+ (error "Don't know how to promote to :uintm from"
                          (type obj)))))
 
@@ -206,27 +210,27 @@
        ~impl-body
        ~@bodies)))
 
-(defbinopimpl + :uintm [:j-long]
+(defbinopimpl + :uintm [:j-integral]
   [x y]
   (+ (:val x) (:val y)))
 
-(defbinopimpl - :uintm [:j-long]
+(defbinopimpl - :uintm [:j-integral]
   [x y]
   (- (:val x) (:val y)))
 
-(defbinopimpl * :uintm [:j-long]
+(defbinopimpl * :uintm [:j-integral]
   [x y]
   (* (:val x) (:val y)))
 
-(defbinopimpl bit-and :uintm [:j-long]
+(defbinopimpl bit-and :uintm [:j-integral]
   [x y]
   (bit-and (:val x) (:val y)))
 
-(defbinopimpl bit-or :uintm [:j-long]
+(defbinopimpl bit-or :uintm [:j-integral]
   [x y]
   (bit-or (:val x) (:val y)))
 
-(defbinopimpl bit-xor :uintm [:j-long]
+(defbinopimpl bit-xor :uintm [:j-integral]
   [x y]
   (bit-xor (:val x) (:val y)))
 
@@ -258,7 +262,7 @@
     :uintm (instance type
                      (long-to-bitvec (:val obj)
                                      (:n type)))
-    :j-long (instance type
+    :j-integral (instance type
                       (long-to-bitvec obj
                                       (:n type)))
     (throw+ (error "Cannot promote" obj "to bits"))))
@@ -337,17 +341,17 @@
      (recur (bit-cat b1 b2) (first more) (next more))
      (bit-cat b1 b2))))
 
-(defbinopimpl bit-and :bits [:uintm :j-long]
+(defbinopimpl bit-and :bits [:uintm :j-integral]
   [x y]
   (vec (map #(bit-and %1 %2)
             (:val x) (:val y))))
 
-(defbinopimpl bit-or :bits [:uintm :j-long]
+(defbinopimpl bit-or :bits [:uintm :j-integral]
   [x y]
   (vec (map #(bit-or %1 %2)
             (:val x) (:val y))))
 
-(defbinopimpl bit-xor :bits [:uintm :j-long]
+(defbinopimpl bit-xor :bits [:uintm :j-integral]
   [x y]
   (vec (map #(bit-xor %1 %2)
             (:val x) (:val y))))
