@@ -6,7 +6,16 @@
 (defmethod promote 
   :j-long
   [type obj]
-  (if (isa-type? obj :j-long)
+  (condp #(isa-type? %2 %1) obj
+    :j-long obj
+    :j-byte (clojure.core/long obj)
+    (throw+ (error "Cannot promote" obj "to Long"))))
+
+(derive-type Byte :j-byte)
+(defmethod promote 
+  :j-byte
+  [type obj]
+  (if (isa-type? obj :j-byte)
     obj
     (throw+ (error "Cannot promote" obj "to Long"))))
 
@@ -53,8 +62,6 @@
   (merge (UIntM. n)
          {:kind :uintm}))
 
-(derive-type :uintm :bits)
-
 (defmethod constrain
   :uintm
   [this init-val]
@@ -87,6 +94,7 @@
                                "Incompatible type instances: " this
                                "and" (type obj)))
     (isa-type? (kindof obj) :j-long) (instance this obj)
+    (isa-type? (kindof obj) :j-byte) (instance this (promote :j-long obj))
     :else (throw+ (error "Don't know how to promote to :uintm from"
                          (type obj)))))
 
@@ -98,14 +106,11 @@
   ([x y] [(kindof x) (kindof y)])
   ([x y & more] ::n-ary))
 
-(defn- mangle-multi-op [op]
-  (symbol (str (name op) "multi")))
-
 (defn- make-core-binop-fn
   "Makes syntax for a binop using the core
   implementation for a given hierarchy key"
-  [multi-op core-op key]
-  `(defmethod ~multi-op [~key ~key]
+  [op core-op key]
+  `(defmethod ~op [~key ~key]
      [~'x ~'y]
      (~core-op ~'x ~'y)))
 
@@ -119,20 +124,17 @@
   in clojure.core should be integrated."
   [op zero existing-types]
   (let [core-op (gensym (str (name op) "core"))
-        multi-op (mangle-multi-op op)
         core-methods (map #(make-core-binop-fn
-                             multi-op core-op %)
+                             op core-op %)
                           existing-types)]
     `(do
-       (defmulti ~multi-op nary-dispatch :hierarchy types)
-       (defn-errors ~op [& ~'args]
-         (apply ~multi-op ~'args))
-       (defmethod ~multi-op ::nullary [] ~zero)
-       (defmethod ~multi-op ::n-ary
+       (defmulti ~op nary-dispatch :hierarchy types)
+       (defmethod ~op ::nullary [] ~zero)
+       (defmethod ~op ::n-ary
          [~'x ~'y & ~'more]
          (if ~'more
-           (recur (~multi-op ~'x ~'y) (first ~'more) (next ~'more))
-           (~multi-op ~'x ~'y)))
+           (recur (~op ~'x ~'y) (first ~'more) (next ~'more))
+           (~op ~'x ~'y)))
        (def ~core-op (ns-resolve 'clojure.core '~op))
        ~@core-methods)))
 
@@ -185,7 +187,6 @@
   unification failed."
   [op k bases & fntail]
   (let [unmangled-kw (keyword (name op))
-        op (mangle-multi-op op)
         impl-name (gensym (str (name op) (name k)))
         impl-body (make-binop-impl-fn op unmangled-kw
                                       impl-name k fntail)
@@ -249,12 +250,12 @@
   (when (and (isa-type? (kindof obj) :bits)
              (not= (:n type) (get-in obj [:type :n])))
     (throw+ (error "Bit size mismatch")))
-  (condp = (kindof obj)
+  (condp #(isa-type? %2 %1) (kindof obj)
     :bits obj
     :uintm (instance type
                      (long-to-bitvec (:val obj)
                                      (:n type)))
-    Long (instance type
+    :j-long (instance type
                       (long-to-bitvec obj
                                       (:n type)))
     (throw+ (error "Cannot promote" obj "to bits"))))
@@ -319,7 +320,7 @@
            :args {:expr expr}}
           assoc :sim-factory [#(slice-impl % low high) [:expr]])))))
 
-(defn bit-cat-impl
+(defn bit-cat
   ([]
    (instance (bits 0) []))
   ([bs]
@@ -330,13 +331,8 @@
              (vec (concat (:val b1) (:val b2)))))
   ([b1 b2 & more]
    (if more
-     (recur (bit-cat-impl b1 b2) (first more) (next more))
-     (bit-cat-impl b1 b2))))
-
-(defn-errors bit-cat
-  "Takes any number of bits and returns them concatenated"
-  [& args]
-  (apply bit-cat-impl args))
+     (recur (bit-cat b1 b2) (first more) (next more))
+     (bit-cat b1 b2))))
 
 (defbinopimpl bit-and :bits [:uintm :j-long]
   [x y]
@@ -367,7 +363,7 @@
        :args {:expr expr}}
       assoc :sim-factory [(partial cast type) [:expr]])))
 
-(defn mux2-impl
+(defn mux2
   [sel v1 v2]
   (when-not (= (:type v1) (:type v2))
     (throw+ (error v1 "and" v1 "are different types")))
@@ -380,14 +376,7 @@
          :args {:sel sel
                 :v1 v1
                 :v2 v2}}
-        assoc :sim-factory [mux2-impl [:sel :v1 :v2]]))))
-
-(defn mux2
-  "Takes a boolean input and selects between
-  2 values: true for the first, false for the
-  second."
-  [sel v1 v2]
-  (mux2-impl sel v1 v2))
+        assoc :sim-factory [mux2 [:sel :v1 :v2]]))))
 
 (defmethod promote
   :boolean
