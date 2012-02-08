@@ -69,7 +69,7 @@
            (instance (bits 4) [0 0 0 1]))
         "ran and counted up to 10 bits")))
 
-(deftest sim-mux2-test
+(deftest sim-cast-test
   (let [mod (module [:outputs [odd (promote boolean false)
                                c (promote (uintm 3) 0)]]
                     (let [new-c (inc c)]
@@ -97,3 +97,22 @@
     (is (= (get (exec-sim state fns 30)
                [(:token mod) :odd])
            (promote boolean false)))))
+
+(deftest sim-mux2-test
+  (let [mod (module [:outputs [flip (promote boolean false)]]
+                    (connect flip (mux2 flip
+                                        (promote boolean false)
+                                        (promote boolean true))))
+        [state fns] (make-sim mod)]
+    (is (= (get (exec-sim state fns 0)
+                [(:token mod) :flip])
+           (promote boolean false)))
+    (is (= (get (exec-sim state fns 1)
+                [(:token mod) :flip])
+           (promote boolean true)))
+    (is (= (get (exec-sim state fns 10)
+                [(:token mod) :flip])
+           (promote boolean false)))
+    (is (= (get (exec-sim state fns 11)
+                [(:token mod) :flip])
+           (promote boolean true)))))
