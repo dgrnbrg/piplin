@@ -434,6 +434,20 @@
                 :v2 v2}}
         assoc :sim-factory [mux2 [:sel :v1 :v2]]))))
 
+(defn not
+  [x]
+  (if (:type x)
+    (if (instance? Instance x)
+      (->> (:val x)
+        clojure.core/not 
+        (instance boolean))
+      (vary-meta
+        {:type boolean
+         :op :not
+         :args {:x x}}
+        assoc :sim-factory [not [:x]]))
+    (clojure.core/not x)))
+
 (defmethod promote
   :boolean
   [type obj]
