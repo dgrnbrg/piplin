@@ -9,30 +9,6 @@
     (is (error? e) "Error function should make an error")
     (is (:msg e) "some bad stuff")) "check stringification")
 
-(defn-errors
-  unify-error-arg-tester
-  [x y z]
-  "called fn")
-
-(deftest test-unify-error-args
-  (let [e (error "lol")]
-    (symbol-macrolet [t-e (throw+ e)
-                      t2-e (throw+ [e e])]
-      (is (= (try-errors
-               (unify-error-arg-tester 1 2 3)) "called fn") "no errors to unify")
-      (is (= (try-errors
-               (unify-error-arg-tester t-e 2 3)) [e]) "return single error")
-      (is (= (try-errors
-               (unify-error-arg-tester t-e t-e 3)) [e e]) "return several errors")
-      (is (= (try-errors
-               (unify-error-arg-tester 1 t-e t2-e)) [e e e]) "flatten errors")
-      (is (= (try-errors
-               (unify-error-arg-tester 1 t2-e t2-e)) [e e e e]) "merge errors")
-      (is (= (try-errors
-               (unify-error-arg-tester t2-e t-e t2-e)) [e e e e e]) "merge errors")
-      (is (= (try-errors
-               (unify-error-arg-tester t2-e t2-e t-e)) [e e e e e]) "merge errors"))))
-
 (deftest test-let
   (let [e (error "lol")]
     (symbol-macrolet [t-e (throw+ e)]

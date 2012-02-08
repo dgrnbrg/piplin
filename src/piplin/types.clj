@@ -1,5 +1,4 @@
 (ns piplin.types
-  (:use [clojure.tools.macro :only [name-with-attributes]])
   (:use [slingshot.slingshot :only [throw+ try+]]))
 
 (comment
@@ -26,7 +25,7 @@
   (swap! types derive child parent))
 
 (defn isa-type?
-  [unknown type]
+  [type unknown]
   (isa? @types unknown type))
 
 (derive-type CompilerError :error)
@@ -43,30 +42,8 @@
 (defn error?
   "True iff a is a reportable error"
   [a]
-  (or (isa-type? (class a) :error)
+  (or (isa-type? :error (class a))
       (and (coll? a) (seq a) (every? error? a))))
-
-(defmacro join-errors
-  "Takes a list of forms and evaluates them.
-  Any that throw errors will have the errors
-  caught and stored in a coll of all the thrown
-  errors. If nothing threw an error, returns
-  a seq of the values of the forms. If any
-  threw errors, rethrows the coll of errors."
-  [& args]
-  (let [error-coll (gensym "error-coll")
-        arg-thunks (map (fn [arg]
-                          `(try+
-                             ~arg
-                             (catch error? ~'e
-                               (swap! ~error-coll conj ~'e))))
-                        args)]
-    `(let [~error-coll (atom [])
-           args# [~@arg-thunks]
-           ec# (flatten @~error-coll)]
-       (if (seq ec#)
-         (throw+ ec#)
-         args#))))
 
 (defmacro try-errors
   "Executes the forms in an implicit do and
@@ -77,19 +54,7 @@
      (catch error? ~'e
        ~'e)))
 
-(defmacro defn-errors
-  "Like defn, but allows any number of the
-  argument to throw errors, using join-errors"
-  [name & args]
-  (let [[name [params & body]] (name-with-attributes
-                               name args)
-        param-sym (gensym "params")]
-    `(defmacro ~name [& ~param-sym]
-       `(apply (fn [~@'~params] ~@'~body)
-                           (join-errors
-                             ~@~param-sym)))))
-
-(defn-errors type-unify
+(defn type-unify
   "Takes a target kind and two other
   objects. Determines which of them is the
   target kind, then promotes the other
@@ -97,14 +62,12 @@
   objects if any errors occurred, or if
   any of the objects were errors"
   [target-kind a b]
-  (letfn [(type-unify [target-kind a b]
-            (cond
-              (= (kindof a) target-kind)
-              (let [b (promote (:type a) b)]
-                [a b])
-              (= (kindof b) target-kind)
-              (let [[b a] (type-unify target-kind b a)]
-                [a b])
-              :else
-              (throw+ (error "Neither" a "nor" b "is of kind" target-kind))))]
-    (type-unify target-kind a b)))
+  (cond
+    (= (kindof a) target-kind)
+    (let [b (promote (:type a) b)]
+      [a b])
+    (= (kindof b) target-kind)
+    (let [[b a] (type-unify target-kind b a)]
+      [a b])
+    :else
+    (throw+ (error "Neither" a "nor" b "is of kind" target-kind))))

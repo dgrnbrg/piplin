@@ -6,7 +6,7 @@
 (defmethod promote 
   :j-long
   [type obj]
-  (condp #(isa-type? %2 %1) obj
+  (condp isa-type? obj
     :j-long obj
     :j-byte (clojure.core/long obj)
     (throw+ (error "Cannot promote" obj "to Long"))))
@@ -15,7 +15,7 @@
 (defmethod promote 
   :j-byte
   [type obj]
-  (if (isa-type? obj :j-byte)
+  (if (isa-type? :j-byte obj)
     obj
     (throw+ (error "Cannot promote" obj "to Long"))))
 
@@ -93,8 +93,8 @@
        (:kind this)) (throw+ (error
                                "Incompatible type instances: " this
                                "and" (type obj)))
-    (isa-type? (kindof obj) :j-long) (instance this obj)
-    (isa-type? (kindof obj) :j-byte) (instance this (promote :j-long obj))
+    (isa-type? :j-long (kindof obj)) (instance this obj)
+    (isa-type? :j-byte (kindof obj)) (instance this (promote :j-long obj))
     :else (throw+ (error "Don't know how to promote to :uintm from"
                          (type obj)))))
 
@@ -247,10 +247,10 @@
 (defmethod promote
   :bits
   [type obj]
-  (when (and (isa-type? (kindof obj) :bits)
+  (when (and (isa-type? :bits (kindof obj))
              (not= (:n type) (get-in obj [:type :n])))
     (throw+ (error "Bit size mismatch")))
-  (condp #(isa-type? %2 %1) (kindof obj)
+  (condp isa-type? (kindof obj)
     :bits obj
     :uintm (instance type
                      (long-to-bitvec (:val obj)
