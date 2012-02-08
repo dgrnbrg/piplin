@@ -109,10 +109,10 @@
 (defn- make-core-binop-fn
   "Makes syntax for a binop using the core
   implementation for a given hierarchy key"
-  [op core-op key]
+  [op key]
   `(defmethod ~op [~key ~key]
      [~'x ~'y]
-     (~core-op ~'x ~'y)))
+     ('~(ns-resolve 'clojure.core op) ~'x ~'y)))
 
 (defmacro defbinop
   "Defines a generic function for a binary operation
@@ -123,9 +123,8 @@
   is a vector of hierarchy elements whose implementations
   in clojure.core should be integrated."
   [op zero existing-types]
-  (let [core-op (gensym (str (name op) "core"))
-        core-methods (map #(make-core-binop-fn
-                             op core-op %)
+  (let [core-methods (map #(make-core-binop-fn
+                             op %)
                           existing-types)]
     `(do
        (defmulti ~op nary-dispatch :hierarchy types)
@@ -135,7 +134,6 @@
          (if ~'more
            (recur (~op ~'x ~'y) (first ~'more) (next ~'more))
            (~op ~'x ~'y)))
-       (def ~core-op (ns-resolve 'clojure.core '~op))
        ~@core-methods)))
 
 (defbinop + 0 [:j-long])
