@@ -83,12 +83,12 @@
   (let [n (get-in inst [:type :n])
         v (:val inst)
         maxval (dec (bit-shift-left 1 n))]
-    (if (< v 0)
-      (throw+ (error "uintm must be positive:" v))
-      (if (> v maxval)
-        (throw+ (error "uintm" n "must be less than" maxval
-                       ", got:" v))
-        inst))))
+    (when (< v 0)
+      (throw+ (error "uintm must be positive:" v)))
+    (when (> v maxval)
+      (throw+ (error "uintm" n "must be less than" maxval
+                     ", got:" v))))
+  inst)
 
 (defmethod promote
   :uintm
@@ -144,7 +144,7 @@
        (defmethod ~op ::nullary [] ~zero)
        (defmethod ~op ::n-ary
          [~'x ~'y & ~'more]
-         (if ~'more
+         (if (seq ~'more)
            (recur (~op ~'x ~'y) (first ~'more) (next ~'more))
            (~op ~'x ~'y)))
        ~@core-methods)))
@@ -181,17 +181,17 @@
 (def-binary-binop < [:j-num])
 (def-binary-binop >= [:j-num])
 (def-binary-binop <= [:j-num])
-(comment
+
 (defmulti = nary-dispatch :hierarchy types)
 (defmethod = :default [x y]
   (clojure.core/= x y))
 (defmethod = ::n-ary
   [x y & more]
   (if (= x y)
-    (if more
+    (if (seq more)
       (recur x (first more) (rest more))
       true)
-    false)))
+    false))
 
 (defn not=
   ([x] false)
@@ -312,6 +312,19 @@
   (merge (Bits. n)
          {:kind :bits}))
 
+(defmethod check
+  :bits
+  [inst]
+  (let [n (get-in inst [:type :n])
+        v (:val inst)]
+    (when-not (and (vector? v)
+                   (every? #{0 1} v))
+      (throw+ (error
+                "bits must be a vector of 0s and 1s:" v)))
+    (when (not= (count v) n)
+      (throw+ (error "bit vector must be of length " n))))
+  inst)
+
 (defmulti get-bits
   (fn [expr] (kindof expr))
   :hierarchy types)
@@ -341,7 +354,7 @@
     (instance type (-> (:val expr)
                      reverse
                      vec
-                     (subvec  low high)
+                     (subvec low high)
                      reverse
                      vec))))
 

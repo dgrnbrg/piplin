@@ -16,7 +16,13 @@
   (is (= 1 1 1))
   (is (not (= 1 1 2)))
   (is (= "hello" "hello"))
-  (is (= [1 \a] [1 \a])))
+  (is (= [1 \a] [1 \a]))
+  (is (< 3 7))
+  (is (> 0 -1.2))
+  (is (>= -3.3 -3.3))
+  (is (not (<= 4 1)))
+  (is (not= 1 2))
+  (is (not (not= 0 0))))
 
 (deftest uintm-test
   (letfn [(um8 [v] (instance (uintm 8) v))]
@@ -40,20 +46,20 @@
     (is (= (try-errors (bit-cat (throw+ e) (throw+ e))) e))))
 
 (deftest bits-test
-  (let [b8 #(instance (bits 8) (long-to-bitvec % 8))]
+  (let [b8 #(promote (bits 8) %)]
     (is (= (:val (b8 0xa0)) [1 0 1 0 0 0 0 0]))
     (is (= (:val (bit-cat (b8 0xa0) (bit-cat (b8 0xfe))))
            [1 0 1 0 0 0 0 0 1 1 1 1 1 1 1 0]))
-    (is (= (:val (bit-slice (bit-cat (b8 0xf) (b8 0xf0)) 4 12)
-                 [1 1 1 1 1 1 1 1])))
+    (is (= (:val (bit-slice (bit-cat (b8 0xf) (b8 0xf0)) 4 12))
+                 [1 1 1 1 1 1 1 1]))
     (is (= (bit-and (b8 0xf) 0x3c) (b8 0xc)))
     (is (= (bit-or 0xf0 (b8 0xf)) (b8 0xff)))
     (is (= (bit-xor (instance (uintm 8) 0x3c) (b8 0xf))
            (b8 0x33)))))
 
 (deftest sim-uintm-bits-test
-  (let [mod (module [:outputs [c (instance (uintm 8) 0)
-                               d (instance (bits 8) 0)]]
+  (let [mod (module [:outputs [c (promote (uintm 8) 0)
+                               d (promote (bits 8) 0)]]
                     (connect c (+ c 1))
                     (connect d (bit-slice (get-bits c) 0 4)))
         sim (make-sim mod)
