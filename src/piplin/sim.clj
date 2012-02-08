@@ -106,15 +106,14 @@
   ;entry point
   ([initial-state initial-fns max-cycle]
    (exec-sim 0 initial-fns initial-state {} max-cycle))
-
   ([cycle fns state reactors max-cycle]
-   (let [[delta-state new-reactors] (run-cycle cycle state fns)
-         [state events] (what-changed state delta-state)
-         reactors (merge-with concat reactors new-reactors)
-         next-cycle (inc cycle)
-         [fns reactors] (next-fns next-cycle (keys events) reactors)]
-     (if (= next-cycle max-cycle)
-       state
+   (if-not (pos? (- max-cycle cycle))
+     state
+     (let [[delta-state new-reactors] (run-cycle cycle state fns)
+           [state events] (what-changed state delta-state)
+           reactors (merge-with concat reactors new-reactors)
+           next-cycle (inc cycle)
+           [fns reactors] (next-fns next-cycle (keys events) reactors)]
        (recur next-cycle fns state reactors max-cycle)))))
 
 (defn every-cycle
