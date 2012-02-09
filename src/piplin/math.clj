@@ -2,6 +2,18 @@
   (:use [slingshot.slingshot])
   (:use (piplin types)))
 
+(defmacro mkast
+  "Takes the type, op, args, and function and
+  returns an ast fragment."
+  [type op args f]
+  (let [kwargs (vec (map (comp keyword name) args))
+        argmap (zipmap kwargs args)]
+    `(vary-meta
+       {:type ~type
+        :op ~op
+        :args ~argmap}
+       assoc :sim-factory [~f ~kwargs])))
+
 (defmethod promote 
   :j-integral
   [type obj]
@@ -153,11 +165,7 @@
       (->> (:val x)
         clojure.core/not 
         (instance boolean))
-      (vary-meta
-        {:type boolean
-         :op :not
-         :args {:x x}}
-        assoc :sim-factory [not [:x]]))
+      (mkast boolean :not [x] not))
     (clojure.core/not x)))
 
 (defmulti = nary-dispatch :hierarchy types)
@@ -192,12 +200,10 @@
          (instance (:type x#)
                    ((fn ~@fntail) x# y#)
                    :constrain)
-         (vary-meta
-           {:type (:type x#)
-            :op ~unmangled-kw
-            :args {:lhs x#
-                   :rhs y#}}
-           assoc :sim-factory [~op [:lhs :rhs]])))))
+         (let [~'lhs x# ~'rhs y#]
+           (mkast (:type x#)
+                  ~unmangled-kw
+                  [~'lhs ~'rhs] ~op))))))
 
 (defmacro defbinopimpl
   "Defines implementation of a binop on a piplin kind.
@@ -317,11 +323,7 @@
         type (bits n)]
     (if (pipinst? expr)
       (instance type (long-to-bitvec (:val expr) n))
-      (vary-meta
-        {:type type
-         :op :get-bits
-         :args {:expr expr}}
-        assoc :sim-factory [get-bits [:expr]]))))
+      (mkast type :get-bits [expr] get-bits))))
 
 (defn slice-impl
   "Does slicing of bits"
@@ -344,13 +346,11 @@
     (let [type (bits (- high low))]
       (if (pipinst? expr)
         (slice-impl expr low high)
-        (vary-meta
-          {:type type
-           :op :slice
-           :low low
-           :high high
-           :args {:expr expr}}
-          assoc :sim-factory [#(slice-impl % low high) [:expr]])))))
+        (merge
+          (mkast type :slice
+                 [expr] #(slice-impl % low high))
+          {:low low
+           :high high})))))
 
 (defn bit-cat
   ([]
@@ -390,11 +390,7 @@
   (if (:type expr)
     (if (pipinst? expr)
       (promote type expr)
-      (vary-meta
-        {:type type
-         :op :cast
-         :args {:expr expr}}
-        assoc :sim-factory [(partial cast type) [:expr]]))
+      (mkast type :cast [expr] (partial cast type)))
     (try+
       (promote type expr)
       (catch piplin.types.CompilerError e
@@ -409,13 +405,7 @@
   (let [sel (cast boolean sel)]
     (if (pipinst? sel)
       (if (:val sel) v1 v2)
-      (vary-meta
-        {:type (:type v1)
-         :op :mux2
-         :args {:sel sel
-                :v1 v1
-                :v2 v2}}
-        assoc :sim-factory [mux2 [:sel :v1 :v2]]))))
+      (mkast (:type v1) :mux2 [sel v1 v2] mux2))))
 
 
 (defmethod promote
@@ -438,11 +428,7 @@
   will run the given function for its side effects
   every time this value is used."
   [f expr]
-  (vary-meta
-    {:type (:type expr)
-     :op :noop
-     :args {:expr expr}}
-    assoc :sim-factory [#(do (f %) %) [:expr]]))
+  (mkast (:type expr) :noop [expr] #(do (f %) %)))
 
 (defn pr-trace
   "Prints the args followed by the traced value."
