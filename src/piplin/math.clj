@@ -474,6 +474,13 @@
      :args {:expr expr}}
     assoc :sim-factory [#(do (f %) %) [:expr]]))
 
+(defn pr-trace
+  "Prints the args followed by the traced value."
+  [& args]
+  (trace #(apply print-str (butlast args) %)
+         (last args)))
+
+
 (comment
   How to get the combinational function for ops.
 
