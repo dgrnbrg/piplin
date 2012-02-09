@@ -25,46 +25,7 @@
 (derive-type :j-short :j-integral)
 (derive-type :j-long :j-integral)
 
-(defmulti constrain
-  "Takes a type and a value and constrains the value to
-  the type's range."
-  (fn [type val] (:kind type))
-  :hierarchy types)
-
-(defmethod constrain
-  :default
-  [a b] b)
-
-(defmulti check
-  "Takes an instance and verifies that it meets the
-  constraints of its type"
-  kindof
-  :hierarchy types)
-
-(defmethod check
-  :default
-  [a] a)
-
-(defrecord Instance [type val])
-(defn instance
-  "Creates an instance of the type with value val"
-  [type val & more]
-  (let [val (if (some #{:constrain} more)
-              (constrain type val)
-              val)
-        inst (merge (Instance. type val)
-               {:type type})]
-    (vary-meta
-      (check inst)
-      assoc :sim-factory [#(apply instance
-                                      type
-                                      val
-                                      more) []])))
-
-(defrecord UIntM [n]
-  clojure.lang.IFn
-  (invoke [this x]
-    (instance this x)))
+(defpiplintype UIntM [n])
 (defn uintm
   "Make a new uintm type object."
   [n]
@@ -188,7 +149,7 @@
 (defn not
   [x]
   (if (:type x)
-    (if (instance? Instance x)
+    (if (pipinst? x)
       (->> (:val x)
         clojure.core/not 
         (instance boolean))
@@ -226,8 +187,8 @@
   `(defn ~impl-name
      [x# y#]
      (let [[x# y#] (type-unify ~k x# y#)]
-       (if (and (instance? Instance x#)
-                (instance? Instance y#))
+       (if (and (pipinst? x#)
+                (pipinst? y#))
          (instance (:type x#)
                    ((fn ~@fntail) x# y#)
                    :constrain)
@@ -320,10 +281,7 @@
                                           (:n type)))
     (throw+ (error "Cannot promote" obj "to bits"))))
 
-(defrecord Bits [n]
-  clojure.lang.IFn
-  (invoke [this x]
-    (instance this x)))
+(defpiplintype Bits [n])
 (defn bits
   "Make a new bits type object."
   [n]
@@ -357,7 +315,7 @@
   [expr]
   (let [n (get-in expr [:type :n])
         type (bits n)]
-    (if (instance? Instance expr)
+    (if (pipinst? expr)
       (instance type (long-to-bitvec (:val expr) n))
       (vary-meta
         {:type type
@@ -384,7 +342,7 @@
   (if-not (= (kindof expr) :bits)
     (throw+ (error "Can only slice bits, not " expr))
     (let [type (bits (- high low))]
-      (if (instance? Instance expr)
+      (if (pipinst? expr)
         (slice-impl expr low high)
         (vary-meta
           {:type type
@@ -423,17 +381,14 @@
   (vec (map #(bit-xor %1 %2)
             (:val x) (:val y))))
 
-(defrecord Bool []
-  clojure.lang.IFn
-  (invoke [this x]
-    (instance this x)))
+(defpiplintype Bool [])
 (def boolean (merge (Bool.) {:kind :boolean}))
 
 (defn cast
   "Converts the expr to the type."
   [type expr]
   (if (:type expr)
-    (if (instance? Instance expr)
+    (if (pipinst? expr)
       (promote type expr)
       (vary-meta
         {:type type
@@ -452,7 +407,7 @@
   (when-not (= (:type v1) (:type v2))
     (throw+ (error v1 "and" v1 "are different types")))
   (let [sel (cast boolean sel)]
-    (if (instance? Instance sel)
+    (if (pipinst? sel)
       (if (:val sel) v1 v2)
       (vary-meta
         {:type (:type v1)
@@ -494,3 +449,4 @@
   [& args]
   (trace #(apply print-str (butlast args) %)
          (last args)))
+

@@ -78,3 +78,54 @@
       [a b])
     :else
     (throw+ (error "Neither" a "nor" b "is of kind" target-kind))))
+
+(defmulti constrain
+  "Takes a type and a value and constrains the value to
+  the type's range."
+  (fn [type val] (:kind type))
+  :hierarchy types)
+
+(defmethod constrain
+  :default
+  [a b] b)
+
+(defmulti check
+  "Takes an instance and verifies that it meets the
+  constraints of its type"
+  kindof
+  :hierarchy types)
+
+(defmethod check
+  :default
+  [a] a)
+
+(defrecord Instance [type val])
+(defn instance
+  "Creates an instance of the type with value val"
+  [type val & more]
+  (let [val (if (some #{:constrain} more)
+              (constrain type val)
+              val)
+        inst (merge (Instance. type val)
+               {:type type})]
+    (vary-meta
+      (check inst)
+      assoc :sim-factory [#(apply instance
+                                      type
+                                      val
+                                      more) []])))
+
+(defn pipinst?
+  "Returns true if x is an instance of a piplin type"
+  [x]
+  (instance? Instance x))
+
+(defmacro defpiplintype
+  "Creates a piplin type record that implements
+  the necessary protocols and has the vector of
+  members as the record's members."
+  [name args]
+  `(defrecord ~name ~args
+     clojure.lang.IFn
+     (invoke [~'this ~'x]
+       (instance ~'this ~'x))))

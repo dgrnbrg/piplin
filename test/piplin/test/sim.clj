@@ -1,5 +1,5 @@
 (ns piplin.test.sim
-  (:use [piplin sim modules math])
+  (:use [piplin sim modules math types])
   (:use clojure.test))
 
 (deftest what-changed-test
