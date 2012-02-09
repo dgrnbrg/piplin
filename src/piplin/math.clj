@@ -1,5 +1,5 @@
 (ns piplin.math
-  (:use [slingshot.slingshot :only [throw+]])
+  (:use [slingshot.slingshot])
   (:use (piplin types)))
 
 (defmethod promote 
@@ -61,7 +61,10 @@
                                       val
                                       more) []])))
 
-(defrecord UIntM [n])
+(defrecord UIntM [n]
+  clojure.lang.IFn
+  (invoke [this x]
+    (instance this x)))
 (defn uintm
   "Make a new uintm type object."
   [n]
@@ -290,22 +293,25 @@
 (defmethod promote
   :bits
   [type obj]
-  (when (and (isa-type? :bits (kindof obj))
-             (not= (:n type) (get-in obj [:type :n])))
-    (throw+ (error "Bit size mismatch")))
+  (when-let [n (get-in obj [:type :n])]
+    (when-not (= (:n type) n)
+      (throw+ (error "Bit size mismatch"))))
   (condp isa-type? (kindof obj)
     :bits obj
     :uintm (instance type
                      (long-to-bitvec (:val obj)
                                      (:n type)))
     :j-integral (instance type
-                      (long-to-bitvec obj
-                                      (:n type)))
+                          (long-to-bitvec obj
+                                          (:n type)))
     (throw+ (error "Cannot promote" obj "to bits"))))
 
 ;TODO: needs check & constrain, and a better backing
 ;impl (bitset instead of 64 bit number)
-(defrecord Bits [n])
+(defrecord Bits [n]
+  clojure.lang.IFn
+  (invoke [this x]
+    (instance this x)))
 (defn bits
   "Make a new bits type object."
   [n]
@@ -405,19 +411,29 @@
   (vec (map #(bit-xor %1 %2)
             (:val x) (:val y))))
 
-(defrecord Bool [])
+(defrecord Bool []
+  clojure.lang.IFn
+  (invoke [this x]
+    (instance this x)))
 (def boolean (merge (Bool.) {:kind :boolean}))
 
 (defn cast
   "Converts the expr to the type."
   [type expr]
-  (if (instance? Instance expr)
-    (promote type expr)
-    (vary-meta
-      {:type type
-       :op :cast
-       :args {:expr expr}}
-      assoc :sim-factory [(partial cast type) [:expr]])))
+  (if (:type expr)
+    (if (instance? Instance expr)
+      (promote type expr)
+      (vary-meta
+        {:type type
+         :op :cast
+         :args {:expr expr}}
+        assoc :sim-factory [(partial cast type) [:expr]]))
+    (try+
+      (promote type expr)
+      (catch piplin.types.CompilerError e
+        (if (class? type)
+          (clojure.core/cast type expr)
+          (throw+))))))
 
 (defn mux2
   [sel v1 v2]
@@ -451,7 +467,7 @@
 (defmethod promote
   :boolean
   [type obj]
-  (instance boolean
+  (boolean
     (= 1
        (cond
          (= (:type obj) type) (if (:val obj) 1 0)
