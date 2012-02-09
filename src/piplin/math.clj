@@ -51,7 +51,7 @@
   to initialize the new instance with,
   and constrains the number to be in the
   range of uintm"
-  (mod init-val (bit-shift-left 1 (:n this))))
+  (bit-and init-val (dec (bit-shift-left 1 (:n this)))))
 
 (defmethod check
   :uintm
