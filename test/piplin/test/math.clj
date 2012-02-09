@@ -131,3 +131,35 @@
     (is (= (get (exec-sim state fns 11)
                 [(:token mod) :flip])
            (promote boolean true)))))
+
+(deftest sim-equals-test
+  (let [mod (module [:outputs [triggered (boolean false)]
+                     :feedback [c ((uintm 2) 0)]]
+                    (let [c' (inc c)]
+                      (connect c c')
+                      (connect triggered (= c ((uintm 2) 3)))))
+        [state fns] (make-sim mod)]
+    (is (= (get (exec-sim state fns 0)
+                [(:token mod) :triggered])
+           (boolean false)))
+    (is (= (get (exec-sim state fns 1)
+                [(:token mod) :triggered])
+           (boolean false)))
+    (is (= (get (exec-sim state fns 2)
+                [(:token mod) :triggered])
+           (boolean false)))
+    (is (= (get (exec-sim state fns 3)
+                [(:token mod) :triggered])
+           (boolean true)))
+    (is (= (get (exec-sim state fns 4)
+                [(:token mod) :triggered])
+           (boolean false)))
+    (is (= (get (exec-sim state fns 5)
+                [(:token mod) :triggered])
+           (boolean false)))
+    (is (= (get (exec-sim state fns 6)
+                [(:token mod) :triggered])
+           (boolean false)))
+    (is (= (get (exec-sim state fns 7)
+                [(:token mod) :triggered])
+           (boolean true)))))
