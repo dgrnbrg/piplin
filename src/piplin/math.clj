@@ -185,6 +185,20 @@
 (def-binary-binop >= [:j-num])
 (def-binary-binop <= [:j-num])
 
+(defn not
+  [x]
+  (if (:type x)
+    (if (instance? Instance x)
+      (->> (:val x)
+        clojure.core/not 
+        (instance boolean))
+      (vary-meta
+        {:type boolean
+         :op :not
+         :args {:x x}}
+        assoc :sim-factory [not [:x]]))
+    (clojure.core/not x)))
+
 (defmulti = nary-dispatch :hierarchy types)
 (defmethod = :default [x y]
   (clojure.core/= x y))
@@ -306,8 +320,6 @@
                                           (:n type)))
     (throw+ (error "Cannot promote" obj "to bits"))))
 
-;TODO: needs check & constrain, and a better backing
-;impl (bitset instead of 64 bit number)
 (defrecord Bits [n]
   clojure.lang.IFn
   (invoke [this x]
@@ -450,19 +462,6 @@
                 :v2 v2}}
         assoc :sim-factory [mux2 [:sel :v1 :v2]]))))
 
-(defn not
-  [x]
-  (if (:type x)
-    (if (instance? Instance x)
-      (->> (:val x)
-        clojure.core/not 
-        (instance boolean))
-      (vary-meta
-        {:type boolean
-         :op :not
-         :args {:x x}}
-        assoc :sim-factory [not [:x]]))
-    (clojure.core/not x)))
 
 (defmethod promote
   :boolean
@@ -495,37 +494,3 @@
   [& args]
   (trace #(apply print-str (butlast args) %)
          (last args)))
-
-
-(comment
-  How to get the combinational function for ops.
-
-  We have an op & args, and we need to look up
-  the function that does this thing and the way
-  to bind the args. Then we recur on the args.
-  )
-
-;successfully blocked
-;(+ ((uintm 3) 3) ((uintm 4) 3))
-
-;(+ 42 3)
-;(+ ((uintm 8) 3) ((uintm 8) 4))
-
-;(+ ((uintm 8) 3) -4)
-;(+ 3 ((uintm 8) 4))
-
-(comment
-  TODO
-  - error reporting (file/lineno)
-  - implement sintm, sints, uints, etc. (e type is hard)
-  - design AST
-  - implement sim function, ast, and
-    verilog module binding macro(s)
-  - implement simulation with syn/ack)
-
-(comment
-;  The following is converted to AST now:
-(pprint (module [:outputs
-                        [c (instance (uintm 8) 3)]]
-                       [c (+ 1 c)]))
-)
