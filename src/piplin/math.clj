@@ -2,6 +2,11 @@
   (:use [slingshot.slingshot])
   (:use (piplin types)))
 
+(defrecord ASTNode [type]
+  ITyped
+  (typeof [this] type)
+  (pipinst? [this] false))
+
 (defmacro mkast
   "Takes the type, op, args, and function and
   returns an ast fragment."
@@ -9,10 +14,47 @@
   (let [kwargs (vec (map (comp keyword name) args))
         argmap (zipmap kwargs args)]
     `(vary-meta
-       {:type ~type
-        :op ~op
-        :args ~argmap}
+       (merge (ASTNode. ~type )
+              {:op ~op 
+               :args ~argmap}) 
        assoc :sim-factory [~f ~kwargs])))
+
+(extend-protocol ITyped
+  java.lang.Boolean
+  (typeof [this] (anontype :boolean))
+  (pipinst? [this] true)
+  java.lang.Long
+  (typeof [this] (anontype :j-long))
+  (pipinst? [this] true)
+  java.lang.Integer
+  (typeof [this] (anontype :j-int))
+  (pipinst? [this] true)
+  java.lang.Short
+  (typeof [this] (anontype :j-short))
+  (pipinst? [this] true)
+  java.lang.Byte
+  (typeof [this] (anontype :j-byte))
+  (pipinst? [this] true)
+  java.lang.Float
+  (typeof [this] (anontype :j-num))
+  (pipinst? [this] true)
+  java.lang.Double
+  (typeof [this] (anontype :j-num))
+  (pipinst? [this] true))
+
+(defn cast
+  "Converts the expr to the type."
+  [type expr]
+  (if (typeof expr)
+    (if (pipinst? expr)
+      (promote type expr)
+      (mkast type :cast [expr] (partial cast type)))
+    (try+
+      (promote type expr)
+      (catch piplin.types.CompilerError e
+        (if (class? type)
+          (clojure.core/cast type expr)
+          (throw+))))))
 
 (defmethod promote 
   :j-integral
@@ -29,7 +71,7 @@
 
 (derive-type Byte :j-byte)
 (derive-type Short :j-short)
-(derive-type Short :j-int)
+(derive-type Integer :j-int)
 (derive-type Long :j-long)
 
 (derive-type :j-byte :j-integral)
@@ -56,7 +98,7 @@
 (defmethod check
   :uintm
   [inst]
-  (let [n (get-in inst [:type :n])
+  (let [n (-> inst typeof :n)
         v (:val inst)
         maxval (dec (bit-shift-left 1 n))]
     (when (< v 0)
@@ -70,7 +112,7 @@
   :uintm
   [this obj]
   (cond
-    (= (:type obj) this) obj ;Already correct
+    (= (typeof obj) this) obj ;Already correct
     (= (kindof obj)
        (:kind this)) (throw+
                        (error
@@ -160,12 +202,10 @@
 
 (defn not
   [x]
-  (if (:type x)
+  (if (typeof x)
     (if (pipinst? x)
-      (->> (:val x)
-        clojure.core/not 
-        (instance boolean))
-      (mkast boolean :not [x] not))
+      (clojure.core/not x) 
+      (mkast (anontype :boolean) :not [x] not))
     (clojure.core/not x)))
 
 (defmulti = nary-dispatch :hierarchy types)
@@ -191,19 +231,42 @@
   it will evaluate them if the arguments are
   immediate and it will return an AST expr if one
   or more of the arguments aren't immediates."
-  [op unmangled-kw impl-name k fntail]
-  `(defn ~impl-name
+  [op unmangled-kw k fntail]
+  `(defmethod ~op [~k ~k]
      [x# y#]
-     (let [[x# y#] (type-unify ~k x# y#)]
-       (if (and (pipinst? x#)
-                (pipinst? y#))
-         (instance (:type x#)
-                   ((fn ~@fntail) x# y#)
-                   :constrain)
-         (let [~'lhs x# ~'rhs y#]
-           (mkast (:type x#)
-                  ~unmangled-kw
-                  [~'lhs ~'rhs] ~op))))))
+     (if (and (pipinst? x#)
+              (pipinst? y#))
+       (instance (typeof x#)
+                 ((fn ~@fntail) x# y#)
+                 :constrain)
+       (let [~'lhs x# ~'rhs y#]
+         (mkast (typeof x#)
+                ~unmangled-kw
+                [~'lhs ~'rhs] ~op)))))
+
+(defn make-binop-explict-coercions
+  "Takes a kind and a vector of kinds and returns
+  a list of syntax for defmethods that will invoke
+  the method for [kind kind] if kind is one of the
+  arguments and any element of the vector is the
+  other argument's kind."
+  [op k bases]
+  (let [k-bases (map #(vector k %) bases)
+        dispatches (concat k-bases
+                           (map reverse k-bases))]
+    (map (fn [[a b]]
+           `(defmethod ~op [~a ~b]
+              [~'x ~'y]
+              (let [[~'x  ~'y] (type-unify ~k ~'x ~'y)]
+                (~op ~'x ~'y))))
+         dispatches)))
+
+(defmacro defcoercions
+  "Used to construct automatic coercion for binop types
+  when they don't follow the more common return value
+  pattern."
+  [op k bases]
+  `(do ~@(make-binop-explict-coercions op k bases)))
 
 (defmacro defbinopimpl
   "Defines implementation of a binop on a piplin kind.
@@ -214,18 +277,9 @@
   unification failed."
   [op k bases & fntail]
   (let [unmangled-kw (keyword (name op))
-        impl-name (gensym (str (name op) (name k)))
         impl-body (make-binop-impl-fn op unmangled-kw
-                                      impl-name k fntail)
-        k-bases (map #(vector k %) bases)
-        dispatches (concat k-bases
-                           (map reverse k-bases)
-                           [[k k]])
-        bodies (map (fn [[a b]]
-                      `(defmethod ~op [~a ~b]
-                         [~'x ~'y]
-                         (~impl-name ~'x ~'y)))
-                    dispatches)]
+                                      k fntail)
+        bodies (make-binop-explict-coercions op k bases)]
     `(do
        ~impl-body
        ~@bodies)))
@@ -241,6 +295,41 @@
 (defbinopimpl * :uintm [:j-integral]
   [x y]
   (* (:val x) (:val y)))
+
+(defmethod > [:uintm :uintm]
+  [x y]
+  (if (and (pipinst? x) (pipinst? y))
+    (> (:val x) (:val y))
+    (mkast (anontype :boolean) :> [x y] >)))
+(defcoercions > :uintm [:j-integral])
+
+(defmethod >= [:uintm :uintm]
+  [x y]
+  (if (and (pipinst? x) (pipinst? y))
+    (>= (:val x) (:val y))
+    (mkast (anontype :boolean) :>= [x y] >=)))
+(defcoercions >= :uintm [:j-integral])
+
+(defmethod < [:uintm :uintm]
+  [x y]
+  (if (and (pipinst? x) (pipinst? y))
+    (< (:val x) (:val y))
+    (mkast (anontype :boolean) :< [x y] <)))
+(defcoercions < :uintm [:j-integral])
+
+(defmethod <= [:uintm :uintm]
+  [x y]
+  (if (and (pipinst? x) (pipinst? y))
+    (<= (:val x) (:val y))
+    (mkast (anontype :boolean) :<= [x y] <=)))
+(defcoercions <= :uintm [:j-integral])
+
+(defmethod = [:uintm :uintm]
+  [x y]
+  (if (and (pipinst? x) (pipinst? y))
+    (= (:val x) (:val y))
+    (mkast (anontype :boolean) := [x y] =)))
+(defcoercions = :uintm [:j-integral])
 
 (defbinopimpl bit-and :uintm [:j-integral]
   [x y]
@@ -274,7 +363,7 @@
 (defmethod promote
   :bits
   [type obj]
-  (when-let [n (get-in obj [:type :n])]
+  (when-let [n (-> obj typeof :n)]
     (when-not (= (:n type) n)
       (throw+ (error "Bit size mismatch"))))
   (condp isa-type? (kindof obj)
@@ -297,14 +386,14 @@
 (defmethod check
   :bits
   [inst]
-  (let [n (get-in inst [:type :n])
+  (let [n (-> inst typeof :n)
         v (:val inst)]
     (when-not (and (vector? v)
                    (every? #{0 1} v))
       (throw+ (error
                 "bits must be a vector of 0s and 1s:" v)))
     (when (not= (count v) n)
-      (throw+ (error "bit vector must be of length " n))))
+      (throw+ (error "bit vector must be of length" n (count  v)))))
   inst)
 
 (defmulti get-bits
@@ -319,7 +408,7 @@
 (defmethod get-bits
   :uintm
   [expr]
-  (let [n (get-in expr [:type :n])
+  (let [n (-> expr typeof :n)
         type (bits n)]
     (if (pipinst? expr)
       (instance type (long-to-bitvec (:val expr) n))
@@ -358,8 +447,7 @@
   ([bs]
    bs)
   ([b1 b2]
-   (instance (bits (+ (get-in b1 [:type :n])
-                      (get-in b2 [:type :n])))
+   (instance (bits (+ (-> b1 typeof :n) (-> b2 typeof :n)))
              (vec (concat (:val b1) (:val b2)))))
   ([b1 b2 & more]
    (if more
@@ -381,46 +469,28 @@
   (vec (map #(bit-xor %1 %2)
             (:val x) (:val y))))
 
-(defpiplintype Bool [])
-(def boolean (merge (Bool.) {:kind :boolean}))
-
-(defn cast
-  "Converts the expr to the type."
-  [type expr]
-  (if (:type expr)
-    (if (pipinst? expr)
-      (promote type expr)
-      (mkast type :cast [expr] (partial cast type)))
-    (try+
-      (promote type expr)
-      (catch piplin.types.CompilerError e
-        (if (class? type)
-          (clojure.core/cast type expr)
-          (throw+))))))
-
 (defn mux2
   [sel v1 v2]
-  (when-not (= (:type v1) (:type v2))
-    (throw+ (error v1 "and" v1 "are different types")))
-  (let [sel (cast boolean sel)]
+  (when-not (= (typeof v1) (typeof v2))
+    (throw+ (error v1 "and" v2 "are different types" (typeof v1) (typeof v2))))
+  (let [sel (cast (anontype :boolean) sel)]
     (if (pipinst? sel)
-      (if (:val sel) v1 v2)
-      (mkast (:type v1) :mux2 [sel v1 v2] mux2))))
+      (if sel v1 v2)
+      (mkast (typeof v1) :mux2 [sel v1 v2] mux2))))
 
 
 (defmethod promote
   :boolean
   [type obj]
-  (boolean
-    (= 1
-       (cond
-         (= (:type obj) type) (if (:val obj) 1 0)
-         (or (= true obj) (= false obj)) (if obj 1 0)
-         (= (:type obj) (bits 1)) (first (:val obj))
-         (and (= (kindof obj) :uintm)
-              (= (get-in obj [:type :n]) 1)) (:val obj)
-         :else
-         (throw+ (error "Cannot promote" obj "to boolean"))))))
+  (= 1
+     (cond
+       (= (typeof obj) type) (if obj 1 0)
+       (or (= true obj) (= false obj)) (if obj 1 0)
+       (= (typeof obj) (bits 1)) (first (:val obj))
+       (and (= (kindof obj) :uintm)
+            (= (-> obj typeof :n) 1)) (:val obj)
+       :else
+       (throw+ (error "Cannot promote" obj "to boolean")))))
 
 (defn trace
   "Takes a function and an expr and returns an
@@ -428,11 +498,11 @@
   will run the given function for its side effects
   every time this value is used."
   [f expr]
-  (mkast (:type expr) :noop [expr] #(do (f %) %)))
+  (mkast (typeof expr) :noop [expr] #(do (f %) %)))
 
 (defn pr-trace
   "Prints the args followed by the traced value."
   [& args]
-  (trace #(apply print-str (butlast args) %)
+  (trace #(apply print-str (conj (butlast args) %))
          (last args)))
 

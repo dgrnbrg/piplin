@@ -85,10 +85,10 @@
         "ran and counted up to 10 bits")))
 
 (deftest sim-cast-test
-  (let [mod (module [:outputs [odd (promote boolean false)
+  (let [mod (module [:outputs [odd false
                                c (promote (uintm 3) 0)]]
                     (let [new-c (inc c)]
-                      (connect odd (cast boolean
+                      (connect odd (cast (anontype :boolean) 
                                              (bit-slice (get-bits new-c) 0 1)))
                       (connect c new-c)))
         [state fns] (make-sim mod)]
@@ -98,68 +98,71 @@
 
     (is (= (get (exec-sim state fns 1)
                [(:token mod) :odd])
-           (promote boolean true)))
+           true))
     (is (= (get (exec-sim state fns 2)
                [(:token mod) :odd])
-           (promote boolean false)))
+           false))
     (is (= (get (exec-sim state fns 3)
                [(:token mod) :odd])
-           (promote boolean true)))
+           true))
 
     (is (= (get (exec-sim state fns 30)
                [(:token mod) :c])
            (instance (uintm 3) 30 :constrain)))
     (is (= (get (exec-sim state fns 30)
                [(:token mod) :odd])
-           (promote boolean false)))))
+           false))))
 
 (deftest sim-mux2-test
-  (let [mod (module [:outputs [flip (promote boolean false)]]
+  (let [mod (module [:outputs [flip false]]
                     (connect flip (mux2 flip
-                                        (promote boolean false)
-                                        (promote boolean true))))
+                                        false
+                                        true)))
         [state fns] (make-sim mod)]
     (is (= (get (exec-sim state fns 0)
                 [(:token mod) :flip])
-           (promote boolean false)))
+           false))
     (is (= (get (exec-sim state fns 1)
                 [(:token mod) :flip])
-           (promote boolean true)))
+           true))
+    (is (= (get (exec-sim state fns 2)
+                [(:token mod) :flip])
+           false))
     (is (= (get (exec-sim state fns 10)
                 [(:token mod) :flip])
-           (promote boolean false)))
+           false))
     (is (= (get (exec-sim state fns 11)
                 [(:token mod) :flip])
-           (promote boolean true)))))
+           true))))
 
 (deftest sim-equals-test
-  (let [mod (module [:outputs [triggered (boolean false)]
+  (let [mod (module [:outputs [triggered false]
                      :feedback [c ((uintm 2) 0)]]
                     (let [c' (inc c)]
                       (connect c c')
-                      (connect triggered (= c ((uintm 2) 3)))))
+                      (connect triggered (pr-trace "bool" (= c' ((uintm 2) 3))))))
         [state fns] (make-sim mod)]
     (is (= (get (exec-sim state fns 0)
                 [(:token mod) :triggered])
-           (boolean false)))
+           false))
     (is (= (get (exec-sim state fns 1)
                 [(:token mod) :triggered])
-           (boolean false)))
+           false))
     (is (= (get (exec-sim state fns 2)
                 [(:token mod) :triggered])
-           (boolean false)))
+           false))
     (is (= (get (exec-sim state fns 3)
                 [(:token mod) :triggered])
-           (boolean true)))
+           true))
     (is (= (get (exec-sim state fns 4)
                 [(:token mod) :triggered])
-           (boolean false)))
+           false))
     (is (= (get (exec-sim state fns 5)
                 [(:token mod) :triggered])
-           (boolean false)))
+           false))
     (is (= (get (exec-sim state fns 6)
                 [(:token mod) :triggered])
-           (boolean false)))
+           false))
     (is (= (get (exec-sim state fns 7)
                 [(:token mod) :triggered])
-           (boolean true)))))
+           true))))

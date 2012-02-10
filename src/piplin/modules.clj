@@ -140,7 +140,7 @@
           connections (gensym "connections")
           old-connect (gensym "old-connect")
           registers (map (tuplefn 1
-                           #(identity `(:type ~%2)))
+                           #(identity `(typeof ~%2)))
                          (concat outputs feedback))
           exprs (map (tuplefn 1
                        #(make-port %1 token %2))
@@ -307,10 +307,13 @@
   binds before invoking the function so that the
   ports can get their values at the bottom."
   [mz]
-  (let [[my-sim-fn my-args] (-> mz
-                              z/node
-                              meta
-                              :sim-factory)]
+  (let [[my-sim-fn my-args]
+        (if (pipinst? (z/node mz)) 
+          [#(identity (z/node mz)) []] 
+          (-> mz
+            z/node
+            meta
+            :sim-factory))]
     (if-let [args (go-down mz :args)]
       (let [args (zipseq args)
             arg-fns (map #(make-sim-fn (mz-val %)) args)

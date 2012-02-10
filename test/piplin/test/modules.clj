@@ -39,7 +39,7 @@
                  :args {
                         :reg {:token token
                               :port :quux
-                              :type nil}
+                              :type {:kind :j-long}}
                         :expr {:token token
                                :port :foo
                                :type "foo"}}}]})))))

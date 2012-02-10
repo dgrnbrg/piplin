@@ -7,8 +7,22 @@
 
 (def types (atom (make-hierarchy)))
 
+(defprotocol ITyped
+  "Things with types in piplin implement this."
+  (typeof [this] "Return type obj for this obj.")
+  (pipinst? [this] "Returns true if this is an
+                   instance of the type (as opposed
+                   to a symbolic representation)"))
+
+(extend-protocol ITyped
+  Object
+  (typeof [this] (:type this))
+  (pipinst? [this] false))
+
 (defn kindof [a]
-  (or (get-in a [:type :kind]) (class a)))
+  (if (satisfies? ITyped a)
+    (-> a typeof :kind)
+    (class a)))
 
 (defn anontype
   "Returns an anonymous type of
@@ -99,7 +113,11 @@
   :default
   [a] a)
 
-(defrecord Instance [type val])
+(defrecord Instance [type val]
+  ITyped
+  (typeof [this] type)
+  (pipinst? [this] true))
+
 (defn instance
   "Creates an instance of the type with value val"
   [type val & more]
@@ -115,10 +133,6 @@
                                       val
                                       more) []])))
 
-(defn pipinst?
-  "Returns true if x is an instance of a piplin type"
-  [x]
-  (instance? Instance x))
 
 (defmacro defpiplintype
   "Creates a piplin type record that implements
