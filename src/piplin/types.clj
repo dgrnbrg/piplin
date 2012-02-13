@@ -10,6 +10,7 @@
 (defprotocol ITyped
   "Things with types in piplin implement this."
   (typeof [this] "Return type obj for this obj.")
+  (value [this] "Return the value of this")
   (pipinst? [this] "Returns true if this is an
                    instance of the type (as opposed
                    to a symbolic representation)"))
@@ -17,6 +18,9 @@
 (extend-protocol ITyped
   Object
   (typeof [this] (:type this))
+  (value [this] (throw (IllegalArgumentException.
+                         (str "Cannot get value of "
+                              this))))
   (pipinst? [this] false))
 
 (defn kindof [a]
@@ -116,6 +120,7 @@
 (defrecord Instance [type val]
   ITyped
   (typeof [this] type)
+  (value [this] val)
   (pipinst? [this] true))
 
 (defn instance

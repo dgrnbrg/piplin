@@ -5,6 +5,7 @@
 (defrecord ASTNode [type]
   ITyped
   (typeof [this] type)
+  (value [this] (throw+ (error "ASTNode has no value")))
   (pipinst? [this] false))
 
 (defmacro mkast
@@ -22,24 +23,31 @@
 (extend-protocol ITyped
   java.lang.Boolean
   (typeof [this] (anontype :boolean))
+  (value [this] this)
   (pipinst? [this] true)
   java.lang.Long
   (typeof [this] (anontype :j-long))
+  (value [this] this)
   (pipinst? [this] true)
   java.lang.Integer
   (typeof [this] (anontype :j-int))
+  (value [this] this)
   (pipinst? [this] true)
   java.lang.Short
   (typeof [this] (anontype :j-short))
+  (value [this] this)
   (pipinst? [this] true)
   java.lang.Byte
   (typeof [this] (anontype :j-byte))
+  (value [this] this)
   (pipinst? [this] true)
   java.lang.Float
   (typeof [this] (anontype :j-num))
+  (value [this] this)
   (pipinst? [this] true)
   java.lang.Double
   (typeof [this] (anontype :j-num))
+  (value [this] this)
   (pipinst? [this] true))
 
 (defn cast
@@ -61,7 +69,7 @@
   [type obj]
   (condp isa-type? (kindof obj)
     :j-integral (clojure.core/long obj)
-    :uintm (:val obj)
+    :uintm (value obj)
     (throw+ (error "Cannot promote" obj "to Long"))))
 
 (derive-type :j-integral :j-num)
@@ -99,7 +107,7 @@
   :uintm
   [inst]
   (let [n (-> inst typeof :n)
-        v (:val inst)
+        v (value inst)
         maxval (dec (bit-shift-left 1 n))]
     (when (< v 0)
       (throw+ (error "uintm must be positive:" v)))
@@ -286,62 +294,62 @@
 
 (defbinopimpl + :uintm [:j-integral]
   [x y]
-  (+ (:val x) (:val y)))
+  (+ (value x) (value y)))
 
 (defbinopimpl - :uintm [:j-integral]
   [x y]
-  (- (:val x) (:val y)))
+  (- (value x) (value y)))
 
 (defbinopimpl * :uintm [:j-integral]
   [x y]
-  (* (:val x) (:val y)))
+  (* (value x) (value y)))
 
 (defmethod > [:uintm :uintm]
   [x y]
   (if (and (pipinst? x) (pipinst? y))
-    (> (:val x) (:val y))
+    (> (value x) (value y))
     (mkast (anontype :boolean) :> [x y] >)))
 (defcoercions > :uintm [:j-integral])
 
 (defmethod >= [:uintm :uintm]
   [x y]
   (if (and (pipinst? x) (pipinst? y))
-    (>= (:val x) (:val y))
+    (>= (value x) (value y))
     (mkast (anontype :boolean) :>= [x y] >=)))
 (defcoercions >= :uintm [:j-integral])
 
 (defmethod < [:uintm :uintm]
   [x y]
   (if (and (pipinst? x) (pipinst? y))
-    (< (:val x) (:val y))
+    (< (value x) (value y))
     (mkast (anontype :boolean) :< [x y] <)))
 (defcoercions < :uintm [:j-integral])
 
 (defmethod <= [:uintm :uintm]
   [x y]
   (if (and (pipinst? x) (pipinst? y))
-    (<= (:val x) (:val y))
+    (<= (value x) (value y))
     (mkast (anontype :boolean) :<= [x y] <=)))
 (defcoercions <= :uintm [:j-integral])
 
 (defmethod = [:uintm :uintm]
   [x y]
   (if (and (pipinst? x) (pipinst? y))
-    (= (:val x) (:val y))
+    (= (value x) (value y))
     (mkast (anontype :boolean) := [x y] =)))
 (defcoercions = :uintm [:j-integral])
 
 (defbinopimpl bit-and :uintm [:j-integral]
   [x y]
-  (bit-and (:val x) (:val y)))
+  (bit-and (value x) (value y)))
 
 (defbinopimpl bit-or :uintm [:j-integral]
   [x y]
-  (bit-or (:val x) (:val y)))
+  (bit-or (value x) (value y)))
 
 (defbinopimpl bit-xor :uintm [:j-integral]
   [x y]
-  (bit-xor (:val x) (:val y)))
+  (bit-xor (value x) (value y)))
 
 (defn long-to-bitvec
   "Takes a long and returns a bitvec with the first n bits"
@@ -369,7 +377,7 @@
   (condp isa-type? (kindof obj)
     :bits obj
     :uintm (instance type
-                     (long-to-bitvec (:val obj)
+                     (long-to-bitvec (value obj)
                                      (:n type)))
     :j-integral (instance type
                           (long-to-bitvec obj
@@ -387,7 +395,7 @@
   :bits
   [inst]
   (let [n (-> inst typeof :n)
-        v (:val inst)]
+        v (value inst)]
     (when-not (and (vector? v)
                    (every? #{0 1} v))
       (throw+ (error
@@ -411,14 +419,14 @@
   (let [n (-> expr typeof :n)
         type (bits n)]
     (if (pipinst? expr)
-      (instance type (long-to-bitvec (:val expr) n))
+      (instance type (long-to-bitvec (value expr) n))
       (mkast type :get-bits [expr] get-bits))))
 
 (defn slice-impl
   "Does slicing of bits"
   [expr low high]
   (let [type (bits (- high low))]
-    (instance type (-> (:val expr)
+    (instance type (-> (value expr)
                      reverse
                      vec
                      (subvec low high)
@@ -448,7 +456,7 @@
    bs)
   ([b1 b2]
    (instance (bits (+ (-> b1 typeof :n) (-> b2 typeof :n)))
-             (vec (concat (:val b1) (:val b2)))))
+             (vec (concat (value b1) (value b2)))))
   ([b1 b2 & more]
    (if more
      (recur (bit-cat b1 b2) (first more) (next more))
@@ -457,17 +465,17 @@
 (defbinopimpl bit-and :bits [:uintm :j-integral]
   [x y]
   (vec (map #(bit-and %1 %2)
-            (:val x) (:val y))))
+            (value x) (value y))))
 
 (defbinopimpl bit-or :bits [:uintm :j-integral]
   [x y]
   (vec (map #(bit-or %1 %2)
-            (:val x) (:val y))))
+            (value x) (value y))))
 
 (defbinopimpl bit-xor :bits [:uintm :j-integral]
   [x y]
   (vec (map #(bit-xor %1 %2)
-            (:val x) (:val y))))
+            (value x) (value y))))
 
 (defn mux2
   [sel v1 v2]
@@ -486,9 +494,9 @@
      (cond
        (= (typeof obj) type) (if obj 1 0)
        (or (= true obj) (= false obj)) (if obj 1 0)
-       (= (typeof obj) (bits 1)) (first (:val obj))
+       (= (typeof obj) (bits 1)) (first (value obj))
        (and (= (kindof obj) :uintm)
-            (= (-> obj typeof :n) 1)) (:val obj)
+            (= (-> obj typeof :n) 1)) (value obj)
        :else
        (throw+ (error "Cannot promote" obj "to boolean")))))
 
