@@ -500,6 +500,14 @@
        :else
        (throw+ (error "Cannot promote" obj "to boolean")))))
 
+(defmethod get-bits
+  :boolean 
+  [expr]
+  (let [type (bits 1)]
+    (if (pipinst? expr)
+      (instance type (if expr [1] [0]))
+      (mkast type :get-bits [expr] get-bits))))
+
 (defn trace
   "Takes a function and an expr and returns an
   expr whose value is the expr, but when simulated
@@ -563,3 +571,26 @@
         :else
         (merge (PiplinEnum. coll)
                {:kind :enum})))))
+
+(defmethod promote
+  :enum
+  [type obj]
+  (cond
+    (= (typeof obj) type) obj
+    (and (keyword? obj)
+         (obj (:keymap type))) (instance type obj)
+    :else
+    (throw+ (error "Cannot promote" obj "to" type))))
+
+(defmethod get-bits
+  :enum
+  [expr]
+  (let [type (-> (typeof expr)
+               :keymap
+               seq
+               first
+               val
+               typeof)]
+    (if (pipinst? expr)
+      ((value expr) (:keymap (typeof expr)))
+      (mkast type :get-bits [expr] get-bits))))

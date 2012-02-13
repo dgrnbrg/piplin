@@ -55,7 +55,9 @@
     (is (= (bit-and (b8 0xf) 0x3c) (b8 0xc)))
     (is (= (bit-or 0xf0 (b8 0xf)) (b8 0xff)))
     (is (= (bit-xor (instance (uintm 8) 0x3c) (b8 0xf))
-           (b8 0x33)))))
+           (b8 0x33))))
+  (is (= (get-bits true) (promote (bits 1) 1)))
+  (is (= (get-bits false) (promote (bits 1) 0)))) 
 
 (deftest sim-uintm-bits-test
   (let [mod (module [:outputs [c (promote (uintm 8) 0)
