@@ -3,7 +3,7 @@
   (:use (piplin types)))
 
 (defrecord ASTNode [type]
-  ITyped
+  piplin.types.ITyped
   (typeof [this] type)
   (value [this] (throw+ (error "ASTNode has no value")))
   (pipinst? [this] false))
@@ -514,3 +514,52 @@
   (trace #(apply print-str (conj (butlast args) %))
          (last args)))
 
+(defn log2
+  "Log base 2"
+  [v]
+  (let [log2v (-> (value v)
+                Math/log
+                (/ (Math/log 2))
+                (+ 0.5)
+                int)]
+    (promote (typeof v) log2v)))
+
+(defpiplintype PiplinEnum [keymap])
+(defn enum
+  "Takes a collection of keywords or a map of
+  keywords to bits and returns it as an enum
+  type."
+  [coll]
+  (if (set? coll)
+    (if (every? keyword? coll)
+      (let [n (count coll)
+            logn (log2 n)]
+        (merge (PiplinEnum.
+                 (zipmap coll
+                         (map #(cast (bits logn) %)
+                              (iterate inc 0))))
+               {:kind :enum}))
+      (throw+ (error
+                "Set must be made of only kewords"
+                (remove keyword? coll))))
+    (if (map? coll)
+      (cond
+        (some #(not= (kindof %) :bits) (vals coll))
+        (throw+ (error "Map's values must all be bits")) 
+        (some #(not= (-> (seq coll)
+                       first
+                       val
+                       typeof
+                       :n)
+                     (-> % typeof :n))
+              (vals coll))
+        (throw+ (error
+                  "Map's values must be same bit width")) 
+        (some #(not (keyword? %)) (keys coll))
+        (throw+ (error "Map's keys must be keywords")) 
+        (not= (count (vals coll))
+              (count (distinct (vals coll))))
+        (throw+ (error "Enum keys must be distinct"))
+        :else
+        (merge (PiplinEnum. coll)
+               {:kind :enum})))))

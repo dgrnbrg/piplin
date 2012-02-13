@@ -166,3 +166,21 @@
     (is (= (get (exec-sim state fns 7)
                 [(:token mod) :triggered])
            true))))
+
+(deftest enum-initialize-test
+  (let [e (enum #{:a :b :c})]
+    (enum (:keymap e)))
+  (is (thrown? ExceptionInfo
+               (enum {:a (cast (bits 2) 0)
+                      :b (cast (bits 2) 0)})))
+  (is (thrown? ExceptionInfo 
+               (enum {:a (cast (bits 2) 0)
+                      2 (cast (bits 2) 1)})))
+  (is (thrown? ExceptionInfo 
+               (enum {:a (cast (bits 2) 0)
+                      :b (cast (bits 3) 1)})))
+  (is (thrown? ExceptionInfo 
+               (enum {:a 0
+                      :b (cast (bits 2) 1)})))
+  (is (thrown? ExceptionInfo 
+               (enum #{:a 1 "a"}))))
