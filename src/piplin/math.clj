@@ -594,3 +594,12 @@
     (if (pipinst? expr)
       ((value expr) (:keymap (typeof expr)))
       (mkast type :get-bits [expr] get-bits))))
+
+(defmethod check
+  :enum
+  [inst]
+  (let [keymap (-> inst typeof :keymap)
+        v (value inst)]
+    (when-not (some #{v} (keys keymap))
+      (throw+ (error v "is not in" (keys keymap)))))
+  inst)
