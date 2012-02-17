@@ -603,3 +603,55 @@
     (when-not (some #{v} (keys keymap))
       (throw+ (error v "is not in" (keys keymap)))))
   inst)
+
+(defpiplintype Bundle [schema])
+(defn bundle
+  "Takes a map of keys to types and returns
+  a bundle type with that schema."
+  [schema]
+  (cond
+    (not (map? schema))
+    (throw+ (error "Schema must be a map"))
+    (some (comp not keyword?) (keys schema))
+    (throw+ (error "keys must be keywords"))
+    (some #(not (or (:kind %) (class? %))) (vals schema))
+    (throw+ (error "values must be piplin or java types:" schema))
+    :else
+    (merge (Bundle. schema)
+           {:kind :bundle})))
+
+(defmethod promote
+  :bundle
+  [type obj]
+  (cond
+    (= (typeof obj) type) obj
+    (map? obj) (instance type obj :constrain)
+    :else
+    (throw+ (error "Cannot promote" obj "to" type))))
+
+(defmethod get-bits
+  :bundle
+  [expr])
+
+(defmethod constrain
+  :bundle
+  [type val]
+  (let [schema (:schema type)]
+    (->> val
+      (mapcat (fn [[k v]]
+                [k (cast (k schema) v)]))
+      (apply hash-map))))
+
+(defmethod check 
+  :bundle
+  [inst]
+  (let [schema (:schema (typeof inst))
+        all-correct (map (fn [[k v]]
+                           (isa-type? (k schema)
+                                      (typeof v)))
+                         (value inst))]
+    (when-not (every? identity all-correct)
+      (throw+ (error (value inst)
+                     "doesn't match schema"
+                     schema))))
+  inst)

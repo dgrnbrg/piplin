@@ -192,3 +192,19 @@
                       :b (cast (bits 2) 1)})))
   (is (thrown? ExceptionInfo 
                (enum #{:a 1 "a"}))))
+
+(deftest bundle-test
+  (let [b1 (bundle {:a (uintm 3)
+                    :b (enum #{:foo :bar})})]
+    (is (instance b1 {:a (cast (uintm 3) 2)
+                      :b (cast (enum #{:foo :bar})
+                               :foo)}))
+    (is (thrown? ExceptionInfo
+                 (instance b1 {:a 1
+                               :b (cast (enum #{:foo :bar})
+                                        :foo)})))
+    (is (= (:a (cast b1 {:a 4 :b :bar})) ((uintm 3) 4)))
+    (let [{:keys [a b]} (cast b1 {:a 2 :b :bar})]
+      (is (= a ((uintm 3) 2)))
+      (is (= b ((enum #{:foo :bar}) :bar))))
+    ))
