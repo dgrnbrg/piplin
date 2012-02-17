@@ -89,7 +89,7 @@
   [target-kind a b]
   (cond
     (= (kindof a) target-kind)
-    (let [b (promote (:type a) b)]
+    (let [b (promote (typeof a) b)]
       [a b])
     (= (kindof b) target-kind)
     (let [[b a] (type-unify target-kind b a)]
@@ -117,11 +117,29 @@
   :default
   [a] a)
 
-(defrecord Instance [type val]
-  ITyped
-  (typeof [this] type)
+;This is a scalar instance
+(deftype Instance [type val metamap]
+  java.lang.Object
+  (equals [this other]
+    (and (= (.type other) type)
+         (= (.val other) val)))
+  (hashCode [this]
+    (+ (.hashCode type)
+       (.hashCode val)))
+  (toString [this]
+    (print-str "{:type" type ":val" val "}"))
+  ITyped 
+  (typeof [this] type) 
   (value [this] val)
-  (pipinst? [this] true))
+  (pipinst? [this] true)
+  clojure.lang.ILookup 
+  (valAt 
+    [this key] 
+    (get val key))
+  clojure.lang.IMeta
+  (meta [this] metamap)
+  clojure.lang.IObj
+  (withMeta [this metamap] (Instance. type val metamap)))
 
 (defn instance
   "Creates an instance of the type with value val"
@@ -129,15 +147,13 @@
   (let [val (if (some #{:constrain} more)
               (constrain type val)
               val)
-        inst (merge (Instance. type val)
-               {:type type})]
+        inst (Instance. type val {})]
     (vary-meta
       (check inst)
       assoc :sim-factory [#(apply instance
-                                      type
-                                      val
-                                      more) []])))
-
+                                  type
+                                  val
+                                  more) []])))
 
 (defmacro defpiplintype
   "Creates a piplin type record that implements
