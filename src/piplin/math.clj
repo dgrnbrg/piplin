@@ -2,24 +2,6 @@
   (:use [slingshot.slingshot])
   (:use (piplin types)))
 
-(defrecord ASTNode [type]
-  piplin.types.ITyped
-  (typeof [this] type)
-  (value [this] (throw+ (error "ASTNode has no value")))
-  (pipinst? [this] false))
-
-(defmacro mkast
-  "Takes the type, op, args, and function and
-  returns an ast fragment."
-  [type op args f]
-  (let [kwargs (vec (map (comp keyword name) args))
-        argmap (zipmap kwargs args)]
-    `(vary-meta
-       (merge (ASTNode. ~type )
-              {:op ~op 
-               :args ~argmap}) 
-       assoc :sim-factory [~f ~kwargs])))
-
 (extend-protocol ITyped
   java.lang.Boolean
   (typeof [this] (anontype :boolean))
@@ -443,11 +425,11 @@
     (let [type (bits (- high low))]
       (if (pipinst? expr)
         (slice-impl expr low high)
-        (merge
-          (mkast type :slice
-                 [expr] #(slice-impl % low high))
-          {:low low
-           :high high})))))
+        (alter-aug (mkast type :slice
+                          [expr] #(slice-impl % low high))
+                   merge
+                   {:low low
+                    :high high})))))
 
 (defn bit-cat
   ([]

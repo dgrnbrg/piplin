@@ -86,9 +86,10 @@
   the port."
   [name token type-syntax]
   `(vary-meta
-     {:type ~type-syntax
-      :port ~name
-      :token '~token}
+     (piplin.types.ASTNode. ~type-syntax 
+                            {:port ~name 
+                             :token '~token}
+                            {}) 
      assoc :sim-factory
      [#(get sim-fn-args ['~token ~name]) []]))
 
@@ -173,9 +174,10 @@
 (defn connect-impl
   "This connects a register to an expr"
   [reg expr]
-  {:type :connection
-   :args {:reg reg
-          :expr expr}})
+  (piplin.types.ASTNode. :connection 
+            {:args {:reg reg 
+                    :expr expr}}
+            {}))
 
 (defn entry [k v]
   (clojure.lang.MapEntry. k v))
@@ -193,11 +195,14 @@
   (z/zipper
     #(or (map? %)
          (vector? %)
-         (entry? %))
+         (entry? %)
+         (= (class %) piplin.types.IAugmented))
     #(cond
        (map? %) (seq %)
        (vector? %) (seq %)
-       (entry? %) (seq %))
+       (entry? %) (seq %)
+       (= (class %) piplin.types.IAugmented)
+       (-> % aug seq))
     (fn [node children]
       (cond
         (map? node) (zipmap (map key children)
@@ -270,7 +275,7 @@
     mz
     (fn [mz]
       (map visit
-           (filter #(= (-> % z/node :type)
+           (filter #(= (-> % z/node typeof)
                        :connection)
                    (zipseq (go-down mz :body)))))
     combine))

@@ -164,3 +164,60 @@
      clojure.lang.IFn
      (invoke [~'this ~'x]
        (instance ~'this ~'x))))
+
+(defprotocol IAugmented
+  "Like IMeta, but counts for equality and hashcode"
+  (aug [this] "Gets the augment data")
+  (with-aug [this aug]
+    "Returns this with the new augment data"))
+
+(defn alter-aug
+  "Takes an augmented object, a function, and args,
+  and returns the object's augmentation to
+  (f old-aug args)"
+  [obj f & args]
+  (let [old-aug (aug obj)
+        new-aug (apply f old-aug args)]
+    (with-aug obj new-aug)))
+
+(deftype ASTNode [type map metamap]
+  java.lang.Object
+  (equals [this other]
+    (and (= (.type other) type)
+         (= (.map other) map)))
+  (hashCode [this]
+    (+ (.hashCode type) (* 17 (.hashCode map))))
+  (toString [this]
+    (print-str "ASTNode" type map))
+
+  IAugmented
+  (aug [this] map)
+  (with-aug [this aug] (ASTNode. type aug metamap))
+
+  clojure.lang.ILookup 
+  (valAt 
+    [this key] 
+    (get map key))
+
+  clojure.lang.IMeta
+  (meta [this] metamap)
+  clojure.lang.IObj
+  (withMeta [this metamap] (ASTNode. type map metamap))
+
+  piplin.types.ITyped
+  (typeof [this] type)
+  (value [this] (throw+ (error "ASTNode has no value")))
+  (pipinst? [this] false))
+
+(defmacro mkast
+  "Takes the type, op, args, and function and
+  returns an ast fragment."
+  [type op args f]
+  (let [kwargs (vec (map (comp keyword name) args))
+        argmap (zipmap kwargs args)]
+    `(vary-meta
+       (ASTNode. ~type
+                 {:op ~op 
+                  :args ~argmap}
+                 {})
+       assoc :sim-factory [~f ~kwargs])))

@@ -207,4 +207,20 @@
     (let [{:keys [a b]} (cast b1 {:a 2 :b :bar})]
       (is (= a ((uintm 3) 2)))
       (is (= b ((enum #{:foo :bar}) :bar))))
-    ))
+    (let [mod (module [:outputs [o (cast b1 {:a 0 :b :foo})]]
+                      (println o)
+                      (let [a' (inc (pr-trace "o =" o))
+                            b' (mux2 (= (:b o) :foo)
+                                     :bar :foo)]
+                        (connect o (cast b1 {:a a' :b b'}))))
+          [state fns] (make-sim mod)] 
+      (is (= (get (exec-sim state fns 0)
+                  [(:token mod) :o])
+             (cast b1 {:a 0 :b :foo})))
+      (is (= (get (exec-sim state fns 2)
+                  [(:token mod) :o])
+             (cast b1 {:a 1 :b :bar})))
+      (is (= (get (exec-sim state fns 2)
+                  [(:token mod) :o])
+             (cast b1 {:a 2 :b :foo})))
+      ))) 
