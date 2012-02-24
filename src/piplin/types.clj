@@ -117,29 +117,40 @@
   :default
   [a] a)
 
-;This is a scalar instance
-(deftype Instance [type val metamap]
+(defn- unsupported
+  [& args]
+  (throw (UnsupportedOperationException. "Not supported!")))
+
+(deftype ASTNode [type map metamap]
   java.lang.Object
   (equals [this other]
-    (and (= (.type other) type)
-         (= (.val other) val)))
+    (and (instance? ASTNode other)
+         (= (.type other) type)
+         (= (.map other) map)))
   (hashCode [this]
-    (+ (.hashCode type)
-       (.hashCode val)))
+    (+ (.hashCode type) (* 17 (.hashCode map))))
   (toString [this]
-    (print-str "{:type" type ":val" val "}"))
-  ITyped 
-  (typeof [this] type) 
-  (value [this] val)
-  (pipinst? [this] true)
+    (print-str "(ASTNode" type map ")"))
+
   clojure.lang.ILookup 
   (valAt 
-    [this key] 
-    (get val key))
+    [this key]
+    ((get type
+          :valAt
+          unsupported)
+       this key))
+
   clojure.lang.IMeta
   (meta [this] metamap)
   clojure.lang.IObj
-  (withMeta [this metamap] (Instance. type val metamap)))
+  (withMeta [this metamap] (ASTNode. type map metamap))
+
+  piplin.types.ITyped
+  (typeof [this] type)
+  (value [this] map)
+  (pipinst? [this]
+    (let [x ((get metamap :pipinst?) this)]
+      x)))
 
 (defn instance
   "Creates an instance of the type with value val"
@@ -147,7 +158,7 @@
   (let [val (if (some #{:constrain} more)
               (constrain type val)
               val)
-        inst (Instance. type val {})]
+        inst (ASTNode. type val {:pipinst? identity})]
     (vary-meta
       (check inst)
       assoc :sim-factory [#(apply instance
@@ -165,49 +176,12 @@
      (invoke [~'this ~'x]
        (instance ~'this ~'x))))
 
-(defprotocol IAugmented
-  "Like IMeta, but counts for equality and hashcode"
-  (aug [this] "Gets the augment data")
-  (with-aug [this aug]
-    "Returns this with the new augment data"))
-
-(defn alter-aug
-  "Takes an augmented object, a function, and args,
-  and returns the object's augmentation to
-  (f old-aug args)"
-  [obj f & args]
-  (let [old-aug (aug obj)
-        new-aug (apply f old-aug args)]
-    (with-aug obj new-aug)))
-
-(deftype ASTNode [type map metamap]
-  java.lang.Object
-  (equals [this other]
-    (and (= (.type other) type)
-         (= (.map other) map)))
-  (hashCode [this]
-    (+ (.hashCode type) (* 17 (.hashCode map))))
-  (toString [this]
-    (print-str "ASTNode" type map))
-
-  IAugmented
-  (aug [this] map)
-  (with-aug [this aug] (ASTNode. type aug metamap))
-
-  clojure.lang.ILookup 
-  (valAt 
-    [this key] 
-    (get map key))
-
-  clojure.lang.IMeta
-  (meta [this] metamap)
-  clojure.lang.IObj
-  (withMeta [this metamap] (ASTNode. type map metamap))
-
-  piplin.types.ITyped
-  (typeof [this] type)
-  (value [this] (throw+ (error "ASTNode has no value")))
-  (pipinst? [this] false))
+(defn alter-value
+  "Takes an ASTNode and alters its value"
+  [astnode f & more]
+  (ASTNode. (.type astnode)
+            (apply f (.map astnode) more)
+            (.metamap astnode)))
 
 (defmacro mkast
   "Takes the type, op, args, and function and
@@ -219,5 +193,5 @@
        (ASTNode. ~type
                  {:op ~op 
                   :args ~argmap}
-                 {})
+                 {:pipinst? (fn [& ~'a] false)})
        assoc :sim-factory [~f ~kwargs])))

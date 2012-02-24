@@ -89,7 +89,7 @@
      (piplin.types.ASTNode. ~type-syntax 
                             {:port ~name 
                              :token '~token}
-                            {}) 
+                            {:pipinst? (fn [x#] false)})
      assoc :sim-factory
      [#(get sim-fn-args ['~token ~name]) []]))
 
@@ -112,7 +112,7 @@
   that module."
   [token connections old-connect]
   `(fn [~'reg ~'expr]
-    (if (= (:token ~'reg) '~token)
+    (if (= (:token (value ~'reg)) '~token)
       (swap! ~connections
              conj
              (connect-impl
@@ -196,13 +196,13 @@
     #(or (map? %)
          (vector? %)
          (entry? %)
-         (= (class %) piplin.types.IAugmented))
+         (not (pipinst? %)))
     #(cond
        (map? %) (seq %)
        (vector? %) (seq %)
        (entry? %) (seq %)
-       (= (class %) piplin.types.IAugmented)
-       (-> % aug seq))
+       :else
+       (seq (value %)))
     (fn [node children]
       (cond
         (map? node) (zipmap (map key children)

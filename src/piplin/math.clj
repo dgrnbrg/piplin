@@ -425,11 +425,11 @@
     (let [type (bits (- high low))]
       (if (pipinst? expr)
         (slice-impl expr low high)
-        (alter-aug (mkast type :slice
-                          [expr] #(slice-impl % low high))
-                   merge
-                   {:low low
-                    :high high})))))
+        (alter-value (mkast type :slice
+                            [expr] #(slice-impl % low high))
+                     merge
+                     {:low low
+                      :high high})))))
 
 (defn bit-cat
   ([]
@@ -586,6 +586,15 @@
       (throw+ (error v "is not in" (keys keymap)))))
   inst)
 
+(defn bundle-get
+  [map key]
+  ;(println (str "Getting " key " from " map)) 
+  (if (pipinst? map)
+    (clojure.core/get (value map) key)
+    (mkast (get-in (typeof map) [:schema key]) :bundle-key
+           [map] (fn [e]
+                   (bundle-get e key)))))
+
 (defpiplintype Bundle [schema])
 (defn bundle
   "Takes a map of keys to types and returns
@@ -600,7 +609,8 @@
     (throw+ (error "values must be piplin or java types:" schema))
     :else
     (merge (Bundle. schema)
-           {:kind :bundle})))
+           {:valAt bundle-get
+            :kind :bundle})))
 
 (defmethod promote
   :bundle

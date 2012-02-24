@@ -209,8 +209,10 @@
       (is (= b ((enum #{:foo :bar}) :bar))))
     (let [mod (module [:outputs [o (cast b1 {:a 0 :b :foo})]]
                       (println o)
-                      (let [a' (inc (pr-trace "o =" o))
-                            b' (mux2 (= (:b o) :foo)
+                      (let [a' (inc (bundle-get o :a))
+                            b' (mux2 (= (bundle-get o :b)
+                                        (cast (enum #{:foo :bar})
+                                              :foo))
                                      :bar :foo)]
                         (connect o (cast b1 {:a a' :b b'}))))
           [state fns] (make-sim mod)] 
