@@ -208,7 +208,6 @@
       (is (= a ((uintm 3) 2)))
       (is (= b ((enum #{:foo :bar}) :bar))))
     (let [mod (module [:outputs [o (cast b1 {:a 0 :b :foo})]]
-                      (println o)
                       (let [a' (inc (bundle-get o :a))
                             b' (mux2 (= (bundle-get o :b)
                                         (cast (enum #{:foo :bar})

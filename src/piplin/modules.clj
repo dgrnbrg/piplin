@@ -255,14 +255,12 @@
   "Takes a map-zipper of the ast and applies
   the function combine as a reduce across the values
   given by (visit module) for every module."
-  [mz visit combine]
-  (let [x (visit mz)]
-    (if-let [submodules (seq (z/node
-                               (go-down mz :modules)))]
+  [ast visit combine]
+  (let [x (visit ast)]
+    (if (seq (:modules ast))
       (reduce combine x
-              (map (comp #(walk-modules % visit combine)
-                         mz-val)
-                   (zipseq (go-down mz :modules))))
+              (map #(walk-modules % visit combine)
+                   (vals (:modules ast))))
       x)))
 
 (defn walk-connects
@@ -270,24 +268,23 @@
   the function combine as a reduce operation
   across the values given by (visit connect)
   for every connection in every module"
-  [mz visit combine]
+  [ast visit combine]
   (walk-modules
-    mz
-    (fn [mz]
+   ast 
+    (fn [ast]
       (map visit
-           (filter #(= (-> % z/node typeof)
+           (filter #(= (typeof %)
                        :connection)
-                   (zipseq (go-down mz :body)))))
+                   (:body ast))))
     combine))
 
 (defn walk-expr
-  [exprz visit combine]
-  (let [x (visit exprz)]
-    (if-let [argsz (go-down exprz :args)]
-      (let [subexprs (zipseq argsz)]
+  [expr visit combine]
+  (let [x (visit expr)]
+    (if-let [args (:args (value expr))]
+      (let [subexprs (vals args)]
         (reduce combine x
-                (map (comp #(walk-expr % visit combine)
-                           mz-val)
+                (map #(walk-expr % visit combine)
                      subexprs)))
       x)))
 
@@ -311,19 +308,16 @@
   The function collects its args into a map which it
   binds before invoking the function so that the
   ports can get their values at the bottom."
-  [mz]
+  [expr]
   (let [[my-sim-fn my-args]
-        (if (pipinst? (z/node mz)) 
-          [#(identity (z/node mz)) []] 
-          (-> mz
-            z/node
+        (if (pipinst? expr)
+          [#(identity expr) []] 
+          (-> expr 
             meta
             :sim-factory))]
-    (if-let [args (go-down mz :args)]
-      (let [args (zipseq args)
-            arg-fns (map #(make-sim-fn (mz-val %)) args)
-            arg-map (zipmap (map (comp z/node mz-key)
-                                 args)
+    (if-let [args (:args (value expr))]
+      (let [arg-fns (map #(make-sim-fn (val %)) args)
+            arg-map (zipmap (keys args)
                             arg-fns)
             fn-vec (map #(get arg-map %) my-args)]
         (fn []
@@ -340,16 +334,15 @@
   that takes the needed ports as arguments (listed in
   states), binds them to the sim-fn-arg binding, and
   invokes the no-arg sim-fn to get the result."
-  [mz]
-  (let [reg (z/node (go-path-down mz [:args :reg]))
-        expr (go-path-down mz [:args :expr])
+  [connection]
+  (let [reg (get-in (value connection) [:args :reg])
+        expr (get-in (value connection) [:args :expr])
         sim-fn (make-sim-fn expr)
-        reg-state [(:token reg) (:port reg)]
-        ports (walk-expr mz
-                         #(let [n (z/node %)]
-                            (if-let [port (:port n)]
-                              [[(:token n) port]]
-                              nil))
+        reg-state [(:token (value reg)) (:port (value reg))]
+        ports (walk-expr connection 
+                         #(if-let [port (:port (value %))]
+                              [[(:token (value %)) port]]
+                              nil)
                          concat)]
     (every-cycle
        (fn [& vals]
@@ -368,9 +361,9 @@
   This state can be used by the simulation
   engine."
   [module]
-  (let [token (z/node (go-down module :token))
-        regs (merge (z/node (go-down module :outputs))
-                    (z/node (go-down module :feedback)))]
+  (let [token (:token module)
+        regs (merge (:outputs module)
+                    (:feedback module))]
     (apply hash-map (mapcat (fn [[k v]]
                               [[token k] v])
                             regs))))
@@ -380,10 +373,9 @@
   pair of [state fns] that can be simulated with
   exec-sim. See exec-sim for details."
   [root]
-  (let [mz (map-zipper root)
-        initial-state (walk-modules mz get-qual-state
+  (let [initial-state (walk-modules root get-qual-state
                                     merge)
-        connections (walk-connects mz make-connection
+        connections (walk-connects root make-connection
                                    concat)
         connections (->> connections
                       (apply concat)
