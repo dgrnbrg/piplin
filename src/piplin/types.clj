@@ -1,5 +1,6 @@
 (ns piplin.types
-  (:use [slingshot.slingshot :only [throw+ try+]]))
+  (:use [slingshot.slingshot :only [throw+ try+]]
+        [clojure.pprint]))
 
 (comment
 ;  TODO: email jim@dueys.net questions about monads
@@ -119,7 +120,7 @@
 
 (defn- unsupported
   [& args]
-  (throw (UnsupportedOperationException. "Not supported!")))
+  (throw (UnsupportedOperationException. (str "Not supported! " (first args)))))
 
 (deftype ASTNode [type map metamap]
   java.lang.Object
@@ -152,19 +153,45 @@
     (let [x ((get metamap :pipinst?) this)]
       x)))
 
+(defn astnode-dispatch  [f]
+  (clojure.pprint/simple-dispatch
+    (if (instance? ASTNode f)
+      (let [value (value f)
+            type (typeof f)]
+        (comment (if (map? value) 
+          (assoc value :type type))) 
+        [:type type :value value])
+      f)))
+
+    (comment (cl-format true
+      "~<{~;~<type ~_~w~:>, ~_~<map ~_~w~:>, ~_~<metamap ~_~w~:>~;}~:>"
+      [[(.type f)]  [(.map f)]  [(.metamap f)]])) 
+
+(defn pprint-ast [f]
+  (with-pprint-dispatch astnode-dispatch
+    (pprint f)))
+
 (defn instance
   "Creates an instance of the type with value val"
   [type val & more]
   (let [val (if (some #{:constrain} more)
               (constrain type val)
               val)
-        inst (ASTNode. type val {:pipinst? identity})]
-    (vary-meta
-      (check inst)
-      assoc :sim-factory [#(apply instance
-                                  type
-                                  val
-                                  more) []])))
+        inst (ASTNode. type val
+                       {:pipinst?
+                        (get (meta type)
+                             :pipinst?
+                             identity)
+                        :sim-factory
+                        (get (meta val)
+                             :sim-factory
+                             [(fn []
+                                (apply instance 
+                                       type 
+                                       val 
+                                       more)) []])})
+        checked (check inst)]
+    checked))
 
 (defmacro defpiplintype
   "Creates a piplin type record that implements
@@ -195,3 +222,11 @@
                   :args ~argmap}
                  {:pipinst? (fn [& ~'a] false)})
        assoc :sim-factory [~f ~kwargs])))
+
+(defn uninst
+  "Takes a pipinst and makes it into an AST frag"
+  [pipinst]
+  (when-not (pipinst? pipinst)
+    (throw+ (error pipinst "must be a pipinist")))
+  (vary-meta (alter-value pipinst assoc :args [])
+             assoc :pipinst? (fn [x] false)))

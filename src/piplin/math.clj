@@ -587,13 +587,23 @@
   inst)
 
 (defn bundle-get
-  [map key]
-  ;(println (str "Getting " key " from " map)) 
-  (if (pipinst? map)
-    (clojure.core/get (value map) key)
-    (mkast (get-in (typeof map) [:schema key]) :bundle-key
-           [map] (fn [e]
-                   (bundle-get e key)))))
+  [bund key]
+  (if (pipinst? bund)
+    (clojure.core/get (:consts (value bund)) key)
+    (vary-meta
+      (alter-value
+        (mkast (get-in (typeof bund) [:schema key])
+               :bundle-key
+               [bund]
+               (fn [b]
+                 (bundle-get b key)))
+        assoc :key key)
+      assoc
+      :valAt
+      (fn [this key]
+        (let [v (value this)]
+          (get (:consts v) key
+               (get (:args v) key)))))))
 
 (defpiplintype Bundle [schema])
 (defn bundle
@@ -608,16 +618,35 @@
     (some #(not (or (:kind %) (class? %))) (vals schema))
     (throw+ (error "values must be piplin or java types:" schema))
     :else
-    (merge (Bundle. schema)
-           {:valAt bundle-get
-            :kind :bundle})))
+    (vary-meta (assoc (Bundle. schema) :kind :bundle)
+               merge 
+               {:valAt bundle-get
+                :pipinst? #(empty? (:args (value %)))})))
+
+(defn filter-map
+  "Returns a map by filtering the values with
+  the given predicate"
+  [pred map]
+  (->> map 
+    (filter (fn [[k v]] (pred v)))
+    (apply concat) 
+    (apply hash-map)))
+
+(defn const-uneval-filter
+  "Takes a map and returns 2 maps: one containing
+  elements of the initial map whose values are pipinsts,
+  and the other containing the non-pipinst values (i.e.
+  AST fragments."
+  [map]
+  [(filter-map pipinst? map)
+   (filter-map (comp not pipinst?) map)])
 
 (defmethod promote
   :bundle
   [type obj]
   (cond
     (= (typeof obj) type) obj
-    (map? obj) (instance type obj :constrain)
+    (map? obj) (instance type {:args obj} :constrain)
     :else
     (throw+ (error "Cannot promote" obj "to" type))))
 
@@ -628,20 +657,43 @@
 (defmethod constrain
   :bundle
   [type val]
-  (let [schema (:schema type)]
-    (->> val
-      (mapcat (fn [[k v]]
-                [k (cast (k schema) v)]))
-      (apply hash-map))))
+  (let [schema (:schema type)
+        [evaluated args] (const-uneval-filter
+                           (->> (:args val)
+                             (mapcat (fn [[k v]]
+                                       [k (cast (k schema) v)]))
+                             (apply hash-map)))]
+    (println (str "evaluated = " evaluated ", args = " args))
+    (vary-meta
+      {:consts (->> evaluated 
+                 (mapcat (fn [[k v]]
+                           [k (cast (k schema) v)]))
+                 (apply hash-map))
+       :args args}
+      assoc
+      :sim-factory
+      [(fn [& more]
+         (let [tmp (merge evaluated
+                          (zipmap (keys args)
+                                  more))]
+           (println (str "tmp = " tmp))
+           (instance type
+                     {:args tmp}
+                     :constrain)))
+       (-> args keys vec)])))
 
 (defmethod check 
   :bundle
   [inst]
   (let [schema (:schema (typeof inst))
+        v (value inst)
+        consts (:consts v)
+        unevaled (:args v)
+        all-elts (merge {} consts unevaled)
         all-correct (map (fn [[k v]]
                            (isa-type? (k schema)
                                       (typeof v)))
-                         (value inst))]
+                         all-elts)]
     (when-not (every? identity all-correct)
       (throw+ (error (value inst)
                      "doesn't match schema"

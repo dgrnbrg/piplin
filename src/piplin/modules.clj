@@ -322,9 +322,9 @@
             fn-vec (map #(get arg-map %) my-args)]
         (fn []
           (apply my-sim-fn (map #(%) fn-vec))))
-        (if (seq my-args)
-          (throw (AssertionError. (str "lol" my-args)))
-          (fn [] (my-sim-fn))))))
+      (if (seq my-args)
+        (throw (AssertionError. (str "lol" my-args)))
+        (fn [] (my-sim-fn))))))
 
 (def ^:dynamic sim-fn-args {})
 
