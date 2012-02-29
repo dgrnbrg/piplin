@@ -129,7 +129,8 @@
          (= (.type other) type)
          (= (.map other) map)))
   (hashCode [this]
-    (+ (.hashCode type) (* 17 (.hashCode map))))
+    (int (mod (+ (.hashCode type) (* 17 (.hashCode map)))
+         Integer/MAX_VALUE)))
   (toString [this]
     (print-str "(ASTNode" type map ")"))
 

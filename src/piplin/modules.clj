@@ -302,8 +302,8 @@
 
 (defn make-sim-fn
   "Takes a map-zipper of the ast of an expr
-  and walks along the expr. It returns a pair whose
-  first element is a function that computes the expr
+  and walks along the expr. It returns a function
+  that computes the expr
   and takes no args (needed ports come via binding).
   The function collects its args into a map which it
   binds before invoking the function so that the
@@ -320,6 +320,10 @@
             arg-map (zipmap (keys args)
                             arg-fns)
             fn-vec (map #(get arg-map %) my-args)]
+        (println (str "my-args = " my-args))
+        (println (str "args-fns = " (vec arg-fns)))
+        (println (str "args-map = " arg-map))
+        (println (str "fn-vec = " (vec fn-vec)))
         (fn []
           (apply my-sim-fn (map #(%) fn-vec))))
       (if (seq my-args)

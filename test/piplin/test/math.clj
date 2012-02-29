@@ -218,7 +218,7 @@
       (is (= (get (exec-sim state fns 0)
                   [(:token mod) :o])
              (cast b1 {:a 0 :b :foo})))
-      (is (= (get (exec-sim state fns 2)
+      (is (= (get (exec-sim state fns 1)
                   [(:token mod) :o])
              (cast b1 {:a 1 :b :bar})))
       (is (= (get (exec-sim state fns 2)

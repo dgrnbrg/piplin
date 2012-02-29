@@ -3,6 +3,10 @@
   (:use (piplin types)))
 
 (extend-protocol ITyped
+  clojure.lang.Keyword
+  (typeof [this] (anontype :keyword))
+  (value [this] this)
+  (pipinst? [this] true)
   java.lang.Boolean
   (typeof [this] (anontype :boolean))
   (value [this] this)
@@ -46,6 +50,7 @@
           (clojure.core/cast type expr)
           (throw+))))))
 
+;TODO: why doesn't this work if I make it :j-integra?
 (defmethod promote 
   :j-integral
   [type obj]
@@ -110,7 +115,7 @@
                          "and" (type obj)))
     (isa-type? :j-integral (kindof obj)) (instance
                                            this
-                                           (promote (anontype :j-long)
+                                           (promote (anontype :j-integral) ;TODO: this should be j-long
                                                     obj))
     :else (throw+ (error "Don't know how to promote to :uintm from"
                          (type obj)))))
@@ -589,21 +594,14 @@
 (defn bundle-get
   [bund key]
   (if (pipinst? bund)
-    (clojure.core/get (:consts (value bund)) key)
-    (vary-meta
-      (alter-value
-        (mkast (get-in (typeof bund) [:schema key])
-               :bundle-key
-               [bund]
-               (fn [b]
-                 (bundle-get b key)))
-        assoc :key key)
-      assoc
-      :valAt
-      (fn [this key]
-        (let [v (value this)]
-          (get (:consts v) key
-               (get (:args v) key)))))))
+    (clojure.core/get (value bund) key)
+    (alter-value
+      (mkast (get-in (typeof bund) [:schema key])
+             :bundle-key
+             [bund]
+             (fn [b]
+               (bundle-get b key)))
+      assoc :key key)))
 
 (defpiplintype Bundle [schema])
 (defn bundle
@@ -618,10 +616,9 @@
     (some #(not (or (:kind %) (class? %))) (vals schema))
     (throw+ (error "values must be piplin or java types:" schema))
     :else
-    (vary-meta (assoc (Bundle. schema) :kind :bundle)
-               merge 
-               {:valAt bundle-get
-                :pipinst? #(empty? (:args (value %)))})))
+    (merge (Bundle. schema)
+           {:valAt bundle-get
+            :kind :bundle})))
 
 (defn filter-map
   "Returns a map by filtering the values with
@@ -641,12 +638,47 @@
   [(filter-map pipinst? map)
    (filter-map (comp not pipinst?) map)])
 
+
 (defmethod promote
   :bundle
   [type obj]
   (cond
     (= (typeof obj) type) obj
-    (map? obj) (instance type {:args obj} :constrain)
+    (map? obj)
+    ;TODO: the following must be rewritten to maybe
+    ;generate a deferred ast node
+    (if (every? pipinst? (vals obj))
+      (instance type obj :constrain) 
+      (let [schema (:schema type)
+            [evaluated args]
+            (const-uneval-filter
+              (->> obj
+                (mapcat (fn [[k v]]
+                          [k (cast (k schema) v)]))
+                (apply hash-map)))
+            arg-keys (vec (keys args))]
+        (println (str "evaluated = " evaluated
+                      ", args = " args))
+        (alter-value
+          (vary-meta
+            (piplin.types.ASTNode.
+              schema
+              {:op :make-bundle
+               :args args}
+              {:pipinst? (fn [& x] false)})
+            assoc :sim-factory
+            [(fn [& more]
+               (let [tmp (merge evaluated
+                                (zipmap arg-keys
+                                        more))]
+                 (println (str "tmp = " tmp))
+                 (instance type
+                           {:args tmp}
+                           :constrain)))
+             (-> arg-keys)])
+          assoc
+          :consts
+          (constrain type evaluated))))
     :else
     (throw+ (error "Cannot promote" obj "to" type))))
 
@@ -656,46 +688,24 @@
 
 (defmethod constrain
   :bundle
-  [type val]
-  (let [schema (:schema type)
-        [evaluated args] (const-uneval-filter
-                           (->> (:args val)
-                             (mapcat (fn [[k v]]
-                                       [k (cast (k schema) v)]))
-                             (apply hash-map)))]
-    (println (str "evaluated = " evaluated ", args = " args))
-    (vary-meta
-      {:consts (->> evaluated 
-                 (mapcat (fn [[k v]]
-                           [k (cast (k schema) v)]))
-                 (apply hash-map))
-       :args args}
-      assoc
-      :sim-factory
-      [(fn [& more]
-         (let [tmp (merge evaluated
-                          (zipmap (keys args)
-                                  more))]
-           (println (str "tmp = " tmp))
-           (instance type
-                     {:args tmp}
-                     :constrain)))
-       (-> args keys vec)])))
+  [type val] 
+  (let [schema (:schema type)]
+    (->> val
+      (mapcat (fn [[k v]]
+                [k (cast (k schema) v)]))
+      (apply hash-map)))) 
 
 (defmethod check 
   :bundle
   [inst]
   (let [schema (:schema (typeof inst))
-        v (value inst)
-        consts (:consts v)
-        unevaled (:args v)
-        all-elts (merge {} consts unevaled)
-        all-correct (map (fn [[k v]]
-                           (isa-type? (k schema)
-                                      (typeof v)))
-                         all-elts)]
-    (when-not (every? identity all-correct)
+        correct (map (fn [[k v]]
+                       (and (isa-type? (k schema)
+                                       (typeof v))
+                            (pipinst? v)))
+                         (value inst))] 
+    (when-not (every? identity correct)
       (throw+ (error (value inst)
                      "doesn't match schema"
-                     schema))))
+                     schema)))) 
   inst)
