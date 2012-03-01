@@ -326,6 +326,13 @@
     (mkast (anontype :boolean) := [x y] =)))
 (defcoercions = :uintm [:j-integral])
 
+(defmethod = [:enum :enum]
+  [x y]
+  (println (str "in equals, x = " x "; y = " y))
+  (if (and (pipinst? x) (pipinst? y))
+    (clojure.core/= (value x) (value y))
+    (mkast (anontype :boolean) := [x y] =)))
+
 (defbinopimpl bit-and :uintm [:j-integral]
   [x y]
   (bit-and (value x) (value y)))
@@ -673,7 +680,7 @@
                                         more))]
                  (println (str "tmp = " tmp))
                  (instance type
-                           {:args tmp}
+                           tmp
                            :constrain)))
              (-> arg-keys)])
           assoc
