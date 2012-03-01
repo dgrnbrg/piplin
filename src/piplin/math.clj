@@ -328,10 +328,10 @@
 
 (defmethod = [:enum :enum]
   [x y]
-  (println (str "in equals, x = " x "; y = " y))
   (if (and (pipinst? x) (pipinst? y))
     (clojure.core/= (value x) (value y))
     (mkast (anontype :boolean) := [x y] =)))
+(defcoercions = :enum [:keyword])
 
 (defbinopimpl bit-and :uintm [:j-integral]
   [x y]
@@ -664,8 +664,6 @@
                           [k (cast (k schema) v)]))
                 (apply hash-map)))
             arg-keys (vec (keys args))]
-        (println (str "evaluated = " evaluated
-                      ", args = " args))
         (alter-value
           (vary-meta
             (piplin.types.ASTNode.
@@ -678,7 +676,6 @@
                (let [tmp (merge evaluated
                                 (zipmap arg-keys
                                         more))]
-                 (println (str "tmp = " tmp))
                  (instance type
                            tmp
                            :constrain)))

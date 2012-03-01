@@ -320,10 +320,6 @@
             arg-map (zipmap (keys args)
                             arg-fns)
             fn-vec (map #(get arg-map %) my-args)]
-        (println (str "my-args = " my-args))
-        (println (str "args-fns = " (vec arg-fns)))
-        (println (str "args-map = " arg-map))
-        (println (str "fn-vec = " (vec fn-vec)))
         (fn []
           (apply my-sim-fn (map #(%) fn-vec))))
       (if (seq my-args)
