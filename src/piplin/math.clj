@@ -132,6 +132,14 @@
   ([x y] (binary-dispatch x y))
   ([x y & more] ::n-ary))
 
+(defn- make-core-unop-fn
+  "Makes syntax for a unop using the core
+  implementation for a given hierarchy key"
+  [op key]
+  `(defmethod ~op ~key
+     [~'x]
+     ('~(ns-resolve 'clojure.core op) ~'x)))
+
 (defn- make-core-binop-fn
   "Makes syntax for a binop using the core
   implementation for a given hierarchy key"
@@ -151,7 +159,10 @@
   [op zero existing-types]
   (let [core-methods (map #(make-core-binop-fn
                              op %)
-                          existing-types)]
+                          existing-types)
+        core-unary (map #(make-core-unop-fn
+                           op %)
+                        existing-types)]
     `(do
        (defmulti ~op nary-dispatch :hierarchy types)
        (defmethod ~op ::nullary [] ~zero)
@@ -160,7 +171,8 @@
          (if (seq ~'more)
            (recur (~op ~'x ~'y) (first ~'more) (next ~'more))
            (~op ~'x ~'y)))
-       ~@core-methods)))
+       ~@core-methods
+       ~@core-unary)))
 
 (defmacro def-binary-binop
   "Like def-n-ary-binop, but without nullary or left-associative
