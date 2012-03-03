@@ -1,7 +1,8 @@
 (ns piplin.math
   (:use [slingshot.slingshot])
   (:use [clojure.set])
-  (:use (piplin types)))
+  (:use (piplin types))
+  (:use [piplin.modules :only [connect]]))
 
 (extend-protocol ITyped
   clojure.lang.Keyword
@@ -539,15 +540,51 @@
   (vec (map #(bit-xor %1 %2)
             (value x) (value y))))
 
-(defn mux2
+(defn mux2-impl
   [sel v1 v2]
   (when-not (= (typeof v1) (typeof v2))
-    (throw+ (error v1 "and" v2 "are different types" (typeof v1) (typeof v2))))
+    (throw+ (error v1 "and" v2 "are different types" (typeof v1) (typeof v2)))) 
   (let [sel (cast (anontype :boolean) sel)]
     (if (pipinst? sel)
       (if sel v1 v2)
-      (mkast (typeof v1) :mux2 [sel v1 v2] mux2))))
+      (mkast (typeof v1) :mux2 [sel v1 v2] mux2-impl))))  
 
+(defn mux2-helper
+  [sel v1-thunk v2-thunk]
+  (println "#########HI###########")
+  (let [v1-connections (atom {})
+        v2-connections (atom {})
+        v1-connect #(swap! v1-connections assoc %1 %2)
+        v2-connect #(swap! v2-connections assoc %1 %2)
+        v1 (binding [piplin.modules/connect v1-connect]
+             (v1-thunk))
+        v2 (binding [piplin.modules/connect v2-connect]
+             (v2-thunk))]
+    (cond
+      (not= (keys @v1-connections) (keys @v2-connections))
+      (do
+        (pprint-ast [:v1-conn @v1-connections])
+        (pprint-ast [:v2-conn @v2-connections])
+        (pprint-ast [:v1-res v1])
+        (throw+ (error "Must have the same connections on both parts"))) 
+      (seq @v1-connections)
+       ( do 
+        (pprint-ast [:v1-conn @v1-connections]) 
+        (pprint-ast [:v2-conn @v2-connections]) 
+        (pprint-ast [:v1-res v1]) 
+      (->> @v1-connections
+        keys
+        (map #(connect % (mux2-impl sel
+                                    (get @v1-connections %) 
+                                    (get @v2-connections %))))
+        dorun)) 
+      :else
+      (mux2-impl sel v1 v2))))
+;TODO: above mkast is broken b/c mux2-helper has wrong signature
+
+(defmacro mux2
+  [sel v1 v2]
+  `(mux2-helper ~sel (fn [] ~v1) (fn [] ~v2)))
 
 (defmethod promote
   :boolean
