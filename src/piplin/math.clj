@@ -551,7 +551,6 @@
 
 (defn mux2-helper
   [sel v1-thunk v2-thunk]
-  (println "#########HI###########")
   (let [v1-connections (atom {})
         v2-connections (atom {})
         v1-connect #(swap! v1-connections assoc %1 %2)
@@ -561,26 +560,19 @@
         v2 (binding [piplin.modules/connect v2-connect]
              (v2-thunk))]
     (cond
-      (not= (keys @v1-connections) (keys @v2-connections))
-      (do
-        (pprint-ast [:v1-conn @v1-connections])
-        (pprint-ast [:v2-conn @v2-connections])
-        (pprint-ast [:v1-res v1])
-        (throw+ (error "Must have the same connections on both parts"))) 
+      ;TODO: this code breaks if set isn't called below
+      ;I don't understand why/don't think that should happen
+      (not= (set (keys @v1-connections)) (set (keys @v2-connections)))
+      (throw+ (error "Must have the same connections on both parts"))
       (seq @v1-connections)
-       ( do 
-        (pprint-ast [:v1-conn @v1-connections]) 
-        (pprint-ast [:v2-conn @v2-connections]) 
-        (pprint-ast [:v1-res v1]) 
       (->> @v1-connections
         keys
         (map #(connect % (mux2-impl sel
                                     (get @v1-connections %) 
                                     (get @v2-connections %))))
-        dorun)) 
-      :else
+        dorun)
+      :else,
       (mux2-impl sel v1 v2))))
-;TODO: above mkast is broken b/c mux2-helper has wrong signature
 
 (defmacro mux2
   [sel v1 v2]

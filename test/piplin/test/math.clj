@@ -411,5 +411,4 @@
            ((uintm 8) 3)))  
     (is (= (get (exec-sim state fns 3)
                 [(:token m) :x])
-           (e :c)))  
-    ))
+           (e :c)))))
