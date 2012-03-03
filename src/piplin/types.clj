@@ -234,11 +234,9 @@
   [pipinst]
   (when-not (pipinst? pipinst)
     (throw+ (error pipinst "must be a pipinist")))
-  (let [pipinst (if-not (instance? ASTNode pipinst)
-                  (mkast (typeof pipinst)
-                         :noop
-                         []
-                         (fn [] pipinst))
-                  pipinst)]
+  (let [pipinst (mkast (typeof pipinst)
+                       :noop
+                       []
+                       (fn [] pipinst))]
     (vary-meta (alter-value pipinst assoc :args [])
                assoc :pipinst? (fn [x] false))))
