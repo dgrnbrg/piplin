@@ -16,12 +16,17 @@
                    instance of the type (as opposed
                    to a symbolic representation)"))
 
+  (comment
+    ;TODO: running an experiment to see if this
+    ;could return "this" and make it easier to have
+    ;if and cond support arbitrary objects at sim time
+    (value [this] (throw (IllegalArgumentException.
+                         (str "Cannot get value of "
+                              this)))))
 (extend-protocol ITyped
   Object
   (typeof [this] (:type this))
-  (value [this] (throw (IllegalArgumentException.
-                         (str "Cannot get value of "
-                              this))))
+  (value [this] this)
   (pipinst? [this] false))
 
 (defn kindof [a]
@@ -229,5 +234,11 @@
   [pipinst]
   (when-not (pipinst? pipinst)
     (throw+ (error pipinst "must be a pipinist")))
-  (vary-meta (alter-value pipinst assoc :args [])
-             assoc :pipinst? (fn [x] false)))
+  (let [pipinst (if-not (instance? ASTNode pipinst)
+                  (mkast (typeof pipinst)
+                         :noop
+                         []
+                         (fn [] pipinst))
+                  pipinst)]
+    (vary-meta (alter-value pipinst assoc :args [])
+               assoc :pipinst? (fn [x] false))))
