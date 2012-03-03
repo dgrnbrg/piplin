@@ -205,12 +205,18 @@
 
 (defmulti = nary-dispatch :hierarchy types)
 (defmethod = :default [x y]
-  (if (or (instance? piplin.types.ASTNode x)
-          (instance? piplin.types.ASTNode y)) 
-    (if (and (pipinst? x) (pipinst? y))
-      (clojure.core/= (value x) (value y))
-      (mkast (anontype :boolean) := [x y] =)) 
-    (clojure.core/= x y)))
+  (clojure.core/cond
+    (and (nil? x) (nil? y))
+    true
+    (or (nil? x) (nil? y))
+    false
+    (not (or (instance? piplin.types.ASTNode x)
+             (instance? piplin.types.ASTNode y)))  
+    (clojure.core/= x y)
+    (and (pipinst? x) (pipinst? y))
+    (clojure.core/= (value x) (value y))
+    :else
+    (mkast (anontype :boolean) := [x y] =)))
 (defmethod = ::n-ary
   [x y & more]
   (if (= x y)
