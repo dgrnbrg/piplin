@@ -714,3 +714,46 @@
                      "doesn't match schema"
                      schema)))) 
   inst)
+
+(defn cond-helper [predicates thunks]
+  (if (some #(instance? piplin.types.ASTNode %) predicates)
+    (let [thunks (map #(%) thunks)
+          sentinel (mkast (typeof (first thunks))
+                          :error
+                          []
+                          (fn []
+                            (throw (RuntimeException.
+                                     "Should never be invoked!"))))
+          last-pred (last predicates)
+          predicates (concat (butlast predicates) [true]) 
+          mux-tree (->> thunks
+                     (interleave predicates)
+                     (partition 2)
+                     reverse
+                     (reduce (fn [prev [p t]]
+                               (mux2 p t prev)) 
+                             sentinel))]
+      (if (= last-pred :else)
+        mux-tree
+        (throw+ (error "Must include :else in simulated cond"))))
+    (let [thunk (->> thunks
+                  (interleave predicates)
+                  (partition 2)
+                  (keep (fn [[p t]] (if p t nil)))
+                  first
+                  ((fn [it]
+                     it))
+                  )]
+      (if (nil? thunk)
+        nil
+        (thunk)))))
+
+(defmacro cond [& more]
+  (when-not (even? (count more))
+    (throw (RuntimeException. "cond takes an even number of clauses")))
+  (let [bodies (->> more rest (take-nth 2))
+        thunks (map (fn [body]
+                      `(fn [] ~body))
+                    bodies)
+        predicates (take-nth 2 more)]
+    `(cond-helper [~@predicates] [~@thunks])))

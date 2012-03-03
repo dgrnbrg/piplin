@@ -241,3 +241,48 @@
                   [(:token mod) :o])
              (cast b1 {:a 2 :b :foo})))
       ))) 
+
+(deftest cond-test
+  (is (= (cond false 22)
+         (clojure.core/cond false 22)))
+  (is (= (cond
+           (= true true) 0
+           false 1)
+         (clojure.core/cond
+           (= true true) 0
+           false 1)))
+  (is (= (cond
+           (= true true) 0
+           :else true)
+         (clojure.core/cond
+           (= true true) 0
+           :else true)))
+  (is (thrown-with-msg? ExceptionInfo #"Must include :else.*"
+                        (cond
+                          (= (uninst true) true) 0
+                          false 1)))
+  (is (thrown-with-msg? ExceptionInfo #".*different types.*"
+                        (cond
+                          (= (uninst true) true) 0
+                          :else true)))
+  (is (= 
+        (cond
+          true 1
+          false 0)  
+        (clojure.core/cond
+          true 1
+          false 0)))
+  (is (not= 1
+            (make-sim-fn (cond
+                           ;41 != 42
+                           (= (uninst 41) 42) ((uintm 3) 2)
+                           ;300 > 0
+                           (> ((uintm 22) 300) 0) ((uintm 3) 1)
+                           :else ((uintm 3) 0)))) "unevaluated sim")
+  (is (= 1
+         ((make-sim-fn (cond
+                         ;41 != 42
+                         (= (uninst 41) 42) ((uintm 3) 2)
+                         ;300 > 0
+                         (> ((uintm 22) 300) 0) ((uintm 3) 1)
+                         :else ((uintm 3) 0))))) "evaluted sim"))
