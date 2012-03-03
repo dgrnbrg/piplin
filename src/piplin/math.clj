@@ -205,7 +205,12 @@
 
 (defmulti = nary-dispatch :hierarchy types)
 (defmethod = :default [x y]
-  (clojure.core/= x y))
+  (if (or (instance? piplin.types.ASTNode x)
+          (instance? piplin.types.ASTNode y)) 
+    (if (and (pipinst? x) (pipinst? y))
+      (clojure.core/= (value x) (value y))
+      (mkast (anontype :boolean) := [x y] =)) 
+    (clojure.core/= x y)))
 (defmethod = ::n-ary
   [x y & more]
   (if (= x y)
@@ -319,18 +324,8 @@
     (mkast (anontype :boolean) :<= [x y] <=)))
 (defcoercions <= :uintm [:j-integral])
 
-(defmethod = [:uintm :uintm]
-  [x y]
-  (if (and (pipinst? x) (pipinst? y))
-    (= (value x) (value y))
-    (mkast (anontype :boolean) := [x y] =)))
 (defcoercions = :uintm [:j-integral])
 
-(defmethod = [:enum :enum]
-  [x y]
-  (if (and (pipinst? x) (pipinst? y))
-    (clojure.core/= (value x) (value y))
-    (mkast (anontype :boolean) := [x y] =)))
 (defcoercions = :enum [:keyword])
 
 (defbinopimpl bit-and :uintm [:j-integral]
