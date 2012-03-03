@@ -56,12 +56,14 @@
     (is (= (bit-or 0xf0 (b8 0xf)) (b8 0xff)))
     (is (= (bit-xor (instance (uintm 8) 0x3c) (b8 0xf))
            (b8 0x33))))
-  (is (= (get-bits true) (promote (bits 1) 1)))
-  (is (= (get-bits false) (promote (bits 1) 0)))
-  (is (= (count (value (get-bits
+  (is (= (get-bits true) [1]))
+  (is (= (get-bits false) [0]))
+  (is (= (serialize true) (cast (bits 1) 1)))
+  (is (= (serialize false) (cast (bits 1) 0)))
+  (is (= (count (value (serialize
                          (promote (enum #{:a :b}) :a))))
          1)) 
-  (is (= (count (value (get-bits
+  (is (= (count (value (serialize
                          (promote (enum #{:a :b :c}) :a))))
          2)))  
 
@@ -69,7 +71,7 @@
   (let [mod (module [:outputs [c (promote (uintm 8) 0)
                                d (promote (bits 8) 0)]]
                     (connect c (+ c 1))
-                    (connect d (bit-slice (get-bits c) 0 4)))
+                    (connect d (bit-slice (serialize c) 0 4)))
         sim (make-sim mod)
         init-state (first sim)
         init-fns (second sim)]
@@ -97,7 +99,7 @@
                                c (promote (uintm 3) 0)]]
                     (let [new-c (inc c)]
                       (connect odd (cast (anontype :boolean) 
-                                         (bit-slice (get-bits new-c) 0 1)))
+                                         (bit-slice (serialize new-c) 0 1)))
                       (connect c new-c)))
         [state fns] (make-sim mod)]
     (is (= (get (exec-sim state fns 1)
@@ -286,3 +288,35 @@
                          ;300 > 0
                          (> ((uintm 22) 300) 0) ((uintm 3) 1)
                          :else ((uintm 3) 0))))) "evaluted sim"))
+
+(deftest enhanced-bits-test
+  (let [e (enum #{:a :b :c})
+        b (bundle {:e e :a (uintm 3) :b (anontype :boolean)})]
+    ;enums
+    (let [e-inst (e :a)
+          e-bits (serialize e-inst)
+          e-inst2 (deserialize e e-bits)]
+      (is (= (:n (typeof e-bits)) 2))
+      (is (= e-inst e-inst2 "Unsuccessful serialization roundtrip")))  
+    (let [e-inst (e :b)
+          e-bits (serialize e-inst)
+          e-inst2 (deserialize e e-bits)]
+      (is (= (:n (typeof e-bits)) 2))
+      (is (= e-inst e-inst2 "Unsuccessful serialization roundtrip")))  
+    (let [e-inst (e :c)
+          e-bits (serialize e-inst)
+          e-inst2 (deserialize e e-bits)]
+      (is (= (:n (typeof e-bits)) 2))
+      (is (= e-inst e-inst2 "Unsuccessful serialization roundtrip")))
+    (let [b-inst (cast b {:e :a :a 4 :b true})
+          b-bits (serialize b-inst)
+          b-inst2 (deserialize b b-bits)]
+      (is (= (kindof b-bits) :bits))
+      (is (= 6 (:n (typeof b-bits))))
+      (is (= b-inst b-inst2 "Unsuccessful serialization roundtrip")))  
+    (let [b-inst (cast b {:e :b :a 3 :b false})
+          b-bits (serialize b-inst)
+          b-inst2 (deserialize b b-bits)]
+      (is (= (kindof b-bits) :bits))
+      (is (= 6 (:n (typeof b-bits))))
+      (is (= b-inst b-inst2 "Unsuccessful serialization roundtrip")))))

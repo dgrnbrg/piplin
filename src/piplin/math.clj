@@ -1,5 +1,6 @@
 (ns piplin.math
   (:use [slingshot.slingshot])
+  (:use [clojure.set])
   (:use (piplin types)))
 
 (extend-protocol ITyped
@@ -408,26 +409,80 @@
       (throw+ (error
                 "bits must be a vector of 0s and 1s:" v)))
     (when (not= (count v) n)
-      (throw+ (error "bit vector must be of length" n (count  v)))))
+      (throw+ (error "bit vector must be of length" n (count v)))))
   inst)
 
-(defmulti get-bits
-  (fn [expr] (kindof expr))
+(defmulti from-bits
+  (fn [type bits] (:kind type))
   :hierarchy types)
+
+(defmethod from-bits
+  :default
+  [type bits]
+  (throw+ (error "No way to convert bits to " type)))
+
+(defmethod from-bits
+  :uintm
+  [type bits]
+  (bitvec-to-long bits))
+
+(defmethod from-bits
+  :bits
+  [type bits]
+  bits)
+
+(defmulti bit-width-of
+  :kind :hierarchy types)
+
+(defmulti get-bits
+  kindof
+  :hierarchy types)
+
+(defn serialize
+  "Gets the bits representation of its argument. Supports AST frags."
+  [expr]
+  (when-not (typeof expr)
+    (throw+ (error "Only piplin ITyped expressions can be serialized")))
+  (let [n (bit-width-of (typeof expr))
+        type (bits n)]
+    (if (pipinst? expr)
+      (instance type (get-bits expr)) 
+      (mkast type :serialize [expr] serialize))))
+
+(defn deserialize
+  "Takes a type and bits, and converts the bits
+  to the given type."
+  [type bits]
+  (let [bits-type (typeof bits)
+        n (:n bits-type)]
+    (when-not (= (kindof bits) :bits)
+      (throw+ (error bits "must be of kind :bits")))
+    (when-not (= n (bit-width-of type))
+      (throw+ (error type "has bit width" (bit-width-of type))))
+    (if (pipinst? bits)
+      (cast type (from-bits type (value bits)))
+      (mkast type :deserialize [bits] (partial deserialize type)))))
+
+(defmethod bit-width-of
+  :default
+  [expr]
+  (throw+ (error "Don't know how to get bit width of" expr)))
 
 (defmethod get-bits
   :default
   [expr]
   (throw+ (error "Cannot convert " expr " to bits")))
 
+(defmethod bit-width-of
+  :uintm
+  [type]
+  (:n type))
+
 (defmethod get-bits
   :uintm
   [expr]
-  (let [n (-> expr typeof :n)
-        type (bits n)]
-    (if (pipinst? expr)
-      (instance type (long-to-bitvec (value expr) n))
-      (mkast type :get-bits [expr] get-bits))))
+  (let [n (bit-width-of (typeof expr))]
+      (long-to-bitvec (value expr) n)))
 
 (defn slice-impl
   "Does slicing of bits"
@@ -507,13 +562,20 @@
        :else
        (throw+ (error "Cannot promote" obj "to boolean")))))
 
+(defmethod bit-width-of
+  :boolean
+  [type]
+  1)
+
 (defmethod get-bits
   :boolean 
   [expr]
-  (let [type (bits 1)]
-    (if (pipinst? expr)
-      (instance type (if expr [1] [0]))
-      (mkast type :get-bits [expr] get-bits))))
+  (if expr [1] [0]))
+
+(defmethod from-bits
+  :boolean
+  [type bits]
+  (= (first bits) 1))
 
 (defn trace
   "Takes a function and an expr and returns an
@@ -551,7 +613,7 @@
             logn (log2 n)]
         (merge (PiplinEnum.
                  (zipmap coll
-                         (map #(cast (bits logn) %)
+                         (map #(long-to-bitvec % logn)
                               (iterate inc 0))))
                {:kind :enum}))
       (throw+ (error
@@ -559,14 +621,14 @@
                 (remove keyword? coll))))
     (if (map? coll)
       (cond
-        (some #(not= (kindof %) :bits) (vals coll))
-        (throw+ (error "Map's values must all be bits")) 
+        (some #(not (and (vector? %)
+                         (every? #{0 1} %))) (vals coll))
+        (throw+ (error "Maps values must all be bits")) 
         (some #(not= (-> (seq coll)
                        first
                        val
-                       typeof
-                       :n)
-                     (-> % typeof :n))
+                       count)
+                     (count %))
               (vals coll))
         (throw+ (error
                   "Map's values must be same bit width")) 
@@ -589,6 +651,26 @@
     :else
     (throw+ (error "Cannot promote" obj "to" type))))
 
+(defmethod from-bits
+  :enum
+  [type bits]
+  (let [lookup (map-invert (:keymap type))
+        k (get lookup bits)]
+    (cond
+      (nil? k)
+      (throw+ (error bits "is not a valid element of the enum"))
+      :else
+      k)))
+
+(defmethod bit-width-of
+  :enum
+  [type]
+  (-> type 
+    :keymap
+    vals
+    first
+    count))
+
 (defmethod get-bits
   :enum
   [expr]
@@ -598,9 +680,7 @@
                first
                val
                typeof)]
-    (if (pipinst? expr)
-      ((value expr) (:keymap (typeof expr)))
-      (mkast type :get-bits [expr] get-bits))))
+    ((value expr) (:keymap (typeof expr)))))
 
 (defmethod check
   :enum
@@ -699,9 +779,38 @@
     :else
     (throw+ (error "Cannot promote" obj "to" type))))
 
+(defmethod bit-width-of
+  :bundle
+  [type]
+  (->> type 
+    :schema
+    vals
+    (map bit-width-of)
+    (reduce +)))
+
 (defmethod get-bits
   :bundle
-  [expr])
+  [expr]
+  (let [schema-ks (keys (:schema (typeof expr)))
+        bundle-inst (value expr)
+        ordered-vals (map (partial get bundle-inst)
+                          schema-ks)]
+    (->> ordered-vals
+      (map serialize)
+      (apply bit-cat)
+      value)))
+
+(defmethod from-bits
+  :bundle
+  [type bs]
+  (let [schema (:schema type)
+        subtypes (vals schema)
+        sizes (map bit-width-of subtypes)
+        offsets (reductions + 0 sizes)
+        slice (partial subvec bs)
+        slices (map slice offsets (map + sizes offsets))
+        insts (map from-bits subtypes slices)]
+    (zipmap (keys schema) insts)))
 
 (defmethod constrain
   :bundle
