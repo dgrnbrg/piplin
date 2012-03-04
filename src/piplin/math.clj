@@ -904,6 +904,14 @@
         predicates (take-nth 2 more)]
     `(cond-helper [~@predicates] [~@thunks])))
 
+(defmacro condp [pred expr & clauses]
+  (let [pairs (partition 2 clauses)
+        else (if (even? (count clauses)) nil (last clauses))
+        body (mapcat (fn [[test body]]
+                       `((~pred ~test ~expr) ~body))
+                     pairs)]
+    `(cond ~@body)))
+
 (defpiplintype Union [schema enum])
 (defn union
   "Takes a map of keywords to types and an optional enum

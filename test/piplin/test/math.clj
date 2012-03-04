@@ -438,3 +438,31 @@
     (is (= (get (exec-sim state fns 220)
                 [(:token m) :size])
            (e :big)))))
+
+(deftest condp-test
+  (let [e (enum #{:a :b :c :d})
+        f #(piplin.math/condp = (uninst (e %))
+             :a ((uintm 8) 22)
+             :b ((uintm 8) 32)
+             :c ((uintm 8) 44)
+             :d ((uintm 8) 0))]
+    (is (= ((make-sim-fn (f :a))) ((uintm 8) 22)))  
+    (is (= ((make-sim-fn (f :b))) ((uintm 8) 32)))  
+    (is (= ((make-sim-fn (f :c))) ((uintm 8) 44)))  
+    (is (= ((make-sim-fn (f :d))) ((uintm 8) 0)))
+    (is (thrown? ExceptionInfo
+                 (piplin.math/condp = (uninst (e :a))
+                   :a ((uintm 8) 22)
+                   :e ((uintm 8) 32)
+                   :c ((uintm 8) 44)
+                   :d ((uintm 8) 0)))
+        "invalid key to enum") 
+    (is (thrown? ExceptionInfo
+                 (piplin.math/condp = (uninst (e :a))
+                   :a ((uintm 8) 22)
+                   :b ((uintm 7) 32)
+                   :c ((uintm 8) 44)
+                   :d ((uintm 8) 0)))
+        "not matching bitwidths") 
+    ))
+
