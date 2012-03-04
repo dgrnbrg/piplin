@@ -1,6 +1,7 @@
 (ns piplin.math
   (:use [slingshot.slingshot])
-  (:use [clojure.set :only [map-invert intersection]])
+  (:use [clojure.set :only [map-invert intersection difference]])
+  (:require [clojure.set])
   (:use (piplin types))
   (:use [piplin.modules :only [connect]]))
 
@@ -1004,6 +1005,61 @@
       (throw+ (error m "must have 1 key/value pair")))
     (when-not (get schema k)
       (throw+ (error k "not in schema:" schema)))
-    (when-not (= (typeof v) (get schema k))
-      (throw+ (error v "should be type" (get schema k)))))
+    ;(when-not (= (typeof v) (get schema k))
+      ;(println [(typeof v) (get schema k) (= (typeof v) (get schema k))])
+      ;(throw+ (error (typeof v) "should be type" (get schema k))))
+    )
   inst)
+
+(defn get-value
+  [k u]
+  "Gets the value of the union if the key is k.
+  Otherwise fails somehow..."
+  (let [e (-> (typeof u) :enum)]
+    (if (pipinst? u)
+      (let [v (-> (value u) first)]
+        (if (= (key v) k)
+          v
+          (throw (RuntimeException. "invalid union"))))
+      (mkast e :get-value [u] (partial get-value k)))))
+
+(defn get-tag
+  "Gets the tag of the union"
+  [u]
+  (let [e (-> (typeof u) :enum)]
+    (if (pipinst? u)
+      (e (-> (value u) first key)) 
+      (mkast e :get-tag [u] get-tag))))
+
+(defn sym-diff
+  "symmetric different of 2 sets"
+  [s1 s2]
+  (clojure.set/union
+    (difference s1 s2)
+    (difference s2 s1)))
+
+(defmacro union-match
+  "Takes a union u and a clause for each
+  key in the schema. Clauses are of the form:
+
+  (:key ...)
+
+  where :key is the keyword and ... is an
+  implicit do within a cond-like form."
+  [u & clauses]
+  (let [u-sym (gensym "u")
+        clauses (map (fn [[k name body]]
+                       [k `(let [~name (get-value ~k ~u-sym)]
+                             ~body)])
+                     clauses)]
+    `(do
+       (let [~u-sym ~u]
+         (when-not (sym-diff (-> (typeof ~u-sym)
+                               :enum
+                               :keymap
+                               :keys
+                               set)
+                             (set ~(map first clauses)))
+           (throw+ (error "keys don't match"))) 
+         (condp = (get-tag ~u-sym)
+           ~@(apply concat clauses))))))
