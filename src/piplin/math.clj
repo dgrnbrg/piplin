@@ -5,6 +5,12 @@
   (:use [piplin.modules :only [connect]]))
 
 (extend-protocol ITyped
+  nil
+  (typeof [this] (anontype :null))
+  (value [this] nil)
+  (pipinst? [this] true))
+
+(extend-protocol ITyped
   clojure.lang.Keyword
   (typeof [this] (anontype :keyword))
   (value [this] this)
@@ -867,33 +873,23 @@
 
 (defn cond-helper [predicates thunks]
   (if (some #(instance? piplin.types.ASTNode %) predicates)
-    (let [thunks (map #(%) thunks)
-          sentinel (mkast (typeof (first thunks))
-                          :error
-                          []
-                          (fn []
-                            (throw (RuntimeException.
-                                     "Should never be invoked!"))))
-          last-pred (last predicates)
-          predicates (concat (butlast predicates) [true]) 
+    (let [last-pred (last predicates)
+          predicates (butlast predicates)
           mux-tree (->> thunks
                      (interleave predicates)
                      (partition 2)
                      reverse
                      (reduce (fn [prev [p t]]
-                               (mux2 p t prev)) 
-                             sentinel))]
+                               (fn [] (mux2-helper p t prev))) 
+                             (last thunks)))]
       (if (= last-pred :else)
-        mux-tree
+        (mux-tree) 
         (throw+ (error "Must include :else in simulated cond"))))
     (let [thunk (->> thunks
                   (interleave predicates)
                   (partition 2)
                   (keep (fn [[p t]] (if p t nil)))
-                  first
-                  ((fn [it]
-                     it))
-                  )]
+                  first)]
       (if (nil? thunk)
         nil
         (thunk)))))

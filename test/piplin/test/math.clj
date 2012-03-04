@@ -412,3 +412,29 @@
     (is (= (get (exec-sim state fns 3)
                 [(:token m) :x])
            (e :c)))))
+
+(deftest cond-connect-test
+  (let [e (enum #{:small :medium :big})
+        m (module [:outputs [size (e :small)]
+                   :feedback [i ((uintm 8) 0)]]
+                  (connect i (inc i))
+                  (cond
+                    (< i 100) (connect size (e :small))
+                    (< i 200) (connect size (e :medium))
+                    :else (connect size (e :big))))
+        [state fns] (make-sim m)]
+    (is (= (get (exec-sim state fns 10)
+                [(:token m) :size])
+           (e :small)))  
+    (is (= (get (exec-sim state fns 70)
+                [(:token m) :size])
+           (e :small)))  
+    (is (= (get (exec-sim state fns 110)
+                [(:token m) :size])
+           (e :medium)))
+    (is (= (get (exec-sim state fns 150)
+                [(:token m) :size])
+           (e :medium)))
+    (is (= (get (exec-sim state fns 220)
+                [(:token m) :size])
+           (e :big)))))
