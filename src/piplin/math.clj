@@ -629,7 +629,8 @@
 (defn pr-trace
   "Prints the args followed by the traced value."
   [& args]
-  (trace #(apply print-str (conj (butlast args) %))
+  (trace #(println
+            (apply print-str (concat (butlast args) [%])))
          (last args)))
 
 (defn log2
