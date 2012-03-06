@@ -52,12 +52,7 @@
     (if (pipinst? expr)
       (promote type expr)
       (mkast type :cast [expr] (partial cast type)))
-    (try+
-      (promote type expr)
-      (catch piplin.types.CompilerError e
-        (if (class? type)
-          (clojure.core/cast type expr)
-          (throw+))))))
+    (promote type expr)))
 
 ;TODO: why doesn't this work if I make it :j-integra?
 (defmethod promote 
@@ -606,7 +601,7 @@
 (defmethod get-bits
   :boolean 
   [expr]
-  (if expr [1] [0]))
+  (if (value expr) [1] [0]))
 
 (defmethod from-bits
   :boolean
@@ -727,6 +722,13 @@
       (throw+ (error v "is not in" (keys keymap)))))
   inst)
 
+(defn sym-diff
+  "symmetric different of 2 sets"
+  [s1 s2]
+  (clojure.set/union
+    (difference s1 s2)
+    (difference s2 s1)))
+
 (defn bundle-get
   [bund key]
   (if (pipinst? bund)
@@ -783,8 +785,14 @@
     (map? obj)
     ;TODO: the following must be rewritten to maybe
     ;generate a deferred ast node
+    ;TODO: check symdiff of map and schema
     (if (every? pipinst? (vals obj))
-      (instance type obj :constrain) 
+      (instance type
+                (apply conj {}
+                       (map (fn [[k v]]
+                              [k (cast v (get obj k))]) 
+                            (:schema type)))
+                :constrain) 
       (let [schema (:schema type)
             [evaluated args]
             (const-uneval-filter
@@ -855,8 +863,8 @@
   (let [schema (:schema type)]
     (->> val
       (mapcat (fn [[k v]]
-                [k (cast (k schema) v)]))
-      (apply hash-map)))) 
+                [k (instance (k schema) (value v) :constrain)]))
+      (apply hash-map))))
 
 (defmethod check 
   :bundle
@@ -866,7 +874,11 @@
                        (and (isa-type? (k schema)
                                        (typeof v))
                             (pipinst? v)))
-                         (value inst))] 
+                         (value inst))]
+    (when-let [bad (seq (sym-diff (set (keys schema))
+                                  (set (keys (value inst)))))]
+      (throw+ (error "These keys either didn't have a value"
+                     "or aren't part of the schema")))
     (when-not (every? identity correct)
       (throw+ (error (value inst)
                      "doesn't match schema"
@@ -950,7 +962,8 @@
       (if-let [val-type (get (:schema type) tag)] 
         (let [v (cast val-type v)]
           (if (pipinst? v)
-            (instance type obj :constrain)
+            (do (println (str "type is " type)) 
+            (instance type obj :constrain)) 
             (mkast type :make-union [v] #(promote type {tag %}))))
         (throw+ (error "Tag must be one of"
                        (keys (:schema type))))))))
@@ -992,15 +1005,8 @@
 (defmethod constrain
   :union
   [type val]
-  (constrain {:schema (:schema type)
-              :kind :bundle}
-             val))
-(defn sym-diff
-  "symmetric different of 2 sets"
-  [s1 s2]
-  (clojure.set/union
-    (difference s1 s2)
-    (difference s2 s1)))
+  (let [[k v] (first val)]
+    {k (cast (get (:schema type) k) v)}))
 
 (defmethod check
   :union
@@ -1009,12 +1015,16 @@
         m (value inst)
         k (key (first m))
         v (val (first m))]
+    (when-not (= (class (typeof inst)) piplin.math.Union)
+      (throw+ (error "Union has wrong class")))
     (when-not (= 1 (count m))
       (throw+ (error m "must have 1 key/value pair")))
     (when-not (get schema k)
       (throw+ (error k "not in schema:" schema)))
     (when-not (= (typeof v) (get schema k))
-      (println [(typeof v) (get schema k) (sym-diff (set (keys (typeof v))) (set (keys (get schema k))))])
+      (pprint-ast [:typeof-v (typeof v) :typeof-k (get schema k)
+                   :classof-v-type (class (typeof v))
+                   :classof-k-type (class (get schema k))])
       (throw+ (error (typeof v) "should be type" (get schema k))))
     )
   inst)

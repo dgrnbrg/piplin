@@ -34,12 +34,14 @@
     (-> a typeof :kind)
     (class a)))
 
+(defrecord AnonType [kind])
+
 (defn anontype
   "Returns an anonymous type of
   the given kind. Useful to promote
   to jvm types."
   [kind]
-  {:kind kind})
+  (AnonType. kind))
 
 (defmulti promote
   "Produces an instance of the given
@@ -180,6 +182,8 @@
 (defn instance
   "Creates an instance of the type with value val"
   [type val & more]
+  (when (instance? clojure.lang.PersistentArrayMap type)
+    (throw+ (error "barf"))) ;TODO: be more helpful
   (when (nil? type)
     (throw+ (error "Type probably shouldn't be nil. value =" val)))
   (let [val (if (some #{:constrain} more)
