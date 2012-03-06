@@ -555,7 +555,7 @@
 (defn mux2-impl
   [sel v1 v2]
   (when-not (clj/= (typeof v1) (typeof v2))
-    (throw+ (error v1 "and" v2 "are different types" (typeof v1) (typeof v2)))) 
+    (throw+ (error v1 "and" v2 "are different types" (typeof v1) (typeof v2))))
   (let [sel (cast (anontype :boolean) sel)]
     (if (pipinst? sel)
       (if sel v1 v2)
@@ -934,7 +934,8 @@
         body (mapcat (fn [[test body]]
                        `((~pred ~test ~expr) ~body))
                      pairs)
-        body (if else (concat body [:else else]) body)]
+        body (if (nil? else) body (concat body [:else else]))]
+    (println (str "condp = " (count clauses) (last clauses)))
     `(cond ~@body)))
 
 (defpiplintype Union [schema enum])
@@ -1015,6 +1016,8 @@
 (defmethod constrain
   :union
   [type val]
+  (when (> (count val) 1)
+    (throw+ (error "must have 1 elemen")))
   (let [[k v] (first val)]
     {k (cast (get (:schema type) k) v)}))
 
@@ -1048,7 +1051,9 @@
       (let [v (-> (value u) first)]
         (if (clj/= (key v) k)
           v
-          (throw (RuntimeException. "invalid union"))))
+          (throw (RuntimeException. (str "invalid union: "
+                                         "expected " k 
+                                         " but got " (key v))))))
       (mkast (get (-> (typeof u) :schema) k)
              :get-value
              [u]

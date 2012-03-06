@@ -475,33 +475,33 @@
         u (union {:x (uintm 5) :y b})
         m (module [:outputs [v (u {:x ((uintm 5) 0)})
                              o ((uintm 5) 22)]]
-            (union-match (pr-trace "v = " v) 
+            (union-match v
               (:x x
                   (connect o 22)
-                  (connect v (u {:y (cast
-                                      b {:car :b 
-                                         :cdr 3})})))
+                  (connect v (cast u {:y {:car :b 
+                                           :cdr 3}})))
               (:y {:keys [car cdr]}
                   (connect o 33)
                   (mux2 (< cdr 7)
-                        (connect v (u {:y (cast
-                                            b {:car :c 
-                                               :cdr (inc cdr)})}))
-                        (connect v (u {:x ((uintm 5) 3)}))))))
+                        (connect v (cast u {:y {:car :c 
+                                                :cdr (inc cdr)}}))
+                        (connect v (cast u {:x ((uintm 5) 3)}))))))
         [state fns] (make-sim m)]
-    (pprint-ast m)
     (is (= (get (exec-sim state fns 0)
                 [(:token m) :v])
            (u {:x ((uintm 5) 0)})))  
     (is (= (get (exec-sim state fns 0)
                 [(:token m) :o])
            ((uintm 5) 22)))
-    (println (get (exec-sim state fns 3)
-                [(:token m) :v])) 
+
+    ;(println (get (exec-sim state fns 3)
+    ;            [(:token m) :v])) 
+
     (is (= (get (exec-sim state fns 1)
                 [(:token m) :v])
            (u {:y (cast b {:car :b
                            :cdr 3}) })))  
+
     (is (= (get (exec-sim state fns 1)
                 [(:token m) :o])
            ((uintm 5) 22)))
