@@ -1,9 +1,10 @@
 (ns piplin.test.sim
   (:use [piplin sim modules math types])
+  (:require [clojure.core :as clj])
   (:use clojure.test))
 
 (deftest what-changed-test
-  (is (= (what-changed {:a 1 :b 2 :c 3 :d 4}
+  (is (clj/= (what-changed {:a 1 :b 2 :c 3 :d 4}
                        {:b 2 :c 3 :d 5})
          [{:a 1, :c 3, :b 2, :d 5}
           {:d 5}])
@@ -11,7 +12,7 @@
       changed and merge properly"))
 
 (deftest next-fns-test
-  (is (= (next-fns 3 [:a :b :c]
+  (is (clj/= (next-fns 3 [:a :b :c]
                    {3 {:f1 []}
                     4 {:f2 []}
                     :b {:f3 [] :f5 []}
@@ -34,11 +35,11 @@
                               [{:a 22}
                                {:b [#(str "bar")]}])
                             [:a]})]
-    (is (= delta {:c 3 :a 22})
+    (is (clj/= delta {:c 3 :a 22})
         "make sure full delta is generated")
-    (is (= ((first (get reactors 3))) "next")
+    (is (clj/= ((first (get reactors 3))) "next")
         "get reactor for cycle event")
-    (is (= (set (map #(%) (:b reactors)))
+    (is (clj/= (set (map #(%) (:b reactors)))
            (set ["bar" "baz"]))
         "combining reactors for same event"))
   (is (thrown? AssertionError
@@ -59,20 +60,20 @@
   (let [[counterfn arglist] (every-cycle (fn [x] (inc x))
                                          [:count]
                                          :count)]
-    (is (= (exec-sim {:count 0} {counterfn arglist} 10)
+    (is (clj/= (exec-sim {:count 0} {counterfn arglist} 10)
            {:count 10})))
   (let [mod (module [:outputs [c (instance (uintm 8) 0)]]
                     (connect c (+ c 1)))
         sim (make-sim mod)
         init-state (first sim)
         init-fns (second sim)]
-    (is (= (get (exec-sim init-state
+    (is (clj/= (get (exec-sim init-state
                           init-fns
                           10)
                 [(:token mod) :c])
            (instance (uintm 8) 10))
         "ran and counted up to 10")
-    (is (= (get (exec-sim init-state
+    (is (clj/= (get (exec-sim init-state
                           init-fns
                           257)
                 [(:token mod) :c])
@@ -86,7 +87,7 @@
         state (first sim)
         fns (second sim)
         u4 #(instance (uintm 4) %)]
-    (is (= (reduce #(apply assoc %1 %2) {}
+    (is (clj/= (reduce #(apply assoc %1 %2) {}
                    (map (fn [[k v]] [(second k) v])
                         (select-keys (exec-sim state fns 7)
                                      [[(:token mod) :c]

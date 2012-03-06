@@ -2,6 +2,7 @@
   (:use clojure.test)
   (:import slingshot.ExceptionInfo)
   (:use [slingshot.slingshot :only [throw+]])
+  (:require [clojure.core :as clj])
   (:use [piplin types math modules sim]))
 
 (deftest j-long-test
@@ -15,8 +16,8 @@
 (deftest =test
   (is (= 1 1 1))
   (is (not (= 1 1 2)))
-  (is (= "hello" "hello"))
-  (is (= [1 \a] [1 \a]))
+  (is (clj/= "hello" "hello"))
+  (is (clj/= [1 \a] [1 \a]))
   (is (< 3 7))
   (is (> 0 -1.2))
   (is (>= -3.3 -3.3))
@@ -38,26 +39,26 @@
 
 (deftest binop-error-test
   (let [e (error "hi")]
-    (is (= (try-errors (+ 0 (throw+ e))) e))
-    (is (= (try-errors (+ 0 1 2 3 (throw+ e))) e))
-    (is (= (try-errors (+ 0 1 (throw+ e) 3 (throw+ e))) e))
-    (is (= (try-errors (+ (throw+ e) 0)) e))
-    (is (= (try-errors (+ (throw+ e) (throw+ e))) e))
-    (is (= (try-errors (bit-cat (throw+ e) (throw+ e))) e))))
+    (is (clj/= (try-errors (+ 0 (throw+ e))) e))
+    (is (clj/= (try-errors (+ 0 1 2 3 (throw+ e))) e))
+    (is (clj/= (try-errors (+ 0 1 (throw+ e) 3 (throw+ e))) e))
+    (is (clj/= (try-errors (+ (throw+ e) 0)) e))
+    (is (clj/= (try-errors (+ (throw+ e) (throw+ e))) e))
+    (is (clj/= (try-errors (bit-cat (throw+ e) (throw+ e))) e))))
 
 (deftest bits-test
   (let [b8 #(promote (bits 8) %)]
-    (is (= (value (b8 0xa0)) [1 0 1 0 0 0 0 0]))
-    (is (= (value (bit-cat (b8 0xa0) (bit-cat (b8 0xfe))))
+    (is (clj/= (value (b8 0xa0)) [1 0 1 0 0 0 0 0]))
+    (is (clj/= (value (bit-cat (b8 0xa0) (bit-cat (b8 0xfe))))
            [1 0 1 0 0 0 0 0 1 1 1 1 1 1 1 0]))
-    (is (= (value (bit-slice (bit-cat (b8 0xf) (b8 0xf0)) 4 12))
+    (is (clj/= (value (bit-slice (bit-cat (b8 0xf) (b8 0xf0)) 4 12))
            [1 1 1 1 1 1 1 1]))
     (is (= (bit-and (b8 0xf) 0x3c) (b8 0xc)))
     (is (= (bit-or 0xf0 (b8 0xf)) (b8 0xff)))
     (is (= (bit-xor (instance (uintm 8) 0x3c) (b8 0xf))
            (b8 0x33))))
-  (is (= (get-bits true) [1]))
-  (is (= (get-bits false) [0]))
+  (is (clj/= (get-bits true) [1]))
+  (is (clj/= (get-bits false) [0]))
   (is (= (serialize true) (cast (bits 1) 1)))
   (is (= (serialize false) (cast (bits 1) 0)))
   (is (= (count (value (serialize
@@ -274,7 +275,8 @@
         (clojure.core/cond
           true 1
           false 0)))
-  (is (not= 1
+  (is (clj/not=
+        1
             (make-sim-fn (cond
                            ;41 != 42
                            (= (uninst 41) 42) ((uintm 3) 2)
@@ -297,29 +299,29 @@
           e-bits (serialize e-inst)
           e-inst2 (deserialize e e-bits)]
       (is (= (:n (typeof e-bits)) 2))
-      (is (= e-inst e-inst2 "Unsuccessful serialization roundtrip")))  
+      (is (= e-inst e-inst2) "Unsuccessful serialization roundtrip"))  
     (let [e-inst (e :b)
           e-bits (serialize e-inst)
           e-inst2 (deserialize e e-bits)]
       (is (= (:n (typeof e-bits)) 2))
-      (is (= e-inst e-inst2 "Unsuccessful serialization roundtrip")))  
+      (is (= e-inst e-inst2) "Unsuccessful serialization roundtrip"))  
     (let [e-inst (e :c)
           e-bits (serialize e-inst)
           e-inst2 (deserialize e e-bits)]
       (is (= (:n (typeof e-bits)) 2))
-      (is (= e-inst e-inst2 "Unsuccessful serialization roundtrip")))
+      (is (= e-inst e-inst2) "Unsuccessful serialization roundtrip"))
     (let [b-inst (cast b {:e :a :a 4 :b true})
           b-bits (serialize b-inst)
           b-inst2 (deserialize b b-bits)]
       (is (= (kindof b-bits) :bits))
       (is (= 6 (:n (typeof b-bits))))
-      (is (= b-inst b-inst2 "Unsuccessful serialization roundtrip")))  
+      (is (= b-inst b-inst2) "Unsuccessful serialization roundtrip"))  
     (let [b-inst (cast b {:e :b :a 3 :b false})
           b-bits (serialize b-inst)
           b-inst2 (deserialize b b-bits)]
       (is (= (kindof b-bits) :bits))
       (is (= 6 (:n (typeof b-bits))))
-      (is (= b-inst b-inst2 "Unsuccessful serialization roundtrip")))))
+      (is (= b-inst b-inst2) "Unsuccessful serialization roundtrip"))))
 
 (deftest mux2-connect-test
   (let [m (module [:outputs [o false
@@ -445,7 +447,8 @@
              :a ((uintm 8) 22)
              :b ((uintm 8) 32)
              :c ((uintm 8) 44)
-             :d ((uintm 8) 0))]
+             :d ((uintm 8) 0)
+             ((uintm 8) 222))]
     (is (= ((make-sim-fn (f :a))) ((uintm 8) 22)))  
     (is (= ((make-sim-fn (f :b))) ((uintm 8) 32)))  
     (is (= ((make-sim-fn (f :c))) ((uintm 8) 44)))  

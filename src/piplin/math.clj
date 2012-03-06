@@ -2,6 +2,7 @@
   (:use [slingshot.slingshot])
   (:use [clojure.set :only [map-invert intersection difference]])
   (:require [clojure.set])
+  (:require [clojure.core :as clj])
   (:use (piplin types))
   (:use [piplin.modules :only [connect]]))
 
@@ -10,6 +11,15 @@
   (typeof [this] (anontype :null))
   (value [this] nil)
   (pipinst? [this] true))
+
+(derive-type clojure.lang.Keyword :piplin-type)
+(derive-type java.lang.Boolean :piplin-type)
+(derive-type java.lang.Long :piplin-type)
+(derive-type java.lang.Integer :piplin-type)
+(derive-type java.lang.Short :piplin-type)
+(derive-type java.lang.Byte :piplin-type)
+(derive-type java.lang.Float :piplin-type)
+(derive-type java.lang.Double :piplin-type)
 
 (extend-protocol ITyped
   clojure.lang.Keyword
@@ -111,8 +121,8 @@
   :uintm
   [this obj]
   (cond
-    (= (typeof obj) this) obj ;Already correct
-    (= (kindof obj)
+    (clj/= (typeof obj) this) obj ;Already correct
+    (clj/= (kindof obj)
        (:kind this)) (throw+
                        (error
                          "Incompatible type instances: " this
@@ -383,7 +393,7 @@
   :bits
   [type obj]
   (when-let [n (-> obj typeof :n)]
-    (when-not (= (:n type) n)
+    (when-not (clj/= (:n type) n)
       (throw+ (error "Bit size mismatch"))))
   (condp isa-type? (kindof obj)
     :bits obj
@@ -411,7 +421,7 @@
                    (every? #{0 1} v))
       (throw+ (error
                 "bits must be a vector of 0s and 1s:" v)))
-    (when (not= (count v) n)
+    (when-not (clj/= (count v) n)
       (throw+ (error "bit vector must be of length" n (count v)))))
   inst)
 
@@ -458,9 +468,9 @@
   [type bits]
   (let [bits-type (typeof bits)
         n (:n bits-type)]
-    (when-not (= (kindof bits) :bits)
+    (when-not (clj/= (kindof bits) :bits)
       (throw+ (error bits "must be of kind :bits")))
-    (when-not (= n (bit-width-of type))
+    (when-not (clj/= n (bit-width-of type))
       (throw+ (error type "has bit width" (bit-width-of type))))
     (if (pipinst? bits)
       (cast type (from-bits type (value bits)))
@@ -503,7 +513,7 @@
   "Takes an expr of type bits and returns a subrange
   of the bits."
   [expr low high]
-  (if-not (= (kindof expr) :bits)
+  (if-not (clj/= (kindof expr) :bits)
     (throw+ (error "Can only slice bits, not " expr))
     (let [type (bits (- high low))]
       (if (pipinst? expr)
@@ -544,7 +554,7 @@
 
 (defn mux2-impl
   [sel v1 v2]
-  (when-not (= (typeof v1) (typeof v2))
+  (when-not (clj/= (typeof v1) (typeof v2))
     (throw+ (error v1 "and" v2 "are different types" (typeof v1) (typeof v2)))) 
   (let [sel (cast (anontype :boolean) sel)]
     (if (pipinst? sel)
@@ -564,7 +574,7 @@
     (cond
       ;TODO: this code breaks if set isn't called below
       ;I don't understand why/don't think that should happen
-      (not= (set (keys @v1-connections)) (set (keys @v2-connections)))
+      (clj/not= (set (keys @v1-connections)) (set (keys @v2-connections)))
       (throw+ (error "Must have the same connections on both parts"))
       (seq @v1-connections)
       (->> @v1-connections
@@ -583,13 +593,13 @@
 (defmethod promote
   :boolean
   [type obj]
-  (= 1
+  (clj/= 1
      (cond
-       (= (typeof obj) type) (if obj 1 0)
-       (or (= true obj) (= false obj)) (if obj 1 0)
-       (= (typeof obj) (bits 1)) (first (value obj))
-       (and (= (kindof obj) :uintm)
-            (= (-> obj typeof :n) 1)) (value obj)
+       (clj/= (typeof obj) type) (if obj 1 0)
+       (or (clj/= true obj) (clj/= false obj)) (if obj 1 0)
+       (clj/= (typeof obj) (bits 1)) (first (value obj))
+       (and (clj/= (kindof obj) :uintm)
+            (clj/= (-> obj typeof :n) 1)) (value obj)
        :else
        (throw+ (error "Cannot promote" obj "to boolean")))))
 
@@ -655,7 +665,7 @@
         (some #(not (and (vector? %)
                          (every? #{0 1} %))) (vals coll))
         (throw+ (error "Maps values must all be bits")) 
-        (some #(not= (-> (seq coll)
+        (some #(clj/not= (-> (seq coll)
                        first
                        val
                        count)
@@ -665,7 +675,7 @@
                   "Map's values must be same bit width")) 
         (some #(not (keyword? %)) (keys coll))
         (throw+ (error "Map's keys must be keywords")) 
-        (not= (count (vals coll))
+        (clj/not= (count (vals coll))
               (count (distinct (vals coll))))
         (throw+ (error "Enum keys must be distinct"))
         :else
@@ -676,7 +686,7 @@
   :enum
   [type obj]
   (cond
-    (= (typeof obj) type) obj
+    (clj/= (typeof obj) type) obj
     (and (keyword? obj)
          (obj (:keymap type))) (instance type obj)
     :else
@@ -781,7 +791,7 @@
   :bundle
   [type obj]
   (cond
-    (= (typeof obj) type) obj
+    (clj/= (typeof obj) type) obj
     (map? obj)
     ;TODO: the following must be rewritten to maybe
     ;generate a deferred ast node
@@ -896,7 +906,7 @@
                      (reduce (fn [prev [p t]]
                                (fn [] (mux2-helper p t prev))) 
                              (last thunks)))]
-      (if (= last-pred :else)
+      (if (clj/= last-pred :else)
         (mux-tree) 
         (throw+ (error "Must include :else in simulated cond"))))
     (let [thunk (->> thunks
@@ -941,11 +951,11 @@
   (let [enum (if (seq backing-enum)
                (first backing-enum)
                (enum (set (keys schema))))]
-    (when-not (= (:kind enum) :enum)
+    (when-not (clj/= (:kind enum) :enum)
       (throw+ (error "not an enum: " enum)))
-    ;(when-not (= (intersection (set (keys (:keymap enum)))
-      ;                         (set (keys schema))))
-      ;(throw+ (error "Schema and enum must have same keys")))
+    (when-not (clj/= (intersection (set (keys (:keymap enum)))
+                               (set (keys schema))))
+      (throw+ (error "Schema and enum must have same keys")))
     (merge (Union. schema enum)
            {:kind :union})))
 
@@ -953,11 +963,11 @@
   :union
   [type obj]
   (cond
-    (= (typeof obj) type) obj
+    (clj/= (typeof obj) type) obj
     (map? obj)
     (let [tag (key (first obj))
           v (val (first obj))]
-      (when-not (= (count obj) 1)
+      (when-not (clj/= (count obj) 1)
         (throw+ (error "Union map must have 1 element")))
       (if-let [val-type (get (:schema type) tag)] 
         (let [v (cast val-type v)]
@@ -1015,13 +1025,13 @@
         m (value inst)
         k (key (first m))
         v (val (first m))]
-    (when-not (= (class (typeof inst)) piplin.math.Union)
+    (when-not (clj/= (class (typeof inst)) piplin.math.Union)
       (throw+ (error "Union has wrong class")))
-    (when-not (= 1 (count m))
+    (when-not (clj/= 1 (count m))
       (throw+ (error m "must have 1 key/value pair")))
     (when-not (get schema k)
       (throw+ (error k "not in schema:" schema)))
-    (when-not (= (typeof v) (get schema k))
+    (when-not (clj/= (typeof v) (get schema k))
       (pprint-ast [:typeof-v (typeof v) :typeof-k (get schema k)
                    :classof-v-type (class (typeof v))
                    :classof-k-type (class (get schema k))])
@@ -1036,7 +1046,7 @@
   (let [e (-> (typeof u) :enum)]
     (if (pipinst? u)
       (let [v (-> (value u) first)]
-        (if (= (key v) k)
+        (if (clj/= (key v) k)
           v
           (throw (RuntimeException. "invalid union"))))
       (mkast (get (-> (typeof u) :schema) k)
@@ -1077,4 +1087,5 @@
                              (set '~(map first clauses)))
            (throw+ (error "keys don't match"))) 
          (condp = (get-tag ~u-sym)
-           ~@(apply concat clauses))))))
+           ~@(apply concat (butlast clauses))
+           ~(second (last clauses)))))))

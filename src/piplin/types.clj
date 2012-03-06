@@ -8,6 +8,14 @@
 
 (def types (atom (make-hierarchy)))
 
+(defn derive-type
+  [child parent]
+  (swap! types derive child parent))
+
+(defn isa-type?
+  [type unknown]
+  (isa? @types unknown type))
+
 (defprotocol ITyped
   "Things with types in piplin implement this."
   (typeof [this] "Return type obj for this obj.")
@@ -15,6 +23,15 @@
   (pipinst? [this] "Returns true if this is an
                    instance of the type (as opposed
                    to a symbolic representation)"))
+
+(defrecord CompilerError [msg])
+
+(derive-type CompilerError :error)
+
+(defn error
+  "Convenience function to define a compiler error"
+  [& args]
+  (CompilerError. (apply print-str args)))
 
   (comment
     ;TODO: running an experiment to see if this
@@ -30,18 +47,9 @@
   (pipinst? [this] false))
 
 (defn kindof [a]
-  (if (satisfies? ITyped a)
-    (-> a typeof :kind)
-    (class a)))
-
-(defrecord AnonType [kind])
-
-(defn anontype
-  "Returns an anonymous type of
-  the given kind. Useful to promote
-  to jvm types."
-  [kind]
-  (AnonType. kind))
+  (when-not (isa-type? :piplin-type (class (typeof a)))
+    (throw+ (error (typeof a) "is not a piplin type! val =" a)))
+  (-> a typeof :kind))
 
 (defmulti promote
   "Produces an instance of the given
@@ -50,23 +58,6 @@
   casted."
   (fn [type obj] (:kind type))
   :hierarchy types)
-
-(defrecord CompilerError [msg])
-
-(defn derive-type
-  [child parent]
-  (swap! types derive child parent))
-
-(defn isa-type?
-  [type unknown]
-  (isa? @types unknown type))
-
-(derive-type CompilerError :error)
-
-(defn error
-  "Convenience function to define a compiler error"
-  [& args]
-  (CompilerError. (apply print-str args)))
 
 (defmethod promote :default
   [type obj]
@@ -210,14 +201,16 @@
   the necessary protocols and has the vector of
   members as the record's members."
   [name args]
-  `(defrecord ~name ~args
-     clojure.lang.IFn
-     (invoke [~'this ~'x]
-       (instance ~'this ~'x))
-     (applyTo [~'this  ~'argseq]
-       (when-not (= (count ~'argseq) 1)
-         (throw (IllegalArgumentException. "1 argument only")))
-       (instance ~'this (first ~'argseq)))))
+  `(do
+     (defrecord ~name ~args
+       clojure.lang.IFn
+       (invoke [~'this ~'x]
+         (instance ~'this ~'x))
+       (applyTo [~'this  ~'argseq]
+         (when-not (= (count ~'argseq) 1)
+           (throw (IllegalArgumentException. "1 argument only")))
+         (instance ~'this (first ~'argseq)))) 
+     (derive-type ~name :piplin-type)))
 
 (defn alter-value
   "Takes an ASTNode and alters its value"
@@ -225,6 +218,15 @@
   (ASTNode. (.type astnode)
             (apply f (.map astnode) more)
             (.metamap astnode)))
+
+(defpiplintype AnonType [kind])
+
+(defn anontype
+  "Returns an anonymous type of
+  the given kind. Useful to promote
+  to jvm types."
+  [kind]
+  (AnonType. kind))
 
 (defmacro mkast
   "Takes the type, op, args, and function and
