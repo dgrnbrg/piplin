@@ -180,6 +180,8 @@
 (defn instance
   "Creates an instance of the type with value val"
   [type val & more]
+  (when (nil? type)
+    (throw+ (error "Type probably shouldn't be nil. value =" val)))
   (let [val (if (some #{:constrain} more)
               (constrain type val)
               val)
@@ -207,7 +209,11 @@
   `(defrecord ~name ~args
      clojure.lang.IFn
      (invoke [~'this ~'x]
-       (instance ~'this ~'x))))
+       (instance ~'this ~'x))
+     (applyTo [~'this  ~'argseq]
+       (when-not (= (count ~'argseq) 1)
+         (throw (IllegalArgumentException. "1 argument only")))
+       (instance ~'this (first ~'argseq)))))
 
 (defn alter-value
   "Takes an ASTNode and alters its value"

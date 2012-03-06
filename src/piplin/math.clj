@@ -105,7 +105,7 @@
   (let [n (-> inst typeof :n)
         v (value inst)
         maxval (dec (bit-shift-left 1 n))]
-    (when (< v 0)
+    (when (neg? v)
       (throw+ (error "uintm must be positive:" v)))
     (when (> v maxval)
       (throw+ (error "uintm" n "must be less than" maxval
@@ -790,6 +790,7 @@
             (const-uneval-filter
               (->> obj
                 (mapcat (fn [[k v]]
+                          (println (str "k is " k ", schema val is " (get schema k)))
                           [k (cast (k schema) v)]))
                 (apply hash-map)))
             arg-keys (vec (keys args))]
@@ -910,7 +911,8 @@
         else (if (even? (count clauses)) nil (last clauses))
         body (mapcat (fn [[test body]]
                        `((~pred ~test ~expr) ~body))
-                     pairs)]
+                     pairs)
+        body (if else (concat body [:else else]) body)]
     `(cond ~@body)))
 
 (defpiplintype Union [schema enum])
@@ -993,6 +995,12 @@
   (constrain {:schema (:schema type)
               :kind :bundle}
              val))
+(defn sym-diff
+  "symmetric different of 2 sets"
+  [s1 s2]
+  (clojure.set/union
+    (difference s1 s2)
+    (difference s2 s1)))
 
 (defmethod check
   :union
@@ -1005,9 +1013,9 @@
       (throw+ (error m "must have 1 key/value pair")))
     (when-not (get schema k)
       (throw+ (error k "not in schema:" schema)))
-    ;(when-not (= (typeof v) (get schema k))
-      ;(println [(typeof v) (get schema k) (= (typeof v) (get schema k))])
-      ;(throw+ (error (typeof v) "should be type" (get schema k))))
+    (when-not (= (typeof v) (get schema k))
+      (println [(typeof v) (get schema k) (sym-diff (set (keys (typeof v))) (set (keys (get schema k))))])
+      (throw+ (error (typeof v) "should be type" (get schema k))))
     )
   inst)
 
@@ -1021,7 +1029,10 @@
         (if (= (key v) k)
           v
           (throw (RuntimeException. "invalid union"))))
-      (mkast e :get-value [u] (partial get-value k)))))
+      (mkast (get (-> (typeof u) :schema) k)
+             :get-value
+             [u]
+             (partial get-value k)))))
 
 (defn get-tag
   "Gets the tag of the union"
@@ -1031,12 +1042,6 @@
       (e (-> (value u) first key)) 
       (mkast e :get-tag [u] get-tag))))
 
-(defn sym-diff
-  "symmetric different of 2 sets"
-  [s1 s2]
-  (clojure.set/union
-    (difference s1 s2)
-    (difference s2 s1)))
 
 (defmacro union-match
   "Takes a union u and a clause for each
@@ -1048,9 +1053,9 @@
   implicit do within a cond-like form."
   [u & clauses]
   (let [u-sym (gensym "u")
-        clauses (map (fn [[k name body]]
+        clauses (map (fn [[k name & body]]
                        [k `(let [~name (get-value ~k ~u-sym)]
-                             ~body)])
+                             ~@body)])
                      clauses)]
     `(do
        (let [~u-sym ~u]
@@ -1059,7 +1064,7 @@
                                :keymap
                                :keys
                                set)
-                             (set ~(map first clauses)))
+                             (set '~(map first clauses)))
            (throw+ (error "keys don't match"))) 
          (condp = (get-tag ~u-sym)
            ~@(apply concat clauses))))))
