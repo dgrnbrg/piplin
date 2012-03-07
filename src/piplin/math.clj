@@ -809,7 +809,6 @@
             (const-uneval-filter
               (->> obj
                 (mapcat (fn [[k v]]
-                          (println (str "k is " k ", schema val is " (get schema k)))
                           [k (cast (k schema) v)]))
                 (apply hash-map)))
             arg-keys (vec (keys args))]
@@ -936,7 +935,6 @@
                        `((~pred ~test ~expr) ~body))
                      pairs)
         body (if (nil? else) body (concat body [:else else]))]
-    (println (str "condp = " (count clauses) (last clauses)))
     `(cond ~@body)))
 
 (defpiplintype Union [schema enum])
@@ -974,8 +972,7 @@
       (if-let [val-type (get (:schema type) tag)] 
         (let [v (cast val-type v)]
           (if (pipinst? v)
-            (do (println (str "type is " type)) 
-            (instance type obj :constrain)) 
+            (instance type obj :constrain)
             (mkast type :make-union [v] #(promote type {tag %}))))
         (throw+ (error "Tag must be one of"
                        (keys (:schema type))))))))
@@ -1036,9 +1033,6 @@
     (when-not (get schema k)
       (throw+ (error k "not in schema:" schema)))
     (when-not (clj/= (typeof v) (get schema k))
-      (pprint-ast [:typeof-v (typeof v) :typeof-k (get schema k)
-                   :classof-v-type (class (typeof v))
-                   :classof-k-type (class (get schema k))])
       (throw+ (error (typeof v) "should be type" (get schema k))))
     )
   inst)
@@ -1050,11 +1044,18 @@
   (let [e (-> (typeof u) :enum)]
     (if (pipinst? u)
       (let [v (-> (value u) first)]
-        (if (clj/= (key v) k)
-          v
-          (throw (RuntimeException. (str "invalid union: "
+          (comment (throw (RuntimeException. (str "invalid union: "
                                          "expected " k 
-                                         " but got " (key v))))))
+                                         " but got " (key v))))) 
+        (if (clj/= (key v) k)
+          (val v)
+          (let [vtype (-> (typeof u)
+                                 :schema
+                                 (get k))]
+          (deserialize vtype (cast (-> vtype
+                                     bit-width-of
+                                     bits) 0)))) 
+          )
       (mkast (get (-> (typeof u) :schema) k)
              :get-value
              [u]

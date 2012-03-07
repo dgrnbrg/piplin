@@ -151,7 +151,7 @@
                      :feedback [c ((uintm 2) 0)]]
                     (let [c' (inc c)]
                       (connect c c')
-                      (connect triggered (pr-trace "bool" (= c' ((uintm 2) 3))))))
+                      (connect triggered (= c' ((uintm 2) 3)))))
         [state fns] (make-sim mod)]
     (is (= (get (exec-sim state fns 0)
                 [(:token mod) :triggered])
@@ -494,13 +494,50 @@
                 [(:token m) :o])
            ((uintm 5) 22)))
 
-    ;(println (get (exec-sim state fns 3)
-    ;            [(:token m) :v])) 
-
     (is (= (get (exec-sim state fns 1)
                 [(:token m) :v])
            (u {:y (cast b {:car :b
                            :cdr 3}) })))  
+
+    (is (= (get (exec-sim state fns 1)
+                [(:token m) :o])
+           ((uintm 5) 22)))
+    ))
+
+;TODO: write a test that uses a union-match expr as a value.
+;this should give more info on the wrongly-taken braken issue
+
+(deftest union-test-2
+  (let [e (enum #{:a :b :c})
+        b (bundle {:car e :cdr (uintm 4)})
+        u (union {:x (uintm 5) :y b})
+        m (module [:outputs [v (u {:x ((uintm 5) 0)})
+                             o ((uintm 5) 22)]]
+
+            (mux2
+              (= (get-tag v) :x)
+              (do
+                (connect o (uninst 22))
+                (connect v (cast u {:y {:car :b 
+                                        :cdr 3}}))) 
+              (let [{:keys [car cdr]} (get-value :y v)] 
+                (connect o (uninst 33))
+                (mux2 (< cdr 7)
+                      (connect v (cast u {:y {:car :c 
+                                              :cdr (inc cdr)}}))
+                      (connect v (cast u {:x ((uintm 5) 3)}))))))
+        [state fns] (make-sim m)]
+    (is (= (get (exec-sim state fns 0)
+                [(:token m) :v])
+           (u {:x ((uintm 5) 0)})))  
+    (is (= (get (exec-sim state fns 0)
+                [(:token m) :o])
+           ((uintm 5) 22)))
+
+    (is (= (get (exec-sim state fns 1)
+                [(:token m) :v])
+           (u {:y (cast b {:car :b
+                           :cdr 3}) })))
 
     (is (= (get (exec-sim state fns 1)
                 [(:token m) :o])
