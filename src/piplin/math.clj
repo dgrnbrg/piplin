@@ -445,7 +445,18 @@
   bits)
 
 (defmulti bit-width-of
-  :kind :hierarchy types)
+  ;TODO: error below never gets thrown
+  ;needs a test + fix
+;  #(if (pipinst? %)
+ ;    (throw+ (error "Should be a type: " %))
+     :kind
+;     )
+  :hierarchy types)
+
+(defmethod bit-width-of
+  :bits
+  [bits]
+  (:n bits))
 
 (defmulti get-bits
   kindof
