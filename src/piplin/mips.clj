@@ -7,6 +7,7 @@
 (defn str-to-bits
   [s]
   (let [bit-vec (->> s
+                  (filter (partial not= \_))
                   (map
                     #(condp = % \0 0 \1 1
                        (throw (IllegalArgumentException.
@@ -129,9 +130,9 @@
   given a register an an immediate, store the immediate
   in the register)
 
-(defn compare-key-to-str
-  [m k s]
-  (h/= (get m k) (str-to-bits s)))
+(defn compare-key-via-str
+  [m k b]
+  (h/= (str-to-bits (get m k)) b))
 
 (defn zext32
   "zero extend bits to 32"
@@ -149,7 +150,7 @@
                    :dst rd}}]
     (->>
       (h/condp (partial
-                 compare-key-to-str
+                 compare-key-via-str
                  mips-short-funcs) short-func
         :sll (-> cmd
                (assoc-in
@@ -174,7 +175,7 @@
         :xor (assoc-in
                cmd [:alu :op] :xor)
         (h/condp (partial
-                   compare-key-to-str mips-funcs) func
+                   compare-key-via-str mips-funcs) func
           :add (assoc-in
                  cmd [:alu :op] 
                  :add)
@@ -205,7 +206,9 @@
           :subu   (assoc-in
                     cmd [:alu :op] 
                     :subu)))
-      (cast alu-unresolved-cmd))))
+      ;(cast alu-unresolved-cmd)
+      identity
+      )))
 
 (defn decode
   "Takes an instruction and returns an
@@ -228,7 +231,8 @@
                              :y {:imm imm}
                              :dst rt}}
           ]
-      (h/condp (partial compare-key-to-str mips-ops) op
+      (println "got here")
+      (h/condp (partial compare-key-via-str mips-ops) op
         :addi (assoc-in partial-imm
                         [:alu :op] :add)
         :addiu (assoc-in partial-imm
@@ -252,7 +256,9 @@
         ;loads
         ;stores
         ))
-    (cast alu-unresolved-cmd)))
+    identity
+    ;(cast alu-unresolved-cmd)
+    ))
 
 (defn alu
   "Takes an alu command and returns
@@ -266,3 +272,15 @@
        :dst dst}
       (cast wb-result) 
       )))
+
+(comment (clojure.java.shell/sh "gcc"
+                       "-xc"
+                       "-nostdlib"
+                       "-c"
+                       "-o"
+                       "tmp.o"
+                       "-"
+                       :in (.getBytes
+                             "int main() {
+                               return 22;
+                             }"))) 
