@@ -759,8 +759,7 @@
       (mkast (get-in (typeof bund) [:schema key])
              :bundle-key
              [bund]
-             (fn [b]
-               (bundle-get b key)))
+             #(bundle-get % key))
       assoc :key key)))
 
 (defpiplintype Bundle [schema])
@@ -984,6 +983,8 @@
         (let [v (cast val-type v)]
           (if (pipinst? v)
             (instance type obj :constrain)
+            ;TODO: should composite types need to make ast in promote
+            ;or should cast be smarter?
             (mkast type :make-union [v] #(promote type {tag %}))))
         (throw+ (error "Tag must be one of"
                        (keys (:schema type))))))))
