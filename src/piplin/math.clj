@@ -59,8 +59,14 @@
   "Converts the expr to the type."
   [type expr]
   (if (typeof expr)
-    (if (pipinst? expr)
+    (cond
+      (clj/= (typeof expr) type)
+      expr
+      (pipinst? expr)
       (promote type expr)
+      (-> expr meta :distribute)
+      ((-> expr meta :distribute) type)
+      :else
       (mkast type :cast [expr] (partial cast type)))
     (promote type expr)))
 
@@ -570,7 +576,11 @@
   (let [sel (cast (anontype :boolean) sel)]
     (if (pipinst? sel)
       (if sel v1 v2)
-      (mkast (typeof v1) :mux2 [sel v1 v2] mux2-impl))))  
+      (vary-meta
+        (mkast (typeof v1) :mux2 [sel v1 v2] mux2-impl)
+        assoc
+        :distribute
+        #(mux2-impl sel (cast % v1) (cast % v2))))))  
 
 (defn mux2-helper
   [sel v1-thunk v2-thunk]
