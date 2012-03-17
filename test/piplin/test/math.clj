@@ -203,6 +203,8 @@
                       :b (cast (enum #{:foo :bar})
                                :foo)}))
     (is (thrown? ExceptionInfo
+                 (cast b1 {:a 1})))
+    (is (thrown? ExceptionInfo
                  (instance b1 {:a 1
                                :b (cast (enum #{:foo :bar})
                                         :foo)})))

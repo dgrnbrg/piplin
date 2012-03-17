@@ -791,30 +791,29 @@
   [(filter-map pipinst? map)
    (filter-map (comp not pipinst?) map)])
 
-
 (defmethod promote
   :bundle
   [type obj]
   (cond
     (clj/= (typeof obj) type) obj
     (map? obj)
-    ;TODO: the following must be rewritten to maybe
-    ;generate a deferred ast node
-    ;TODO: check symdiff of map and schema
-    (if (every? pipinst? (vals obj))
-      (instance type
-                (apply conj {}
-                       (map (fn [[k v]]
-                              [k (cast v (get obj k))]) 
-                            (:schema type)))
-                :constrain) 
-      (let [schema (:schema type)
-            casted-obj (->> obj
-                (mapcat (fn [[k v]]
-                          [k (cast (k schema) v)]))
-                (apply hash-map))]
-        (mkast-explicit-keys type :make-bundle (keys obj) casted-obj 
-                             (fn [& args] (promote type (zipmap (keys obj) args))))))
+    (let  [schema (:schema type)]
+      (when-let [bad (seq (sym-diff (set (keys schema))
+                                    (set (keys obj))))]
+        (throw+ (error "These keys either didn't have a value"
+                       "or aren't part of the schema:" bad)))
+      (let [casted-obj (apply conj {}
+                              (map (fn [[k v]]
+                                     [k (cast v (get obj k))]) 
+                                   schema))] 
+        (if (every? pipinst? (vals obj))
+          (instance type casted-obj :constrain) 
+          (mkast-explicit-keys type :make-bundle
+                               (keys obj) casted-obj 
+                               (fn [& args]
+                                 (promote type
+                                          (zipmap (keys obj)
+                                                  args)))))))
     :else
     (throw+ (error "Cannot promote" obj "to" type))))
 
