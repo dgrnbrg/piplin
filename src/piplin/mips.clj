@@ -76,9 +76,13 @@
    :bltzal "10000"})
 
 (def reg (h/enum #{:0 :1 :2 :3
-               :4 :5 :6 :7
-               :8 :9 :10 :11
-               :12 :13 :14 :15}))
+                   :4 :5 :6 :7
+                   :8 :9 :10 :11
+                   :12 :13 :14 :15
+                   :16 :17 :18 :19
+                   :20 :21 :22 :23
+                   :24 :25 :26 :27
+                   :28 :29 :30 :31}))
 
 (def u32m (h/uintm 32))
 
@@ -206,7 +210,8 @@
           :subu   (assoc-in
                     cmd [:alu :op] 
                     :subu)))
-      ;(cast alu-unresolved-cmd)
+      :alu
+      (h/cast alu-unresolved-cmd)
       identity
       )))
 
@@ -219,11 +224,12 @@
   (->>
     (let [b (partial h/bit-slice inst)
           op (b 26 32)
-          rs (b 21 26)
-          rt (b 16 21)
-          imm (b 0 16)
+          rs (h/deserialize reg (b 21 26)) 
+          rt (h/deserialize reg (b 16 21)) 
+          imm (h/deserialize (h/uintm 32)
+                             (zext32 (b 0 16))) 
           target (b 0 26)
-          rd (b 11 16)
+          rd (h/deserialize reg (b 11 16)) 
           sa (b 6 11)
           short-func (b 0 6)
           func (b 0 11)
@@ -231,7 +237,6 @@
                              :y {:imm imm}
                              :dst rt}}
           ]
-      (println "got here")
       (h/condp (partial compare-key-via-str mips-ops) op
         :addi (assoc-in partial-imm
                         [:alu :op] :add)
@@ -257,7 +262,8 @@
         ;stores
         ))
     identity
-    ;(cast alu-unresolved-cmd)
+    :alu
+    (h/cast alu-unresolved-cmd)
     ))
 
 (defn alu
