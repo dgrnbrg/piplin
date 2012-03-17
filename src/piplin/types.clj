@@ -228,18 +228,52 @@
   [kind]
   (AnonType. kind))
 
+(defn filter-map
+  "Returns a map by filtering the values with
+  the given predicate"
+  [pred map]
+  (->> map 
+    (filter (fn [[k v]] (pred v)))
+    (apply concat) 
+    (apply hash-map)))
+
+(defn immediate-fragment-filter
+  "Takes a map and returns 2 maps: one containing
+  elements of the initial map whose values are pipinsts,
+  and the other containing the non-pipinst values (i.e.
+  AST fragments."
+  [map]
+  [(filter-map pipinst? map)
+   (filter-map (comp not pipinst?) map)])
+
 (defmacro mkast
   "Takes the type, op, args, and function and
   returns an ast fragment."
   [type op args f]
   (let [kwargs (vec (map (comp keyword name) args))
         argmap (zipmap kwargs args)]
-    `(vary-meta
+    `(let [[imms# frags#] (immediate-fragment-filter ~argmap)
+           kwargs# (filter #((-> frags# keys set) %) ~kwargs)
+           constargs# (filter #(not ((-> frags# keys set) %))
+                              ~kwargs)
+           permargs# (concat constargs# kwargs#)
+           perm# (map #(.indexOf ~kwargs %) permargs#)
+           const-vec# (map #(get imms# %) constargs#)
+           f# (fn [& args#]
+                (let [jumbled-args# (concat const-vec# args#)
+                      final-args#
+                      (reduce #(assoc %1
+                                      (first %2)
+                                      (second %2))
+                              (vec (repeat (count jumbled-args#) nil))
+                              (map vector perm# jumbled-args#))]
+                (apply ~f final-args#)))]
        (ASTNode. ~type
                  {:op ~op 
-                  :args ~argmap}
-                 {:pipinst? (fn [& ~'a] false)})
-       assoc :sim-factory [~f ~kwargs])))
+                  :args frags#
+                  :consts imms#}
+                 {:pipinst? (fn [& ~'a] false)
+                  :sim-factory [f# kwargs#]}))))
 
 (defn uninst
   "Takes a pipinst and makes it into an AST frag"

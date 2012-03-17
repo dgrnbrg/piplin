@@ -535,11 +535,7 @@
     (let [type (bits (- high low))]
       (if (pipinst? expr)
         (slice-impl expr low high)
-        (alter-value (mkast type :slice
-                            [expr] #(slice-impl % low high))
-                     merge
-                     {:low low
-                      :high high})))))
+         (mkast type :slice [expr low high] slice-impl)))))
 
 (defn bit-cat
   ([]
@@ -765,12 +761,10 @@
   [bund key]
   (if (pipinst? bund)
     (clojure.core/get (value bund) key)
-    (alter-value
       (mkast (get-in (typeof bund) [:schema key])
              :bundle-key
-             [bund]
-             #(bundle-get % key))
-      assoc :key key)))
+             [bund key]
+             bundle-get)))
 
 (defpiplintype Bundle [schema])
 (defn bundle
@@ -788,16 +782,6 @@
     (merge (Bundle. schema)
            {:valAt bundle-get
             :kind :bundle})))
-
-(defn filter-map
-  "Returns a map by filtering the values with
-  the given predicate"
-  [pred map]
-  (->> map 
-    (filter (fn [[k v]] (pred v)))
-    (apply concat) 
-    (apply hash-map)))
-
 (defn const-uneval-filter
   "Takes a map and returns 2 maps: one containing
   elements of the initial map whose values are pipinsts,
