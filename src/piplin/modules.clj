@@ -85,13 +85,10 @@
   and returns a list which can be (eval)ed to get
   the port."
   [name token type-syntax]
-  `(vary-meta
-     (piplin.types.ASTNode. ~type-syntax 
-                            {:port ~name 
-                             :token '~token}
-                            {:pipinst? (fn [x#] false)})
-     assoc :sim-factory
-     [#(get sim-fn-args ['~token ~name]) []]))
+  `(alter-value (mkast ~type-syntax :port [] #(get sim-fn-args ['~token ~name]))
+                merge
+                {:port ~name 
+                 :token '~token}))
 
 (defn- tuplefn
   "Takes a function of n arguments and an index <n

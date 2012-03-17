@@ -809,32 +809,12 @@
                             (:schema type)))
                 :constrain) 
       (let [schema (:schema type)
-            [evaluated args]
-            (const-uneval-filter
-              (->> obj
+            casted-obj (->> obj
                 (mapcat (fn [[k v]]
                           [k (cast (k schema) v)]))
-                (apply hash-map)))
-            arg-keys (vec (keys args))]
-        (alter-value
-          (vary-meta
-            (piplin.types.ASTNode.
-              schema
-              {:op :make-bundle
-               :args args}
-              {:pipinst? (fn [& x] false)})
-            assoc :sim-factory
-            [(fn [& more]
-               (let [tmp (merge evaluated
-                                (zipmap arg-keys
-                                        more))]
-                 (instance type
-                           tmp
-                           :constrain)))
-             (-> arg-keys)])
-          assoc
-          :consts
-          (constrain type evaluated))))
+                (apply hash-map))]
+        (mkast-explicit-keys type :make-bundle (keys obj) casted-obj 
+                             (fn [& args] (promote type (zipmap (keys obj) args))))))
     :else
     (throw+ (error "Cannot promote" obj "to" type))))
 

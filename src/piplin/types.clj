@@ -246,34 +246,40 @@
   [(filter-map pipinst? map)
    (filter-map (comp not pipinst?) map)])
 
+(defmacro mkast-explicit-keys
+  "Takes the type, op, args, and function and
+  returns an ast fragment."
+  [type op kwargs argmap f]
+  `(let [[imms# frags#] (immediate-fragment-filter ~argmap)
+         kwargs# (filter #((-> frags# keys set) %) ~kwargs)
+         constargs# (filter #(not ((-> frags# keys set) %))
+                            ~kwargs)
+         permargs# (concat constargs# kwargs#)
+         perm# (map #(.indexOf ~kwargs %) permargs#)
+         const-vec# (map #(get imms# %) constargs#)
+         f# (fn [& args#]
+              (let [jumbled-args# (concat const-vec# args#)
+                    final-args#
+                    (reduce #(assoc %1
+                                    (first %2)
+                                    (second %2))
+                            (vec (repeat (count jumbled-args#) nil))
+                            (map vector perm# jumbled-args#))]
+                (apply ~f final-args#)))]
+     (ASTNode. ~type
+               {:op ~op 
+                :args frags#
+                :consts imms#}
+               {:pipinst? (fn [& ~'a] false)
+                :sim-factory [f# kwargs#]})))
+
 (defmacro mkast
   "Takes the type, op, args, and function and
   returns an ast fragment."
   [type op args f]
   (let [kwargs (vec (map (comp keyword name) args))
         argmap (zipmap kwargs args)]
-    `(let [[imms# frags#] (immediate-fragment-filter ~argmap)
-           kwargs# (filter #((-> frags# keys set) %) ~kwargs)
-           constargs# (filter #(not ((-> frags# keys set) %))
-                              ~kwargs)
-           permargs# (concat constargs# kwargs#)
-           perm# (map #(.indexOf ~kwargs %) permargs#)
-           const-vec# (map #(get imms# %) constargs#)
-           f# (fn [& args#]
-                (let [jumbled-args# (concat const-vec# args#)
-                      final-args#
-                      (reduce #(assoc %1
-                                      (first %2)
-                                      (second %2))
-                              (vec (repeat (count jumbled-args#) nil))
-                              (map vector perm# jumbled-args#))]
-                (apply ~f final-args#)))]
-       (ASTNode. ~type
-                 {:op ~op 
-                  :args frags#
-                  :consts imms#}
-                 {:pipinst? (fn [& ~'a] false)
-                  :sim-factory [f# kwargs#]}))))
+    `(mkast-explicit-keys ~type ~op ~kwargs ~argmap ~f)))
 
 (defn uninst
   "Takes a pipinst and makes it into an AST frag"
