@@ -292,3 +292,9 @@
                        (fn [] pipinst))]
     (vary-meta (alter-value pipinst assoc :args [])
                assoc :pipinst? (fn [x] false))))
+
+(defn assoc-dist-fn
+  "Takes an ast frag and returns a new ast frag w/ 
+  the given distribution fn"
+  [ast f]
+  (vary-meta ast assoc :distribute f))

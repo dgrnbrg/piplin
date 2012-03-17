@@ -132,13 +132,13 @@
        (:kind this)) (throw+
                        (error
                          "Incompatible type instances: " this
-                         "and" (type obj)))
+                         "and" obj))
     (isa-type? :j-integral (kindof obj)) (instance
                                            this
                                            (promote (anontype :j-integral) ;TODO: this should be j-long
                                                     obj))
     :else (throw+ (error "Don't know how to promote to :uintm from"
-                         (type obj)))))
+                         (typeof obj)))))
 
 (defn binary-dispatch
   "Simplified binary dispatch logic."
@@ -278,9 +278,12 @@
                  ((fn ~@fntail) x# y#)
                  :constrain)
        (let [~'lhs x# ~'rhs y#]
-         (mkast (typeof x#)
+         (->
+           (mkast (typeof x#)
                 ~unmangled-kw
-                [~'lhs ~'rhs] ~op)))))
+                [~'lhs ~'rhs] ~op)
+           (assoc-dist-fn
+             #(~op (cast % ~'lhs) (cast % ~'rhs))))))))
 
 (defn make-binop-explict-coercions
   "Takes a kind and a vector of kinds and returns
@@ -488,7 +491,7 @@
     (when-not (clj/= (kindof bits) :bits)
       (throw+ (error bits "must be of kind :bits")))
     (when-not (clj/= n (bit-width-of type))
-      (throw+ (error type "has bit width" (bit-width-of type))))
+      (throw+ (error type "has bit width" (bit-width-of type) "but should be" n)))
     (if (pipinst? bits)
       (cast type (from-bits type (value bits)))
       (mkast type :deserialize [bits] (partial deserialize type)))))
@@ -572,11 +575,10 @@
   (let [sel (cast (anontype :boolean) sel)]
     (if (pipinst? sel)
       (if sel v1 v2)
-      (vary-meta
+      (->
         (mkast (typeof v1) :mux2 [sel v1 v2] mux2-impl)
-        assoc
-        :distribute
-        #(mux2-impl sel (cast % v1) (cast % v2))))))  
+        (assoc-dist-fn
+          #(mux2-impl sel (cast % v1) (cast % v2)))))))  
 
 (defn mux2-helper
   [sel v1-thunk v2-thunk]
