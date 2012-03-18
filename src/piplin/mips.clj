@@ -289,4 +289,7 @@
                        :in (.getBytes
                              "int main() {
                                return 22;
-                             }"))) 
+                             }")))
+
+;addiu encoded
+;(decode (str-to-bits "001001_00001_00010_1000_0000_0000_0000"))
