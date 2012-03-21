@@ -1083,3 +1083,37 @@
          (condp = (get-tag ~u-sym)
            ~@(apply concat (butlast clauses))
            ~(second (last clauses)))))))
+
+(defn str-to-bits
+  [s]
+  (let [bit-vec (->> s
+                  (filter (partial clj/not= \_))
+                  (map
+                    #(condp clj/= % \0 0 \1 1
+                       (do
+                         (throw (IllegalArgumentException.
+                                (str "invalid bit: " %))))))
+                  vec)]
+    `((bits (count ~bit-vec)) ~bit-vec)))
+
+(defn binary-literal
+  [rdr letter-b]
+  (loop [v []
+         ch (clojure.lang.LispReader/read1 rdr)]
+    (if (#{(int \0) (int \1) (int \_)} ch)
+      (do
+        (recur (if (= (int \_) ch)
+                 v
+                 (conj v ch))
+               (clojure.lang.LispReader/read1 rdr)))
+      (let [bit-vec (vec (map {(int \0) 0 (int \1) 1} v))]
+        (.unread rdr ch)
+        `((bits ~(count bit-vec)) ~bit-vec)))))
+
+(defn dispatch-reader-macro  [ch fun]
+  (let  [dm  (.get  (doto  (.getDeclaredField clojure.lang.LispReader "dispatchMacros")
+                      (.setAccessible true))
+                   nil)]
+    (aset dm  (int ch) fun)))
+
+(dispatch-reader-macro \b binary-literal)
