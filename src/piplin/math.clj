@@ -760,13 +760,42 @@
     (difference s2 s1)))
 
 (defn bundle-get
+  "Gets the given key from the bundle"
   [bund key]
   (if (pipinst? bund)
     (clojure.core/get (value bund) key)
-      (mkast (get-in (typeof bund) [:schema key])
-             :bundle-key
-             [bund key]
-             bundle-get)))
+    (mkast (get-in (typeof bund) [:schema key])
+           :bundle-key
+           [bund key]
+           bundle-get)))
+
+(defn assoc
+  "Returns a new bundle whose key k is equal to v.
+  All other keys are unchanged."
+  ([bund k v]
+   (if (pipinst? bund)
+     (clj/assoc (value bund) k v)
+     (-> (mkast (typeof bund)
+                :bundle-assoc
+                [bund key val]
+                assoc)
+       (assoc-dist-fn
+         #(assoc bund k
+                 (cast (-> % :schema k)
+                       v))))))      
+  ([bund k v & kvs]
+   (if (seq kvs)
+     (recur (assoc bund k v)
+            (first kvs)
+            (second kvs)
+            (nnext kvs))
+     (assoc bund k v))))
+
+(defn assoc-in
+  [m [k & ks] v]
+  (if ks
+    (assoc m k (assoc-in (bundle-get m k) ks v))
+    (assoc m k v)))
 
 (defpiplintype Bundle [schema])
 (defn bundle

@@ -87,7 +87,7 @@
         state (first sim)
         fns (second sim)
         u4 #(instance (uintm 4) %)]
-    (is (clj/= (reduce #(apply assoc %1 %2) {}
+    (is (clj/= (reduce #(apply clojure.core/assoc %1 %2) {}
                    (map (fn [[k v]] [(second k) v])
                         (select-keys (exec-sim state fns 7)
                                      [[(:token mod) :c]

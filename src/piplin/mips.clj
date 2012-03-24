@@ -67,7 +67,6 @@
    :srlv "000_0000_0110"
    :sub "000_0010_0010"
    :subu "000_0010_0011"
-
    })
 
 (def mips-branches
@@ -97,6 +96,7 @@
                     :xor
                     :slt
                     :sltu
+                    :sll
                     }))
 
 (def alu-unresolved-cmd
@@ -141,76 +141,59 @@
 (defn zext32
   "zero extend bits to 32"
   [b]
-  (h/bit-cat
-    (h/cast (h/bits (- 32 (h/bit-width-of (typeof b)))) 0)
-    b))
+  (h/deserialize u32m
+    (h/bit-cat
+      (h/cast (h/bits (- 32 (h/bit-width-of (typeof b)))) 0)
+      b)))
 
 (defn decode-func
   "Takes a partially decoded function and completes
   the decoding"
   [func short-func rs rt rd sa]
-  (let [cmd {:alu {:x {:reg rs}
-                   :y {:reg rt}
-                   :dst rd}}]
+  (let [cmd {:x {:reg rs}
+             :y {:reg rt}
+             :dst rd}]
     (->>
       (h/condp (partial
                  compare-key-via-str
                  mips-short-funcs) short-func
         :sll (-> cmd
                (assoc-in
-                 [:alu :op] :sll)
+                 [:op] :sll)
                (assoc-in
-                 [:alu :x]
+                 [ :x]
                  {:imm (zext32 sa)}))
         :sllv (assoc-in
-                cmd [:alu :op] :sll)
+                cmd [ :op] :sll)
         :sra (-> cmd
                (assoc-in
-                 [:alu :op] :sra)
+                 [ :op] :sra)
                (assoc-in
-                 [:alu :x]
+                 [ :x]
                  {:imm (zext32 sa)}))
         :srl (-> cmd
                (assoc-in
-                 [:alu :op] :srl)
+                 [ :op] :srl)
                (assoc-in
-                 [:alu :y]
+                 [ :y]
                  {:imm (zext32 sa)}))
         :xor (assoc-in
-               cmd [:alu :op] :xor)
-        (h/condp (partial
-                   compare-key-via-str mips-funcs) func
-          :add (assoc-in
-                 cmd [:alu :op] 
-                 :add)
-          :addu (assoc-in
-                  cmd [:alu :op] 
-                  :addu)
-          :and (assoc-in
-                 cmd [:alu :op] 
-                 :and)
-          :jr (assoc-in
-                cmd [:alu :op] 
-                :jr)
-          :or (assoc-in
-                cmd [:alu :op] 
-                :or)
-          :slt (assoc-in
-                 cmd [:alu :op] 
-                 :slt)
-          :sltu (assoc-in
-                  cmd [:alu :op] 
-                  :sltu)
-          :srl (assoc-in
-                 cmd [:alu :op] 
-                 :srlv)
-          :sub (assoc-in
-                 cmd [:alu :op] 
-                 :sub)
-          :subu   (assoc-in
-                    cmd [:alu :op] 
-                    :subu)))
-      :alu
+               cmd [ :op] :xor)
+        (assoc-in
+          cmd
+          [:op]
+          (h/condp (partial
+                     compare-key-via-str mips-funcs) func
+            :add :add
+            :addu :addu
+            :and :and
+            :jr :jr
+            :or :or
+            :slt :slt
+            :sltu :sltu
+            :srl :srlv
+            :sub :sub
+            :subu :subu)))
       (h/cast alu-unresolved-cmd)
       identity
       )))
@@ -226,43 +209,35 @@
           op (b 26 32)
           rs (h/deserialize reg (b 21 26)) 
           rt (h/deserialize reg (b 16 21)) 
-          imm (h/deserialize (h/uintm 32)
-                             (zext32 (b 0 16))) 
+          imm (zext32 (b 0 16)) 
           target (b 0 26)
           rd (h/deserialize reg (b 11 16)) 
           sa (b 6 11)
           short-func (b 0 6)
           func (b 0 11)
-          partial-imm {:alu {:x {:reg rs}
-                             :y {:imm imm}
-                             :dst rt}}
+          partial-imm {:x {:reg rs}
+                       :y {:imm imm}
+                       :dst rt}
           ]
-      (h/condp (partial compare-key-via-str mips-ops) op
-        :addi (assoc-in partial-imm
-                        [:alu :op] :add)
-        :addiu (assoc-in partial-imm
-                         [:alu :op] :addu)
-        :andi (assoc-in partial-imm
-                        [:alu :op] :and)
-        :lui (assoc-in partial-imm
-                       [:alu :op] :lui)
-        :ori (assoc-in partial-imm
-                       [:alu :op] :or)
-        :slti (assoc-in partial-imm
-                        [:alu :op] :slt)
-        :sltiu (assoc-in partial-imm
-                         [:alu :op] :sltu)
-        :xori (assoc-in partial-imm
-                        [:alu :op] :xor)
-        :func (decode-func func short-func
-                           rs rt rd sa)
-        ;branches
-        ;jumps
-        ;loads
-        ;stores
-        ))
-    identity
-    :alu
+      (h/mux2 (compare-key-via-str mips-ops op :func)
+        (decode-func func short-func
+                     rs rt rd sa)
+        (h/cast alu-unresolved-cmd
+                (assoc partial-imm :op
+                       (h/condp (partial compare-key-via-str mips-ops) op
+                         :addi :add
+                         :addiu :addu
+                         :andi :and
+                         :lui :lui
+                         :ori :or
+                         :slti :slt
+                         :sltiu :sltu
+                         :xori :xor
+                         ;branches
+                         ;jumps
+                         ;loads
+                         ;stores
+                         )))))
     (h/cast alu-unresolved-cmd)
     ))
 
