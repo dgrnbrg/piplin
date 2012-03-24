@@ -538,7 +538,7 @@
     (let [type (bits (- high low))]
       (if (pipinst? expr)
         (slice-impl expr low high)
-         (mkast type :slice [expr low high] slice-impl)))))
+        (mkast type :slice [expr low high] slice-impl)))))
 
 (defn bit-cat
   ([]
@@ -674,7 +674,7 @@
             logn (log2 n)]
         (merge (PiplinEnum.
                  (zipmap coll
-                         (map #(long-to-bitvec % logn)
+                         (map #((bits logn) (long-to-bitvec % logn))
                               (iterate inc 0))))
                {:kind :enum}))
       (throw+ (error
@@ -682,22 +682,22 @@
                 (remove keyword? coll))))
     (if (map? coll)
       (cond
-        (some #(not (and (vector? %)
-                         (every? #{0 1} %))) (vals coll))
+        (some #(not= (kindof %) :bits) (vals coll))
         (throw+ (error "Maps values must all be bits")) 
         (some #(clj/not= (-> (seq coll)
                        first
                        val
-                       count)
-                     (count %))
+                       typeof
+                       bit-width-of)
+                     (bit-width-of (typeof %)))
               (vals coll))
         (throw+ (error
                   "Map's values must be same bit width")) 
         (some #(not (keyword? %)) (keys coll))
         (throw+ (error "Map's keys must be keywords")) 
-        (clj/not= (count (vals coll))
-              (count (distinct (vals coll))))
-        (throw+ (error "Enum keys must be distinct"))
+        ;(clj/not= (count (vals coll))
+        ;      (count (distinct (vals coll))))
+        ;(throw+ (error "Enum keys must be distinct"))
         :else
         (merge (PiplinEnum. coll)
                {:kind :enum})))))
@@ -715,11 +715,14 @@
 (defmethod from-bits
   :enum
   [type bits]
-  (let [lookup (map-invert (:keymap type))
+  (let [lookup (reduce (fn [m [k v]]
+                         (assoc m (value v) k))
+                       {}
+                       (:keymap type))
         k (get lookup bits)]
     (cond
       (nil? k)
-      (throw+ (error bits "is not a valid element of the enum"))
+      (throw+ (error bits "is not a valid element of the enum" (typeof bits)))
       :else
       k)))
 
@@ -730,7 +733,8 @@
     :keymap
     vals
     first
-    count))
+    typeof
+    bit-width-of))
 
 (defmethod get-bits
   :enum
@@ -741,7 +745,7 @@
                first
                val
                typeof)]
-    ((value expr) (:keymap (typeof expr)))))
+    (value ((value expr) (:keymap (typeof expr))))))
 
 (defmethod check
   :enum

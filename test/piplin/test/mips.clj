@@ -5,7 +5,7 @@
   (:refer-clojure :as clj))
 
 (deftest decode-add-imm
-  (let [decoded (decode (str-to-bits "001001_00001_00010_1000_0000_0000_0000"))]
+  (let [decoded (decode #b001001_00001_00010_1000_0000_0000_0000)]
     (is (h/= (h/bundle-get decoded :op)
              (alu-op :add)))
     (is (h/= (h/bundle-get decoded :y)

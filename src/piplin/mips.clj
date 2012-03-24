@@ -4,75 +4,65 @@
   (:require [clojure.core :as clj])
   (:require [piplin.math :as h]))
 
-(defn str-to-bits
-  [s]
-  (let [bit-vec (->> s
-                  (filter (partial not= \_))
-                  (map
-                    #(condp = % \0 0 \1 1
-                       (throw (IllegalArgumentException.
-                                (str "invalid bit: " %)))))
-                  vec)]
-    ((h/bits (count bit-vec)) bit-vec)))
 
 (def mips-ops
-  {:func "000_000"
-   :addi "001_000"
-   :addiu "001_001"
-   :andi "001_100"
-   :beq "000_100" ;todo
-   :bgez "000_001" ;todo
-   :bgezal "000_001" ;todo
-   :bgtz "000_111" ;todo
-   :blez "000_110" ;todo
-   :bltz "000_001" ;todo
-   :bltzal "000_001" ;todo
-   :bne "000_101" ;todo
-   :j "000_010" ;todo
-   :jal "000_011" ;todo
-   :lb "100_000" ;todo
-   :lui "001_111"
-   :lw "100_011" ;todo
-   :ori "001_101"
-   :sb "101_000" ;todo
-   :slti "001_010"
-   :sltiu "0010_11"
-   :sw "101_011" ;todo
-   :xori "001_110"
-   })
+  (h/enum {:func #b000_000
+   :addi #b001_000
+   :addiu #b001_001
+   :andi #b001_100
+   :beq #b000_100 ;todo
+   :bgez #b000_001 ;todo
+   :bgezal #b000_001 ;todo
+   :bgtz #b000_111 ;todo
+   :blez #b000_110 ;todo
+   :bltz #b000_001 ;todo
+   :bltzal #b000_001 ;todo
+   :bne #b000_101 ;todo
+   :j #b000_010 ;todo
+   :jal #b000_011 ;todo
+   :lb #b100_000 ;todo
+   :lui #b001_111
+   :lw #b100_011 ;todo
+   :ori #b001_101
+   :sb #b101_000 ;todo
+   :slti #b001_010
+   :sltiu #b0010_11
+   :sw #b101_011 ;todo
+   :xori #b001_110
+   }))
 
 (def mips-short-funcs
-  {:sll "000_000"
-   :sllv "000_100"
-   :sra "000_011"
-   :srl "000_010"
-   :syscall "001_100" ;todo
-   :xor "100_110"
-   })
+  (h/enum {:sll #b000_000
+   :sllv #b000_100
+   :sra #b000_011
+   :srl #b000_010
+   :syscall #b001_100 ;todo
+   :xor #b100_110
+   }))
 
 (def mips-funcs
-  {:add "000_0010_0000"
-   :addu "000_0010_0001"
-   :and "000_0010_0100"
-   :div "000_0001_1010" ;todo
-   :divu "000_0001_1011" ;todo
-   :jr "000_0000_1000"
-   :mfhi "000_0001_0000" ;todo
-   :mflo "000_0001_0010" ;todo
-   :mult "000_0001_1000" ;todo
-   :multu "000_0001_1001" ;todo
-   :or "000_0010_0101"
-   :slt "000_0010_1010"
-   :sltu "000_0010_1011"
-   :srlv "000_0000_0110"
-   :sub "000_0010_0010"
-   :subu "000_0010_0011"
-   })
+  (h/enum {:add #b000_0010_0000
+   :addu #b000_0010_0001
+   :and #b000_0010_0100
+   :div #b000_0001_1010 ;todo
+   :divu #b000_0001_1011 ;todo
+   :jr #b000_0000_1000
+   :mfhi #b000_0001_0000 ;todo
+   :mflo #b000_0001_0010 ;todo
+   :mult #b000_0001_1000 ;todo
+   :multu #b000_0001_1001 ;todo
+   :or #b000_0010_0101
+   :slt #b000_0010_1010
+   :sltu #b000_0010_1011
+   :srlv #b000_0000_0110
+   :sub #b000_0010_0010
+   :subu #b000_0010_0011
+   }))
 
 (def mips-branches
-  {:bgez "00001"
-   :bgezal "10001"
-   :bltzal "10000"})
+  (h/enum {:bgez #b00001
+   :bgezal #b10001
+   :bltzal #b10000}))
 
 (def reg (h/enum #{:0 :1 :2 :3
                    :4 :5 :6 :7
@@ -134,10 +124,6 @@
   given a register an an immediate, store the immediate
   in the register)
 
-(defn compare-key-via-str
-  [m k b]
-  (h/= (str-to-bits (get m k)) b))
-
 (defn zext32
   "zero extend bits to 32"
   [b]
@@ -154,9 +140,7 @@
              :y {:reg rt}
              :dst rd}]
     (->>
-      (h/condp (partial
-                 compare-key-via-str
-                 mips-short-funcs) short-func
+      (h/condp h/= (h/deserialize mips-short-funcs short-func)
         :sll (-> cmd
                (assoc-in
                  [:op] :sll)
@@ -182,8 +166,7 @@
         (assoc-in
           cmd
           [:op]
-          (h/condp (partial
-                     compare-key-via-str mips-funcs) func
+          (h/condp h/= (h/deserialize mips-funcs func)
             :add :add
             :addu :addu
             :and :and
@@ -219,12 +202,12 @@
                        :y {:imm imm}
                        :dst rt}
           ]
-      (h/mux2 (compare-key-via-str mips-ops op :func)
+      (h/mux2 (h/= (h/deserialize mips-ops op) :func)
         (decode-func func short-func
                      rs rt rd sa)
         (h/cast alu-unresolved-cmd
                 (assoc partial-imm :op
-                       (h/condp (partial compare-key-via-str mips-ops) op
+                       (h/condp h/= (h/deserialize mips-ops op)
                          :addi :add
                          :addiu :addu
                          :andi :and
