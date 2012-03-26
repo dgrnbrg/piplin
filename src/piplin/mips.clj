@@ -29,7 +29,7 @@
    :sltiu #b0010_11
    :sw #b101_011 ;todo
    :xori #b001_110
-   }))
+   } :allow-dups))
 
 (def mips-short-funcs
   (h/enum {:sll #b000_000

@@ -667,40 +667,44 @@
   "Takes a collection of keywords or a map of
   keywords to bits and returns it as an enum
   type."
-  [coll]
-  (if (set? coll)
-    (if (every? keyword? coll)
-      (let [n (count coll)
-            logn (log2 n)]
-        (merge (PiplinEnum.
-                 (zipmap coll
-                         (map #((bits logn) (long-to-bitvec % logn))
-                              (iterate inc 0))))
-               {:kind :enum}))
-      (throw+ (error
-                "Set must be made of only kewords"
-                (remove keyword? coll))))
-    (if (map? coll)
-      (cond
-        (some #(not= (kindof %) :bits) (vals coll))
-        (throw+ (error "Maps values must all be bits")) 
-        (some #(clj/not= (-> (seq coll)
-                       first
-                       val
-                       typeof
-                       bit-width-of)
-                     (bit-width-of (typeof %)))
-              (vals coll))
+  [coll & more]
+  (let [allow-dups (some #{:allow-dups} more)]
+    (if (set? coll)
+      (if (every? keyword? coll)
+        (let [n (count coll)
+              logn (log2 n)]
+          (merge (PiplinEnum.
+                   (zipmap coll
+                           (map #((bits logn) (long-to-bitvec % logn))
+                                (iterate inc 0))))
+                 {:kind :enum}))
         (throw+ (error
-                  "Map's values must be same bit width")) 
-        (some #(not (keyword? %)) (keys coll))
-        (throw+ (error "Map's keys must be keywords")) 
-        ;(clj/not= (count (vals coll))
-        ;      (count (distinct (vals coll))))
-        ;(throw+ (error "Enum keys must be distinct"))
-        :else
-        (merge (PiplinEnum. coll)
-               {:kind :enum})))))
+                  "Set must be made of only kewords"
+                  (remove keyword? coll))))
+      (if (map? coll)
+        (cond
+          (some #(not= (kindof %) :bits) (vals coll))
+          (throw+ (error "Maps values must all be bits")) 
+          (some #(clj/not= (-> (seq coll)
+                             first
+                             val
+                             typeof
+                             bit-width-of)
+                           (bit-width-of (typeof %)))
+                (vals coll))
+          (throw+ (error
+                    "Map's values must be same bit width")) 
+          (some #(not (keyword? %)) (keys coll))
+          (throw+ (error "Map's keys must be keywords")) 
+          (clj/and
+            (clj/not allow-dups)
+            (clj/not= (count (vals coll))
+                      (count (distinct
+                               (vals coll)))))
+          (throw+ (error "Enum keys must be distinct"))
+          :else
+          (merge (PiplinEnum. coll)
+                 {:kind :enum}))))))
 
 (defmethod promote
   :enum
