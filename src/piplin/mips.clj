@@ -7,62 +7,62 @@
 
 (def mips-ops
   (h/enum {:func #b000_000
-   :addi #b001_000
-   :addiu #b001_001
-   :andi #b001_100
-   :beq #b000_100 ;todo
-   :bgez #b000_001 ;todo
-   :bgezal #b000_001 ;todo
-   :bgtz #b000_111 ;todo
-   :blez #b000_110 ;todo
-   :bltz #b000_001 ;todo
-   :bltzal #b000_001 ;todo
-   :bne #b000_101 ;todo
-   :j #b000_010 ;todo
-   :jal #b000_011 ;todo
-   :lb #b100_000 ;todo
-   :lui #b001_111
-   :lw #b100_011 ;todo
-   :ori #b001_101
-   :sb #b101_000 ;todo
-   :slti #b001_010
-   :sltiu #b0010_11
-   :sw #b101_011 ;todo
-   :xori #b001_110
-   } :allow-dups))
+           :addi #b001_000
+           :addiu #b001_001
+           :andi #b001_100
+           :beq #b000_100 ;todo
+           :bgez #b000_001 ;todo
+           :bgezal #b000_001 ;todo
+           :bgtz #b000_111 ;todo
+           :blez #b000_110 ;todo
+           :bltz #b000_001 ;todo
+           :bltzal #b000_001 ;todo
+           :bne #b000_101 ;todo
+           :j #b000_010 ;todo
+           :jal #b000_011 ;todo
+           :lb #b100_000 ;todo
+           :lui #b001_111
+           :lw #b100_011 ;todo
+           :ori #b001_101
+           :sb #b101_000 ;todo
+           :slti #b001_010
+           :sltiu #b0010_11
+           :sw #b101_011 ;todo
+           :xori #b001_110
+           } :allow-dups))
 
 (def mips-short-funcs
   (h/enum {:sll #b000_000
-   :sllv #b000_100
-   :sra #b000_011
-   :srl #b000_010
-   :syscall #b001_100 ;todo
-   :xor #b100_110
-   }))
+           :sllv #b000_100
+           :sra #b000_011
+           :srl #b000_010
+           :syscall #b001_100 ;todo
+           :xor #b100_110
+           }))
 
 (def mips-funcs
   (h/enum {:add #b000_0010_0000
-   :addu #b000_0010_0001
-   :and #b000_0010_0100
-   :div #b000_0001_1010 ;todo
-   :divu #b000_0001_1011 ;todo
-   :jr #b000_0000_1000
-   :mfhi #b000_0001_0000 ;todo
-   :mflo #b000_0001_0010 ;todo
-   :mult #b000_0001_1000 ;todo
-   :multu #b000_0001_1001 ;todo
-   :or #b000_0010_0101
-   :slt #b000_0010_1010
-   :sltu #b000_0010_1011
-   :srlv #b000_0000_0110
-   :sub #b000_0010_0010
-   :subu #b000_0010_0011
-   }))
+           :addu #b000_0010_0001
+           :and #b000_0010_0100
+           :div #b000_0001_1010 ;todo
+           :divu #b000_0001_1011 ;todo
+           :jr #b000_0000_1000
+           :mfhi #b000_0001_0000 ;todo
+           :mflo #b000_0001_0010 ;todo
+           :mult #b000_0001_1000 ;todo
+           :multu #b000_0001_1001 ;todo
+           :or #b000_0010_0101
+           :slt #b000_0010_1010
+           :sltu #b000_0010_1011
+           :srlv #b000_0000_0110
+           :sub #b000_0010_0010
+           :subu #b000_0010_0011
+           }))
 
 (def mips-branches
   (h/enum {:bgez #b00001
-   :bgezal #b10001
-   :bltzal #b10000}))
+           :bgezal #b10001
+           :bltzal #b10000}))
 
 (def reg (h/enum #{:0 :1 :2 :3
                    :4 :5 :6 :7
@@ -78,30 +78,30 @@
 (def reg-or-imm (h/union {:reg reg :imm u32m}))
 
 (def alu-op (h/enum #{:add
-                    :addu
-                    :sub
-                    :and
-                    :lui
-                    :or
-                    :xor
-                    :slt
-                    :sltu
-                    :sll
-                    }))
+                      :addu
+                      :sub
+                      :and
+                      :lui
+                      :or
+                      :xor
+                      :slt
+                      :sltu
+                      :sll
+                      }))
 
 (def alu-unresolved-cmd
   (h/bundle {:op alu-op
-           :x reg-or-imm
-           :y reg-or-imm
-           :dst reg})) 
+             :x reg-or-imm
+             :y reg-or-imm
+             :dst reg})) 
 
 (def alu-cmd (h/bundle {:op alu-op
-                      :x u32m
-                      :y u32m
-                      :dst reg}))
+                        :x u32m
+                        :y u32m
+                        :dst reg}))
 
 (def wb-result (h/bundle {:data u32m
-                        :dst reg}))
+                          :dst reg}))
 
 (comment
   MIPS architecture decomposed
@@ -142,30 +142,30 @@
     (->>
       (h/condp h/= (h/deserialize mips-short-funcs short-func)
         :sll (-> cmd
-               (assoc-in
-                 [:op] :sll)
-               (assoc-in
-                 [ :x]
+               (assoc
+                 :op :sll)
+               (assoc
+                 :x
                  {:imm (zext32 sa)}))
-        :sllv (assoc-in
-                cmd [ :op] :sll)
+        :sllv (assoc
+                cmd :op :sll)
         :sra (-> cmd
-               (assoc-in
-                 [ :op] :sra)
-               (assoc-in
-                 [ :x]
+               (assoc
+                 :op :sra)
+               (assoc
+                 :x
                  {:imm (zext32 sa)}))
         :srl (-> cmd
-               (assoc-in
-                 [ :op] :srl)
-               (assoc-in
-                 [ :y]
+               (assoc
+                 :op :srl)
+               (assoc
+                 :y
                  {:imm (zext32 sa)}))
-        :xor (assoc-in
+        :xor (assoc
                cmd [ :op] :xor)
-        (assoc-in
+        (assoc
           cmd
-          [:op]
+          :op
           (h/condp h/= (h/deserialize mips-funcs func)
             :add :add
             :addu :addu
