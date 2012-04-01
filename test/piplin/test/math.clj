@@ -16,8 +16,8 @@
 (deftest =test
   (is (= 1 1 1))
   (is (not (= 1 1 2)))
-  (is (clj/= "hello" "hello"))
-  (is (clj/= [1 \a] [1 \a]))
+  (is (= "hello" "hello"))
+  (is (= [1 \a] [1 \a]))
   (is (< 3 7))
   (is (> 0 -1.2))
   (is (>= -3.3 -3.3))
@@ -39,26 +39,26 @@
 
 (deftest binop-error-test
   (let [e (error "hi")]
-    (is (clj/= (try-errors (+ 0 (throw+ e))) e))
-    (is (clj/= (try-errors (+ 0 1 2 3 (throw+ e))) e))
-    (is (clj/= (try-errors (+ 0 1 (throw+ e) 3 (throw+ e))) e))
-    (is (clj/= (try-errors (+ (throw+ e) 0)) e))
-    (is (clj/= (try-errors (+ (throw+ e) (throw+ e))) e))
-    (is (clj/= (try-errors (bit-cat (throw+ e) (throw+ e))) e))))
+    (is (= (try-errors (+ 0 (throw+ e))) e))
+    (is (= (try-errors (+ 0 1 2 3 (throw+ e))) e))
+    (is (= (try-errors (+ 0 1 (throw+ e) 3 (throw+ e))) e))
+    (is (= (try-errors (+ (throw+ e) 0)) e))
+    (is (= (try-errors (+ (throw+ e) (throw+ e))) e))
+    (is (= (try-errors (bit-cat (throw+ e) (throw+ e))) e))))
 
 (deftest bits-test
   (let [b8 #(promote (bits 8) %)]
-    (is (clj/= (value (b8 0xa0)) [1 0 1 0 0 0 0 0]))
-    (is (clj/= (value (bit-cat (b8 0xa0) (bit-cat (b8 0xfe))))
+    (is (= (value (b8 0xa0)) [1 0 1 0 0 0 0 0]))
+    (is (= (value (bit-cat (b8 0xa0) (bit-cat (b8 0xfe))))
            [1 0 1 0 0 0 0 0 1 1 1 1 1 1 1 0]))
-    (is (clj/= (value (bit-slice (bit-cat (b8 0xf) (b8 0xf0)) 4 12))
+    (is (= (value (bit-slice (bit-cat (b8 0xf) (b8 0xf0)) 4 12))
            [1 1 1 1 1 1 1 1]))
     (is (= (bit-and (b8 0xf) 0x3c) (b8 0xc)))
     (is (= (bit-or 0xf0 (b8 0xf)) (b8 0xff)))
     (is (= (bit-xor (instance (uintm 8) 0x3c) (b8 0xf))
            (b8 0x33))))
-  (is (clj/= (get-bits true) [1]))
-  (is (clj/= (get-bits false) [0]))
+  (is (= (get-bits true) [1]))
+  (is (= (get-bits false) [0]))
   (is (= (serialize true) (cast (bits 1) 1)))
   (is (= (serialize false) (cast (bits 1) 0)))
   (is (= (count (value (serialize
@@ -245,7 +245,19 @@
       (is (= (get (exec-sim state fns 2)
                   [(:token mod) :o])
              (cast b1 {:a 2 :b :foo})))
-      ))) 
+      ))
+  (let [b (bundle {:x (uintm 4) :y (anontype :boolean)})
+        x (cast b {:x 3 :y false})
+        {x-x :x x-y :y} x
+        x' (assoc x :y true)
+        {x'-x :x x'-y :y} x']
+    (is (= x-x 3))
+    (is (= x-y false))
+    (is (= (typeof x') b))
+    (is (= x'-x 3))
+    (is (= x'-y true))))
+
+(deftest assoc-test)
 
 (deftest cond-test
   (is (= (cond false 22)
@@ -277,7 +289,7 @@
         (clojure.core/cond
           true 1
           false 0)))
-  (is (clj/not=
+  (is (not=
         1
             (make-sim-fn (cond
                            ;41 != 42
@@ -545,3 +557,4 @@
                 [(:token m) :o])
            ((uintm 5) 22)))
     ))
+

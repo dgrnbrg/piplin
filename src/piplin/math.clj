@@ -140,15 +140,25 @@
     :else (throw+ (error "Don't know how to promote to :uintm from"
                          (typeof obj)))))
 
+(defn piplin-clojure-dispatch
+  "Returns the kind of the piplin type or
+  :use-core-impl if it has no piplin type"
+  [x]
+  (try+
+    (kindof x)
+    (catch piplin.types.CompilerError ce
+      :use-core-impl)))
+
 (defn binary-dispatch
   "Simplified binary dispatch logic."
   [x y]
-  [(kindof x) (kindof y)])
+  [(piplin-clojure-dispatch x)
+   (piplin-clojure-dispatch y)])
 
 (defn nary-dispatch
   "Dispatching logic used by binary math operations"
   ([] ::nullary)
-  ([x] (kindof x))
+  ([x] (piplin-clojure-dispatch x))
   ([x y] (binary-dispatch x y))
   ([x y & more] ::n-ary))
 
@@ -236,6 +246,10 @@
     (clojure.core/not x)))
 
 (defmulti = nary-dispatch :hierarchy types)
+(defmethod = :use-core-impl [x]
+  (clj/= x))
+(defmethod = [:use-core-impl :use-core-impl] [x y]
+  (clj/= x y))
 (defmethod = :default [x y]
   (clojure.core/cond
     (and (nil? x) (nil? y))
