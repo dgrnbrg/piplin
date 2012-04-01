@@ -229,8 +229,8 @@
                   [(:token mod) :o])
              (cast b1 {:a 2 :b :foo}))))
     (let [mod (module [:outputs [o (cast b1 {:a 0 :b :foo})]]
-                      (let [a' (inc (bundle-get o :a))
-                            b' (mux2 (= (bundle-get o :b)
+                      (let [a' (inc (get o :a))
+                            b' (mux2 (= (get o :b)
                                         (cast (enum #{:foo :bar})
                                               :foo))
                                      :bar :foo)]
@@ -266,7 +266,11 @@
         {{x'-val :x} :a} x']
     (is (= x-val 2))
     (is (= (typeof x') b2))
-    (is (= x'-val 3))))
+    (is (= x'-val 3)))
+  (is (= (assoc {} :x 3) {:x 3}))
+  (is (= (assoc-in {"foo" "bar" :zoo {:a "q"}} [:zoo :b] :x)
+         {"foo" "bar" :zoo {:a "q" :b :x}}))
+  (is (= (assoc [1 2 3] 1 :x) [1 :x 3])))
 
 (deftest cond-test
   (is (= (cond false 22)

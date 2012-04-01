@@ -786,30 +786,40 @@
     (difference s1 s2)
     (difference s2 s1)))
 
-(defn bundle-get
+(defn get
   "Gets the given key from the bundle"
   [bund key]
-  (if (pipinst? bund)
-    (clojure.core/get (value bund) key)
-    (mkast (get-in (typeof bund) [:schema key])
-           :bundle-key
-           [bund key]
-           bundle-get)))
+  (condp = (piplin-clojure-dispatch bund) 
+    :use-core-impl 
+    (clj/get bund key) 
+    :bundle 
+    (if (pipinst? bund)
+      (clojure.core/get (value bund) key)
+      (mkast (get-in (typeof bund) [:schema key])
+             :bundle-key
+             [bund key]
+             get))
+    (throw+ (error "Don't know how to get from" bund))))
 
 (defn assoc
   "Returns a new bundle whose key k is equal to v.
   All other keys are unchanged."
   ([bund k v]
-   (if (pipinst? bund)
-     ((typeof bund) (clj/assoc (value bund) k v))
-     (-> (mkast (typeof bund)
-                :bundle-assoc
-                [bund key val]
-                assoc)
-       (assoc-dist-fn
-         #(assoc bund k
-                 (cast (-> % :schema k)
-                       v))))))      
+   (condp = (piplin-clojure-dispatch bund)
+     :use-core-impl
+     (clj/assoc bund k v)
+     :bundle
+     (if (pipinst? bund)
+       ((typeof bund) (clj/assoc (value bund) k v))
+       (-> (mkast (typeof bund)
+                  :bundle-assoc
+                  [bund key val]
+                  assoc)
+         (assoc-dist-fn
+           #(assoc bund k
+                   (cast (-> % :schema k)
+                         v)))))
+     (throw+ (error "Don't know how to assoc" bund))))      
   ([bund k v & kvs]
    (if (seq kvs)
      (recur (assoc bund k v)
@@ -821,7 +831,7 @@
 (defn assoc-in
   [m [k & ks] v]
   (if ks
-    (assoc m k (assoc-in (bundle-get m k) ks v))
+    (assoc m k (assoc-in (get m k) ks v))
     (assoc m k v)))
 
 (defpiplintype Bundle [schema])
@@ -838,7 +848,7 @@
     (throw+ (error "values must be piplin or java types:" schema))
     :else
     (merge (Bundle. schema)
-           {:valAt bundle-get
+           {:valAt get
             :kind :bundle})))
 
 (defmethod promote

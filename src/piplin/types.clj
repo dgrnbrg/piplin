@@ -48,6 +48,8 @@
 
 (defn kindof [a]
   (when-not (isa-type? :piplin-type (class (typeof a)))
+    (when (:kind a)
+      (throw+ (error a "might be a type, but this function takes piplin objects")))
     (throw+ (error (typeof a) "is not a piplin type! val =" a)))
   (-> a typeof :kind))
 
