@@ -10,7 +10,12 @@
   nil
   (typeof [this] (anontype :null))
   (value [this] nil)
-  (pipinst? [this] true))
+  (pipinst? [this] true)
+ #_ (comment clojure.lang.IPersistentMap 
+  (typeof [this] (anontype :map)) 
+  (value [this] this) 
+  (pipinst? [this] true)) 
+  )
 
 (derive-type clojure.lang.Keyword :piplin-type)
 (derive-type java.lang.Boolean :piplin-type)
@@ -796,7 +801,7 @@
   All other keys are unchanged."
   ([bund k v]
    (if (pipinst? bund)
-     (clj/assoc (value bund) k v)
+     ((typeof bund) (clj/assoc (value bund) k v))
      (-> (mkast (typeof bund)
                 :bundle-assoc
                 [bund key val]
@@ -835,14 +840,6 @@
     (merge (Bundle. schema)
            {:valAt bundle-get
             :kind :bundle})))
-(defn const-uneval-filter
-  "Takes a map and returns 2 maps: one containing
-  elements of the initial map whose values are pipinsts,
-  and the other containing the non-pipinst values (i.e.
-  AST fragments."
-  [map]
-  [(filter-map pipinst? map)
-   (filter-map (comp not pipinst?) map)])
 
 (defmethod promote
   :bundle

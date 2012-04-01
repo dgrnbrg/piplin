@@ -245,7 +245,9 @@
       (is (= (get (exec-sim state fns 2)
                   [(:token mod) :o])
              (cast b1 {:a 2 :b :foo})))
-      ))
+      )))
+
+(deftest assoc-test
   (let [b (bundle {:x (uintm 4) :y (anontype :boolean)})
         x (cast b {:x 3 :y false})
         {x-x :x x-y :y} x
@@ -255,9 +257,16 @@
     (is (= x-y false))
     (is (= (typeof x') b))
     (is (= x'-x 3))
-    (is (= x'-y true))))
-
-(deftest assoc-test)
+    (is (= x'-y true))) 
+  (let [b1 (bundle {:x (uintm 4) :y (uintm 3)})
+        b2 (bundle {:a b1 :b (anontype :boolean)})
+        x (cast b2 {:a {:x 2 :y 1} :b false})
+        x' (assoc-in x [:a :x] 3)
+        {{x-val :x} :a} x
+        {{x'-val :x} :a} x']
+    (is (= x-val 2))
+    (is (= (typeof x') b2))
+    (is (= x'-val 3))))
 
 (deftest cond-test
   (is (= (cond false 22)
