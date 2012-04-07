@@ -128,23 +128,34 @@
   :feedback is similar to :outputs, but they're only
   readable from within the module. :modules is for
   instantiating submodules in the final design."
-  [config & body]
-  (if-not (even? (count config))
-    (explode "Odd number of elements in module args."))
-  (let [{:keys [inputs outputs feedback modules]}
-        (parse-sections
-          config [:inputs :outputs :feedback :modules])]
-    (let [token (gensym "module")
+  [& [module-name config & body]]
+  (let [has-name (symbol? module-name)
+        body (if has-name body (cons config body))
+        config (if has-name config module-name)]
+
+    (if-not (even? (count config))
+      (explode "Odd number of elements in module args.")) 
+
+    (let [{:keys [inputs outputs feedback modules]}
+          (parse-sections
+            config [:inputs :outputs :feedback :modules])
+
+          token (if has-name
+                  (symbol (name (ns-name *ns*))
+                          (name module-name))
+                  (gensym "module")) 
+
           connections (gensym "connections")
           old-connect (gensym "old-connect")
+
           registers (map (tuplefn 1
-                           #(identity `(typeof ~%2)))
+                                  #(identity `(typeof ~%2)))
                          (concat outputs feedback))
           exprs (map (tuplefn 1
-                       #(make-port %1 token %2))
+                              #(make-port %1 token %2))
                      (concat inputs registers))
           bindings (mapcat (tuplefn 0
-                             (fn [x y] (symbol (name x))))
+                                    (fn [x y] (symbol (name x))))
                            (concat exprs modules))]
       `(let [~@bindings
              ~connections (atom [])
@@ -160,6 +171,11 @@
             :feedback ~feedback
             :modules ~modules
             :body @~connections})))))
+
+(defmacro defmodule
+  "Same as module, but conveniently defs it at the same time"
+  [name & args]
+  `(def ~name (module ~name ~@args)))
 
 (defn connect
   {:dynamic true}
