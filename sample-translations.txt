@@ -153,3 +153,21 @@ module union_test(
       o <= tmp0;
     end
 endmodule;
+
+===
+case statements can be made as functions in verilog:
+
+function [7:0] char2vector;
+  input [8:1] c;
+  begin
+    case (c)
+      "A" : char2vector = 8'b01000001;
+      "C" : char2vector = 8'b01000011;
+      "D" : char2vector = 8'b01000100;
+      "E" : char2vector = 8'b01000101;
+      "F" : char2vector = 8'b01000110;
+      "G" : char2vector = 8'b01000111;
+      ...........
+      end case ;
+   end
+endfunction
