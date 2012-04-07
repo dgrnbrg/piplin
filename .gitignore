@@ -8,3 +8,5 @@
 /.lein-deps-sum
 *.swp
 *.swo
+
+docs/uberdoc.html

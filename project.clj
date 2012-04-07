@@ -6,4 +6,5 @@
                  [slingshot "0.10.1"]
                  [org.clojure/tools.macro "0.1.1"]
                  [org.clojure/algo.monads "0.1.0"]
-                 [org.clojure/algo.generic "0.1.0"]])
+                 [org.clojure/algo.generic "0.1.0"]]
+  :dev-dependencies [[lein-marginalia "0.7.0"]])
