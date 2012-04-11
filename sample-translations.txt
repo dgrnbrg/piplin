@@ -51,7 +51,7 @@ endmodule;
 ===
 
 (defmodule counter
-  [:output [x ((uintm 8) 0)]]
+  [:outputs [x ((uintm 8) 0)]]
   (connect x (inc x)))
 
 ===

@@ -288,11 +288,12 @@
   [pipinst]
   (when-not (pipinst? pipinst)
     (throw+ (error pipinst "must be a pipinist")))
-  (let [pipinst (mkast (typeof pipinst)
+  (let [expr pipinst
+        pipinst (mkast (typeof pipinst)
                        :noop
-                       []
+                       [expr]
                        (fn [] pipinst))]
-    (vary-meta (alter-value pipinst assoc :args [])
+    (vary-meta (alter-value pipinst assoc :args {})
                assoc :pipinst? (fn [x] false))))
 
 (defn assoc-dist-fn
