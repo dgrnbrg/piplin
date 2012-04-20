@@ -1018,7 +1018,9 @@
             (instance type obj :constrain)
             ;TODO: should composite types need to make ast in promote
             ;or should cast be smarter?
-            (mkast type :make-union [v] #(promote type {tag %}))))
+            (mkast-explicit-keys type :make-union
+                                 [:tag :val] {:tag tag :val v}
+                                 #(promote type {tag %}))))
         (throw+ (error "Tag must be one of"
                        (keys (:schema type))))))))
 
