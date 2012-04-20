@@ -123,24 +123,21 @@
       padding
       (lookup-expr name-lookup val))))
 
+(defn verilog-noop-passthrough
+  [ast name-lookup]
+  (let [args (apply merge (map (value ast) [:args :consts]))]
+    (when-not (:expr args)
+      (throw+ (error "cast must have an :expr" args)))
+    (when (not= 1 (count args))
+      (throw+ (error "cast must have exactly one expr")))
+    (verilog-of (:expr args) name-lookup)))
+
 (defmethod verilog-of :cast
   [ast name-lookup]
-  (let [args (apply merge (map (value ast) [:args :consts]))]
-  (println args)
-    (when-not (:expr args)
-      (throw+ (error "noop must have an :expr" args)))
-    (when (not= 1 (count args))
-      (throw+ (error "noop must have exactly one expr")))
-    (verilog-of (:expr args) {})))
+  (verilog-noop-passthrough ast name-lookup))
 (defmethod verilog-of :noop
   [ast name-lookup]
-  (let [args (apply merge (map (value ast) [:args :consts]))]
-  (println args)
-    (when-not (:expr args)
-      (throw+ (error "noop must have an :expr" args)))
-    (when (not= 1 (count args))
-      (throw+ (error "noop must have exactly one expr")))
-    (verilog-of (:expr args) {})))
+  (verilog-noop-passthrough ast name-lookup))
 
 (defn render-single-expr
   "Takes an expr and a name table and
