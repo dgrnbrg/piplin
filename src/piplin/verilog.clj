@@ -100,25 +100,16 @@
   [ast name-lookup]
   (lookup-expr name-lookup ast))
 
-(defmethod verilog-of :+
-  [ast name-lookup]
-  (let [ast (value ast)
-        args (apply merge (map ast [:args :consts]))]
-    (str (lookup-expr name-lookup (:lhs args))
-         " + "
-         (lookup-expr name-lookup (:rhs args)))))
+(defn merged-args
+  [ast]
+  (apply merge (map (value ast) [:args :consts])))
 
 (defmethod verilog-of :make-union
   [ast name-lookup]
   (let [t (typeof ast)
         {:keys [schema enum]} t
-        {:keys [tag val]} (apply merge (map (value ast) [:args :consts]))
+        {:keys [tag val]} (merged-args ast)
         w (bit-width-of t)
-        lolol (println (str "enum " enum))
-        lolol (println (str "tag " tag))
-        lolol (println (str "schema " schema))
-        lolol (println (str "tag schema " (get schema tag)))
-        lolol (println (str "val " val))
         padding (- w
                    (bit-width-of enum)
                    (bit-width-of (tag schema)))]
@@ -127,17 +118,55 @@
       padding
       (lookup-expr name-lookup val))))
 
+(defmethod verilog-of :get-value
+  [ast name-lookup]
+  (let [valtype (typeof ast) 
+        union (:u (merged-args ast))
+        top  (dec (bit-width-of valtype))]
+    (str (lookup-expr name-lookup union)
+         "[" top (when-not (zero? top) ":0") "]"))) 
+
+(defmethod verilog-of :get-tag
+  [ast name-lookup]
+  (let [enum (typeof ast) 
+        union (:u (merged-args ast))
+        top (dec (bit-width-of (typeof union)))
+        bottom (inc (- top (bit-width-of enum)))]
+    (str (lookup-expr name-lookup union)
+         "[" top 
+         (when-not (= top bottom)
+           (str ":" bottom))
+         "]"))) 
+
+(defmethod verilog-of :slice
+  [ast name-lookup]
+  (let [{:keys [expr high low]} (merged-args ast)]
+    (str (lookup-expr name-lookup expr) "[" (dec high) ":" low "]")))
+
 (defmethod verilog-of :mux2
   [ast name-lookup]
   (let [t (typeof ast)
-        {:keys [sel v1 v2]} (apply merge (map (value ast) [:args :consts]))]
+        {:keys [sel v1 v2]} (merged-args ast)]
     (str (lookup-expr name-lookup sel) " ? "
          (lookup-expr name-lookup v1) " : "
          (lookup-expr name-lookup v2))))
 
+(defmethod verilog-of :+
+  [ast name-lookup]
+  (let [ast (value ast)
+        args (merged-args ast)]
+    (str (lookup-expr name-lookup (:lhs args))
+         " + "
+         (lookup-expr name-lookup (:rhs args)))))
+
+(defmethod verilog-of :=
+  [ast name-lookup]
+   (let [{:keys [x y]} (merged-args ast)]
+     (str (lookup-expr name-lookup x) " == " (lookup-expr name-lookup y))))
+
 (defn verilog-noop-passthrough
   [ast name-lookup]
-  (let [args (apply merge (map (value ast) [:args :consts]))]
+  (let [args (merged-args ast)]
     (when-not (contains? args :expr)
       (throw+ (error "must have an :expr" args)))
     (when (not= 1 (count args))
@@ -148,6 +177,9 @@
   [ast name-lookup]
   (verilog-noop-passthrough ast name-lookup))
 (defmethod verilog-of :noop
+  [ast name-lookup]
+  (verilog-noop-passthrough ast name-lookup))
+(defmethod verilog-of :serialize
   [ast name-lookup]
   (verilog-noop-passthrough ast name-lookup))
 
@@ -167,7 +199,8 @@
     (let [name (name (gensym))
           indent "  "
           zero-offset-bit-width (dec (bit-width-of (typeof expr)))
-          wire-decl (str "wire [" zero-offset-bit-width ":0] ")
+          wire-decl (str "wire " (when (pos? zero-offset-bit-width)
+                                   (str "[" zero-offset-bit-width ":0] ")))
           assign " = "
           body (verilog-of expr name-table)
           terminator ";\n"]
@@ -221,3 +254,13 @@
     (reduce (fn [accum [k v]] (assoc accum k (name v))) {})))
 
 ;ex: (verilog (+ ((uintm 3) 0) (uninst ((uintm 3) 1))) {})
+
+;way more awesome that this works:
+(comment
+(def e (enum #{:a :b :c})) 
+(def b (bundle {:car e :cdr (uintm 4)})) 
+(def u (union {:x (uintm 5) :y b})) 
+            
+(-> (verilog (union-match (uninst (u {:x ((uintm 5) 0)}))
+              (:x x (bit-slice (serialize x) 1 4))
+              (:y {:keys [car cdr]} #b00_1)) {}) second print))
