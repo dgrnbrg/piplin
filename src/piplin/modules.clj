@@ -170,12 +170,13 @@
             :outputs ~outputs
             :feedback ~feedback
             :modules ~modules
+            :ports ~(apply hash-map (apply concat exprs)) 
             :body @~connections})))))
 
 (defmacro defmodule
   "Same as module, but conveniently defs it at the same time"
-  [name & args]
-  `(def ~name (module ~name ~@args)))
+  [name params & args]
+  `(defn ~name ~params (module ~(-> name gensym) ~@args)))
 
 (defn connect
   {:dynamic true}
