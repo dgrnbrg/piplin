@@ -39,6 +39,10 @@
         w (bit-width-of t)] 
     (str w "'d" i)))
 
+(defmethod verilog-repr :boolean
+  [x]
+  (if x "1'b1" "1'b0"))
+
 (defmethod verilog-repr :bits
   [x]
   (let [t (typeof x)
@@ -123,13 +127,21 @@
       padding
       (lookup-expr name-lookup val))))
 
+(defmethod verilog-of :mux2
+  [ast name-lookup]
+  (let [t (typeof ast)
+        {:keys [sel v1 v2]} (apply merge (map (value ast) [:args :consts]))]
+    (str (lookup-expr name-lookup sel) " ? "
+         (lookup-expr name-lookup v1) " : "
+         (lookup-expr name-lookup v2))))
+
 (defn verilog-noop-passthrough
   [ast name-lookup]
   (let [args (apply merge (map (value ast) [:args :consts]))]
-    (when-not (:expr args)
-      (throw+ (error "cast must have an :expr" args)))
+    (when-not (contains? args :expr)
+      (throw+ (error "must have an :expr" args)))
     (when (not= 1 (count args))
-      (throw+ (error "cast must have exactly one expr")))
+      (throw+ (error "must have exactly one expr")))
     (verilog-of (:expr args) name-lookup)))
 
 (defmethod verilog-of :cast
