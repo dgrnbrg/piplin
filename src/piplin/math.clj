@@ -559,6 +559,7 @@
         (slice-impl expr low high)
         (mkast type :slice [expr low high] slice-impl)))))
 
+;TODO: this needs to use mkast
 (defn bit-cat
   ([]
    (instance (bits 0) []))
