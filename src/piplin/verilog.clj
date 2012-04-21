@@ -5,7 +5,7 @@
   (:use [clojure.set :only [map-invert]])
   (:use [clojure.string :only [join]]) 
   (:use [piplin modules types])
-  (:use [piplin [math :only [bit-width-of]]]))
+  (:use [piplin [math :only [bit-width-of piplin-clojure-dispatch]]]))
 
 
 (def uintm-add-template
@@ -75,23 +75,18 @@
       (verilog-repr v)
       )))
 
+(defmethod verilog-repr :bundle
+  [x]
+  (verilog-repr (piplin.math/serialize x)))
+
 (defn lookup-expr
   [table expr]
   (if (pipinst? expr)
     (verilog-repr expr)
     (if-let [name (get table expr)]
       name
-      (throw+ (error expr "not found in" table)))))
-
-(defmacro let-args
-  [ast name-lookup argvec & body]
-  (let [lookups (mapcat #(vector %
-                              `(lookup-expr ~name-lookup ~%))
-                     argvec)]
-    (println lookups)
-    `(let [{:keys ~argvec} (merged-args ~ast)
-           ~@lookups]
-       ~@body)))
+      (do
+       (throw+ (error expr "not found in" table))))))
 
 (defmulti verilog-of
   (fn [ast name-lookup] (if (pipinst? ast)
@@ -113,6 +108,15 @@
 (defn merged-args
   [ast]
   (apply merge (map (value ast) [:args :consts])))
+
+(defmacro let-args
+  [ast name-lookup argvec & body]
+  (let [lookups (mapcat #(vector %
+                              `(lookup-expr ~name-lookup ~%))
+                     argvec)]
+    `(let [{:keys ~argvec} (merged-args ~ast)
+           ~@lookups]
+       ~@body)))
 
 (defmethod verilog-of :make-union
   [ast name-lookup]
@@ -147,6 +151,48 @@
          (when-not (= top bottom)
            (str ":" bottom))
          "]"))) 
+
+(defmethod verilog-of :make-bundle
+  [ast name-lookup]
+  (let [schema-ks (keys (:schema (typeof ast)))
+        bundle-inst (merged-args ast)
+        ordered-vals (map #(lookup-expr name-lookup
+                                        (get bundle-inst %))
+                          schema-ks)]
+    (str "{" (join ", " ordered-vals) "}")))
+
+(defn compute-key-offsets
+  "Returns a map from keys to pairs. The pairs
+  are the low (inclusive) to high (inclusive)
+  bit indices in the verilog representation."
+  [bundle-type]
+  (let [schema (:schema bundle-type)
+        key-widths (map (comp bit-width-of
+                              (partial get schema))
+                        (keys schema))
+        offsets (reductions + (conj key-widths 0))
+        total (reduce + key-widths)
+        pairs (partition 2 1 (map (partial - total) offsets))
+        pairs (map (fn [[x y]] [(dec x) y]) pairs)
+        ]
+    (into {} (map vector (keys schema) pairs))))
+
+(defmethod verilog-of :bundle-assoc
+  [ast name-lookup]
+  (let [{:keys [bund k v]} (merged-args ast)
+        t (typeof ast)
+        offsets (compute-key-offsets t)
+        w (bit-width-of t)
+        [high low] (get offsets k)
+        v (lookup-expr name-lookup v)
+        bund (lookup-expr name-lookup bund)] 
+    (str "{"
+         (when-not (= (dec w) high)
+           (str bund "[" (dec w) ":" (inc high) "], "))
+         v
+         (when-not (= low 0)
+           (str ", " bund "[" (dec low) ":0]"))
+         "}")))
 
 (defmethod verilog-of :slice
   [ast name-lookup]
@@ -200,10 +246,13 @@
   returns an updated name table and a string
   to add to the text of the verilog"
   [expr name-table]
-  (pprint-ast ["rendering expr: " expr])
   (cond
     (pipinst? expr)
     [(assoc name-table expr (verilog-repr expr)) ""]
+    (= :use-core-impl (piplin-clojure-dispatch expr))
+    (do
+      (println "WARNING: trying to render clojure type, skipping")
+      [name-table ""])
     ;The is common subexpression elimination
     (contains? name-table expr)
     [name-table ""]
@@ -231,13 +280,11 @@
 
   returns the updated name-table and text"
   ([expr name-table]
-   (pprint-ast expr)
    (verilog expr name-table "")) 
   ([expr name-table text]
    (if (pipinst? expr)
      (render-single-expr expr name-table)
      (let [args (vals (:args (value expr)))
-     ;      lolol (pprint-ast ["args: " args])
            [name-table text]
            (reduce
              (fn [[name-table text] expr]
