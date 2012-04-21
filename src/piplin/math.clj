@@ -473,6 +473,8 @@
   bits)
 
 (defmulti bit-width-of
+  "Takes a type and returns the number
+  of bits needed to represent that type"
   ;TODO: error below never gets thrown
   ;needs a test + fix
 ;  #(if (pipinst? %)
