@@ -818,16 +818,16 @@
      :use-core-impl
      (clj/assoc bund k v)
      :bundle
-     (if (pipinst? bund)
-       ((typeof bund) (clj/assoc (value bund) k v))
-       (-> (mkast (typeof bund)
-                  :bundle-assoc
-                  [bund key val]
-                  assoc)
-         (assoc-dist-fn
-           #(assoc bund k
-                   (cast (-> % :schema k)
-                         v)))))
+     (let [schema (:schema (typeof bund))
+           v-type (clj/get schema k)
+           v (cast v-type v)] ;TODO: reconsider if this should be a cast?
+       ; ^^^ yes, b/c the return type fixes this type
+       (if (pipinst? bund)
+         ((typeof bund) (clj/assoc (value bund) k v))
+         (mkast (typeof bund)
+                :bundle-assoc
+                [bund k v]
+                assoc)))
      (throw+ (error "Don't know how to assoc" bund))))      
   ([bund k v & kvs]
    (if (seq kvs)
