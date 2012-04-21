@@ -5,7 +5,7 @@
   (:use [clojure.set :only [map-invert]])
   (:use [clojure.string :only [join]]) 
   (:use [piplin modules types])
-  (:use [piplin [math :only [bit-width-of piplin-clojure-dispatch]]]))
+  (:use [piplin [math :only [bit-width-of piplin-clojure-dispatch bits]]]))
 
 
 (def uintm-add-template
@@ -248,6 +248,11 @@
   [ast name-lookup]
   (verilog-noop-passthrough ast name-lookup))
 
+(defn array-width-decl [x]
+  (if (zero? x)
+    ""
+    (str "[" (dec x) ":0] ")))
+
 (defn render-single-expr
   "Takes an expr and a name table and
   returns an updated name table and a string
@@ -266,9 +271,8 @@
     :else
     (let [name (name (gensym))
           indent "  "
-          zero-offset-bit-width (dec (bit-width-of (typeof expr)))
-          wire-decl (str "wire " (when (pos? zero-offset-bit-width)
-                                   (str "[" zero-offset-bit-width ":0] ")))
+          bit-width (bit-width-of (typeof expr))
+          wire-decl (str "wire " (array-width-decl bit-width))
           assign " = "
           body (verilog-of expr name-table)
           terminator ";\n"]
@@ -319,14 +323,94 @@
     map-invert
     (reduce (fn [accum [k v]] (assoc accum k (name v))) {})))
 
+(defn module->verilog
+  [module]
+  (when-not (= (:type module) :module)
+    (throw+ (error module "must be a module")))
+  (let [ports  (mapcat (comp keys #(get module %)) [:inputs :outputs])
+        inputs (->> (:inputs module)
+                 (mapcat (fn [[k v]] [(name k) (bit-width-of v)]))
+                 (apply hash-map))
+        outputs (->> (:outputs module)
+                  (mapcat (fn [[k v]] [(name k) (bit-width-of (typeof v))]))
+                  (apply hash-map))
+        feedbacks (->> (:feedback module)
+                  (mapcat (fn [[k v]] [(name k) (bit-width-of (typeof v))]))
+                  (apply hash-map))
+        initials (->> (merge (:outputs module) (:feedback module))
+                   (mapcat (fn [[k v]] [(name k) (verilog-repr v)]))
+                   (apply hash-map))
+        name-table (init-name-table module)
+        connections (->> module
+                      :body
+                      (map (comp :args value))
+                      (mapcat (fn [{:keys [reg expr]}]
+                             [(-> reg value :port name)
+                              expr]))
+                      (apply hash-map))
+        [name-table body] (reduce
+                            (fn [[name-table text] expr]
+                              (verilog expr name-table text))
+                            [name-table ""] (vals connections))
+        ]
+    (str "module " (name (:token module)) "(\n"
+         "  clock,\n"
+         "  reset,\n"
+         (join ",\n" (map #(str "  " (name %)) ports)) "\n"
+         ");\n"
+         "  input wire clock;\n"
+         "  input wire reset;\n"
+         (when (seq inputs)
+           (str "\n"
+                "  //inputs\n"
+                (join (map (fn [[input width]]
+                             (str "  input wire " (array-width-decl width) input ";\n"))
+                           inputs))))
+         (when (seq outputs)
+           (str "\n"
+                "  //outputs\n"
+                (join (map (fn [[output width]]
+                             (str "  output reg " (array-width-decl width) output ";\n"))
+                           outputs))))
+         (when (seq feedbacks)
+           (str "\n"
+                "  //feedback\n"
+                (join (map (fn [[feedback width]]
+                             (str "  reg " (array-width-decl width) feedback ";\n"))
+                           feedbacks))))
+         "\n"
+         "\n"
+         body
+         "\n"
+         "\n"
+         "  always @(posedge clock)\n"
+         "    if (reset) begin\n"
+         (join (map (fn [[name val]]
+                      (str "      " name " <= " val ";\n"))
+                    initials))
+         "    end else begin\n"
+         (join (map (fn [[name expr]]
+                      (str "      " name " <= " (lookup-expr name-table expr) ";\n"))
+                    connections))
+         "    end\n"
+         "endmodule;\n")))
+
+
 ;ex: (verilog (+ ((uintm 3) 0) (uninst ((uintm 3) 1))) {})
 
 ;way more awesome that this works:
 (comment
-(def e (enum #{:a :b :c})) 
-(def b (bundle {:car e :cdr (uintm 4)})) 
-(def u (union {:x (uintm 5) :y b})) 
-            
-(-> (verilog (union-match (uninst (u {:x ((uintm 5) 0)}))
-              (:x x (bit-slice (serialize x) 1 4))
-              (:y {:keys [car cdr]} #b00_1)) {}) second print))
+  (def e (enum #{:a :b :c} ))
+  (def b (bundle {:car e :cdr (uintm 4)})) 
+  (def u (union {:x (uintm 5) :y b})) 
+
+  (-> (verilog (union-match (uninst (u {:x ((uintm 5) 0)}))
+  (:x x (bit-slice (serialize x) 1 4))
+  (:y {:keys [car cdr]} #b00_1)) {}) second print))
+
+;this is super cool:
+(comment
+  (defmodule counter [n]
+    [:outputs [x ((uintm n) 0)]]
+    (connect x (inc x)))
+  (module->verilog (counter 8)))
