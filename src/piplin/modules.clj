@@ -185,6 +185,7 @@
     (throw+ (error "Must call connect within a module"))
     (throw+ (error "Must connect to a register"))))
 
+;TODO: this should probably just be a simple map, not an ASTNode
 (defn connect-impl
   "This connects a register to an expr"
   [reg expr]
