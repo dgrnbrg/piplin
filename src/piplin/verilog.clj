@@ -194,6 +194,13 @@
            (str ", " bund "[" (dec low) ":0]"))
          "}")))
 
+(defmethod verilog-of :bundle-key
+  [ast name-lookup]
+  (let [{:keys [bund key]} (merged-args ast)
+        offsets (compute-key-offsets (typeof bund))
+        [high low] (get offsets key)]
+    (str (lookup-expr name-lookup bund) "[" high ":" low "]")))
+
 (defmethod verilog-of :slice
   [ast name-lookup]
   (let [{:keys [expr high low]} (merged-args ast)]
