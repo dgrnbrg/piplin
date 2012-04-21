@@ -559,7 +559,9 @@
         (slice-impl expr low high)
         (mkast type :slice [expr low high] slice-impl)))))
 
-;TODO: this needs to use mkast
+;TODO: this should use mkast-explicit-keys to support
+;varargs in the ast node, which will be faster in sim and
+;simpler to read in verilog
 (defn bit-cat
   ([]
    (instance (bits 0) []))

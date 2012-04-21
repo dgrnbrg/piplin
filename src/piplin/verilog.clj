@@ -83,6 +83,16 @@
       name
       (throw+ (error expr "not found in" table)))))
 
+(defmacro let-args
+  [ast name-lookup argvec & body]
+  (let [lookups (mapcat #(vector %
+                              `(lookup-expr ~name-lookup ~%))
+                     argvec)]
+    (println lookups)
+    `(let [{:keys ~argvec} (merged-args ~ast)
+           ~@lookups]
+       ~@body)))
+
 (defmulti verilog-of
   (fn [ast name-lookup] (if (pipinst? ast)
                           ::immediate
@@ -143,6 +153,11 @@
   (let [{:keys [expr high low]} (merged-args ast)]
     (str (lookup-expr name-lookup expr) "[" (dec high) ":" low "]")))
 
+(defmethod verilog-of :bit-cat
+  [ast name-lookup]
+  (let-args ast name-lookup [b1 b2]
+    (str "{" b1 ", " b2 "}")))
+
 (defmethod verilog-of :mux2
   [ast name-lookup]
   (let [t (typeof ast)
@@ -153,11 +168,8 @@
 
 (defmethod verilog-of :+
   [ast name-lookup]
-  (let [ast (value ast)
-        args (merged-args ast)]
-    (str (lookup-expr name-lookup (:lhs args))
-         " + "
-         (lookup-expr name-lookup (:rhs args)))))
+  (let-args ast name-lookup [lhs rhs]
+            (str lhs " + " rhs)))
 
 (defmethod verilog-of :=
   [ast name-lookup]
