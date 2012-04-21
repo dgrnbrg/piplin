@@ -566,8 +566,12 @@
   ([bs]
    bs)
   ([b1 b2]
-   (instance (bits (+ (-> b1 typeof :n) (-> b2 typeof :n)))
-             (vec (concat (value b1) (value b2)))))
+   (let [type (bits (+ (-> b1 typeof :n)
+                       (-> b2 typeof :n)))]
+     (if (and (pipinst? b1) (pipinst? b2))
+       (instance type
+                 (vec (concat (value b1) (value b2))))
+       (mkast type :bit-cat [b1 b2] bit-cat))))
   ([b1 b2 & more]
    (if more
      (recur (bit-cat b1 b2) (first more) (next more))
@@ -1021,7 +1025,7 @@
             ;or should cast be smarter?
             (mkast-explicit-keys type :make-union
                                  [:tag :val] {:tag tag :val v}
-                                 #(promote type {tag %}))))
+                                 #(promote type {%1 %2}))))
         (throw+ (error "Tag must be one of"
                        (keys (:schema type))))))))
 

@@ -292,7 +292,7 @@
         pipinst (mkast (typeof pipinst)
                        :noop
                        [expr]
-                       (fn [] pipinst))]
+                       (fn [_] pipinst))]
     (vary-meta (alter-value pipinst assoc :args {})
                assoc :pipinst? (fn [x] false))))
 
