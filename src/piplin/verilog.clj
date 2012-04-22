@@ -395,6 +395,71 @@
          "    end\n"
          "endmodule;\n")))
 
+(defn regs-for-inputs
+  [module]
+  [(map #(let [w (-> % val bit-width-of)]
+           (str "reg "
+                (array-width-decl w)
+                (-> % key name)
+                " = " w "'b" (join (repeat w \z)) ";\n"))
+        (:inputs module))
+   (map #(let [n (-> % key name)] (str \. n \( n \)))
+        (:inputs module))])
+
+(defn wire-for-regs
+  [module]
+  [[]
+   (map #(str \. (-> % key name) "()")
+        (mapcat #(get module %) [:outputs :feedback]))])
+
+(defn assert-hierarchical
+  [indent dut-name var val]
+  (let [assertion-str (str dut-name \. var " != " val)]
+    (str indent "if (" assertion-str ") begin\n"
+         indent "  $display(\"failed assertion: " assertion-str "\");\n"
+         indent "  $finish;\n"
+         indent "end")))
+
+(defn make-testbench
+  "Produces verilog that will run a test
+  against a given module. samples is a seqable
+  of maps, where the keys are all the inputs
+  and registers of the module, and the simulation
+  is run with those inputs and asserting those
+  states. The generated verilog will do this check,
+  and generate the appropriate clock and reset signanls."
+  [module samples]
+  (let [[input-decls input-connects] (regs-for-inputs module)
+        [output-decls output-connects] (wire-for-regs module)
+        dut-name "dut"]
+    (str
+      "module test;\n"
+      "  reg clk = 0;\n"
+      "  always #5 clk = !clk;\n"
+      "  reg rst = 1;\n"
+      "\n"
+      (join (map (partial str "  ") input-decls))
+      (join (map (partial str "  ") output-decls))
+      "  " (name (:token module)) " " dut-name "(\n"
+      "    .clock(clk), .reset(rst),\n"
+      (join (map (partial str "    ")
+                 (concat input-connects output-connects))) "\n"
+      "  );\n"
+      "\n"
+      "  initial begin\n"
+      "    #10 rst = 0;\n"
+      (->> samples
+        (map #(assert-hierarchical "    "
+                                   dut-name
+                                   (name (key (first %)))
+                                   (val (first %))))
+        (map #(str % "    #10\n"))
+        join)
+      "    $display(\"test passed\");\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule")))
+
 
 ;ex: (verilog (+ ((uintm 3) 0) (uninst ((uintm 3) 1))) {})
 
@@ -414,3 +479,7 @@
     [:outputs [x ((uintm n) 0)]]
     (connect x (inc x)))
   (module->verilog (counter 8)))
+(comment
+(println (make-testbench (counter 8)
+  (map (fn [x] {:x (verilog-repr ((uintm 8) x))})
+       (take 10 (iterate inc 0))))))
