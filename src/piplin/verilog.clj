@@ -418,7 +418,7 @@
     (str indent "if (" assertion-str ") begin\n"
          indent "  $display(\"failed assertion: " assertion-str "\");\n"
          indent "  $finish;\n"
-         indent "end")))
+         indent "end\n")))
 
 (defn make-testbench
   "Produces verilog that will run a test

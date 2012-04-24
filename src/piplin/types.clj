@@ -196,7 +196,9 @@
                                        val 
                                        more)) []])})
         checked (check inst)]
-    checked))
+    (if checked
+      inst
+      (throw+ (error "Didn't pass check:" type val)))))
 
 (defmacro defpiplintype
   "Creates a piplin type record that implements
