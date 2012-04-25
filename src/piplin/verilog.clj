@@ -224,6 +224,51 @@
   (let-args ast name-lookup [lhs rhs]
             (str lhs " + " rhs)))
 
+(defmethod verilog-of :-
+  [ast name-lookup]
+  (let-args ast name-lookup [lhs rhs]
+            (str lhs " - " rhs)))
+
+(defmethod verilog-of :*
+  [ast name-lookup]
+  (let-args ast name-lookup [lhs rhs]
+            (str lhs " * " rhs)))
+
+(defmethod verilog-of :>
+  [ast name-lookup]
+  (let-args ast name-lookup [lhs rhs]
+            (str lhs " > " rhs)))
+
+(defmethod verilog-of :>=
+  [ast name-lookup]
+  (let-args ast name-lookup [lhs rhs]
+            (str lhs " >= " rhs)))
+
+(defmethod verilog-of :<
+  [ast name-lookup]
+  (let-args ast name-lookup [lhs rhs]
+            (str lhs " - " rhs)))
+
+(defmethod verilog-of :<=
+  [ast name-lookup]
+  (let-args ast name-lookup [lhs rhs]
+            (str lhs " <= " rhs)))
+
+(defmethod verilog-of :bit-and
+  [ast name-lookup]
+  (let-args ast name-lookup [lhs rhs]
+            (str lhs " & " rhs)))
+
+(defmethod verilog-of :bit-or
+  [ast name-lookup]
+  (let-args ast name-lookup [lhs rhs]
+            (str lhs " | " rhs)))
+
+(defmethod verilog-of :bit-xor
+  [ast name-lookup]
+  (let-args ast name-lookup [lhs rhs]
+            (str lhs " ^ " rhs)))
+
 (defmethod verilog-of :=
   [ast name-lookup]
    (let [{:keys [x y]} (merged-args ast)]
