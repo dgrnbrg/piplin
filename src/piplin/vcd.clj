@@ -75,7 +75,10 @@
                        "1!\n"
                        (dump-cycle %1 @names))
                     (rest trace)
-                    (iterate #(+ % 2) 0)))
+                    (iterate #(+ % 2) 1)))
+         ;padding cycle
+         \# (* 2 (count trace)) "\n"
+         "0!\n"
          )))
 
 (defn spit-trace

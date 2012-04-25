@@ -129,3 +129,15 @@
                 {(inc cycle) {every-cycle-fn fnargs}}])]
        every-cycle-fn)
      fnargs]))
+
+(defn trace-keys
+  "Generate a trace for given tokens.
+  Returns the atom that will contain the
+  trace and the fns with the trace added."
+  [fns & tokens]
+  (let [trace-atom (atom [])
+        f (fn [& token-vals]
+            (swap! trace-atom conj
+                   (zipmap (map second tokens) token-vals)))]
+    [(apply assoc fns (every-cycle f tokens nil))
+   trace-atom]))
