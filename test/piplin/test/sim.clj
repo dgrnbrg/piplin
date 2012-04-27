@@ -70,13 +70,13 @@
     (is (= (get (exec-sim init-state
                           init-fns
                           10)
-                [(:token mod) :c])
+                [:c])
            (instance (uintm 8) 10))
         "ran and counted up to 10")
     (is (= (get (exec-sim init-state
                           init-fns
                           257)
-                [(:token mod) :c])
+                [:c])
            (instance (uintm 8) 1))
         "ran and counted up to 257/1 (numeric type must work)"))
   (let [mod (module [:outputs [c (instance (uintm 4) 0)]
@@ -87,11 +87,9 @@
         state (first sim)
         fns (second sim)
         u4 #(instance (uintm 4) %)]
-    (is (= (reduce #(apply clojure.core/assoc %1 %2) {}
-                   (map (fn [[k v]] [(second k) v])
-                        (select-keys (exec-sim state fns 7)
-                                     [[(:token mod) :c]
-                                      [(:token (get-in mod [:modules :sub])) :x]])))
-           {:c (u4 7) :x (u4 15)}))))
+    (is (= (select-keys (exec-sim state fns 7)
+                        [[:c]
+                         [:sub :x]])
+           {[:c] (u4 7) [:sub :x] (u4 15)}))))
            
 

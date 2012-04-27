@@ -85,7 +85,8 @@
   and returns a list which can be (eval)ed to get
   the port."
   [name token type-syntax]
-  `(alter-value (mkast ~type-syntax :port [] #(get sim-fn-args ['~token ~name]))
+  `(alter-value (mkast ~type-syntax :port [] #(throw+
+                                                (error "no longer using sim-fn")))
                 merge
                 {:port ~name 
                  :token '~token}))
@@ -266,6 +267,8 @@
               (iterate
                 z/right (z/down mz))))
 
+
+(def ^:dynamic *module-path* [])
 (defn walk-modules
   "Takes a map-zipper of the ast and applies
   the function combine as a reduce across the values
@@ -274,8 +277,10 @@
   (let [x (visit ast)]
     (if (seq (:modules ast))
       (reduce combine x
-              (map #(walk-modules % visit combine)
-                   (vals (:modules ast))))
+              (map (fn [[name mod]]
+                     (binding [*module-path* (conj *module-path* name)] 
+                      (walk-modules mod visit combine)))
+                   (:modules ast)))
       x)))
 
 (defn walk-connects
@@ -287,10 +292,11 @@
   (walk-modules
    ast 
     (fn [ast]
-      (map visit
-           (filter #(= (typeof %)
-                       :connection)
-                   (:body ast))))
+      (doall ;note: force eagerness here for *module-path* correctness
+        (map visit
+             (filter #(= (typeof %)
+                         :connection)
+                     (:body ast)))))
     combine))
 
 (defn walk-expr
@@ -315,6 +321,8 @@
   
   This is done by make-connection and make-sim-fn.)
 
+(def ^:dynamic *sim-state*)
+
 (defn make-sim-fn
   "Takes a map-zipper of the ast of an expr
   and walks along the expr. It returns a function
@@ -330,18 +338,17 @@
           (-> expr 
             meta
             :sim-factory))]
-    (if-let [args (:args (value expr))]
-      (let [arg-fns (map #(make-sim-fn (val %)) args)
-            arg-map (zipmap (keys args)
-                            arg-fns)
-            fn-vec (map #(get arg-map %) my-args)]
+    (let [args (:args (value expr))
+          arg-fns (map #(make-sim-fn (val %)) args)
+          arg-map (zipmap (keys args)
+                          arg-fns)
+          fn-vec (map #(get arg-map %) my-args)]
+      (if (= (:op (value expr)) :port) 
+        (let [path (conj *module-path* (:port (value expr)))]
+          (fn []
+            (get *sim-state* path)))
         (fn []
-          (apply my-sim-fn (map #(%) fn-vec))))
-      (if (seq my-args)
-        (throw (AssertionError. (str "lol" my-args)))
-        (fn [] (my-sim-fn))))))
-
-(def ^:dynamic sim-fn-args {})
+          (apply my-sim-fn (map #(%) fn-vec)))))))
 
 (defn make-connection
   "Takes a map-zipper of the ast of a connection
@@ -353,15 +360,15 @@
   (let [reg (get-in (value connection) [:args :reg])
         expr (get-in (value connection) [:args :expr])
         sim-fn (make-sim-fn expr)
-        reg-state [(:token (value reg)) (:port (value reg))]
+        reg-state (conj *module-path* (:port (value reg))) 
         ports (walk-expr connection 
                          #(if-let [port (:port (value %))]
-                              [[(:token (value %)) port]]
-                              nil)
+                            [(conj *module-path* port)]
+                            nil)
                          concat)]
     (every-cycle
        (fn [& vals]
-         (binding [sim-fn-args (zipmap ports vals)]
+         (binding [*sim-state* (zipmap ports vals)]
            (sim-fn)))
        ports
        reg-state)))
@@ -380,7 +387,7 @@
         regs (merge (:outputs module)
                     (:feedback module))]
     (apply hash-map (mapcat (fn [[k v]]
-                              [[token k] v])
+                              [(conj *module-path* k) v])
                             regs))))
 
 (defn make-sim
