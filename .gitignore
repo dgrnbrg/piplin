@@ -10,3 +10,11 @@
 *.swo
 
 docs/uberdoc.html
+
+dump.vcd
+
+my-design
+
+piplin_trace.vcd
+
+sample.v
