@@ -6,6 +6,8 @@
   (:use (piplin types))
   (:use [piplin.modules :only [connect]]))
 
+;Here, we allow nil to participate in the ITyped
+;protocol. nil support is incomplete.
 (extend-protocol ITyped
   nil
   (typeof [this] (anontype :null))
@@ -17,6 +19,8 @@
   (pipinst? [this] true)) 
   )
 
+;Allow JVM and piplin types to participate with the
+;kindof function.
 (derive-type clojure.lang.Keyword :piplin-type)
 (derive-type java.lang.Boolean :piplin-type)
 (derive-type java.lang.Long :piplin-type)
@@ -26,6 +30,7 @@
 (derive-type java.lang.Float :piplin-type)
 (derive-type java.lang.Double :piplin-type)
 
+;Allow the about types to participate in ITyped
 (extend-protocol ITyped
   clojure.lang.Keyword
   (typeof [this] (anontype :keyword))
@@ -61,7 +66,11 @@
   (pipinst? [this] true))
 
 (defn cast
-  "Converts the expr to the type."
+  "Converts the given expr to the given type.
+  If the expr is immediate, this returns the
+  same thing as (promote type expr). If the
+  expr is a runtime value, this returns an
+  astfrag."
   [type expr]
   (if (typeof expr)
     (cond
@@ -76,6 +85,7 @@
     (promote type expr)))
 
 ;TODO: why doesn't this work if I make it :j-integra?
+;:j-integral must participate in the promote system
 (defmethod promote 
   :j-integral
   [type obj]
@@ -84,6 +94,7 @@
     :uintm (value obj)
     (throw+ (error "Cannot promote" obj "to Long"))))
 
+;JVM numeric type promotion rules
 (derive-type :j-integral :j-num)
 
 (derive-type Double :j-num)
@@ -99,20 +110,24 @@
 (derive-type :j-short :j-integral)
 (derive-type :j-long :j-integral)
 
+;We define the uintm type. This is
+;an unsigned integer with modulo on overflow
+;or underflow.
 (defpiplintype UIntM [n])
 (defn uintm
-  "Make a new uintm type object."
+  "Makes a new uintm type object with the
+  given number of bits."
   [n]
   (merge (UIntM. n)
          {:kind :uintm}))
 
+;Takes a uintm (this) and the value
+;to initialize the new instance with,
+;and constrains the number to be in the
+;range of uintm
 (defmethod constrain
   :uintm
   [this init-val]
-  "Takes a uintm (this) and the value
-  to initialize the new instance with,
-  and constrains the number to be in the
-  range of uintm"
   (bit-and init-val (dec (bit-shift-left 1 (:n this)))))
 
 (defmethod check
@@ -237,12 +252,15 @@
   [x]
   (- x 1))
 
+;Define the given math operators as extensible piplin operators
+;that support AST generation
 (def-binary-binop > [:j-num])
 (def-binary-binop < [:j-num])
 (def-binary-binop >= [:j-num])
 (def-binary-binop <= [:j-num])
 
 (defn not
+  "not is important to implement ;-)"
   [x]
   (if (typeof x)
     (if (pipinst? x)
@@ -250,7 +268,17 @@
       (mkast (anontype :boolean) :not [x] not))
     (clojure.core/not x)))
 
-(defmulti = nary-dispatch :hierarchy types)
+(defmulti =
+  "= is a very common function. It must be
+  implemented explicitly (rather than using
+  the def-binary-binop function) in order to
+  explicitly check whether they're both not
+  ASTNodes, and if so to delegate to Clojure's
+  =. This is because not every object subject to
+  = participates in the piplin typesystem,
+  whereas all numbers do participate, so this
+  isn't an issue for >, <, <=, >=, etc."
+  nary-dispatch :hierarchy types)
 (defmethod = :use-core-impl [x]
   (clj/= x))
 (defmethod = [:use-core-impl :use-core-impl] [x y]
