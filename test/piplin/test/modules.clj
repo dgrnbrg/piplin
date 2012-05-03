@@ -1,47 +1,12 @@
 (ns piplin.test.modules
   (:use clojure.test)
-  (:use [clojure.core.logic :only [== run fresh lvar]])
-  (:require [clojure.zip :as z])
-  (:use piplin.modules))
+  (:use [piplin types math sim modules]))
 
-(deftest map-zipper-test
-  (let [mz (map-zipper (module [:inputs [a 22]
-                                :feedback [b 3]]
-                         (connect b a))
-                       )]
-    (is (= (entry :a 22)
-           (z/node (z/up (go-path-down mz [:inputs :a])))))
-    (is (= 22
-           (z/node (go-path-down mz [:inputs :a]))))))
-
-(deftest module-expansion
-  (is (seq
-        (run 1 [q]
-          (fresh [token]
-            (==
-              (module [:inputs
-                       [foo "foo"]
-                       :outputs
-                       [baz 12
-                        quux 22]
-                       :feedback
-                       [bar "bar"]]
-                (connect quux foo)
-                bar)
-              {:token token,
-               :outputs {:baz 12 :quux 22},
-               :inputs {:foo "foo"},
-               :modules nil,
-               :type :module,
-               :feedback {:bar "bar"},
-               :body
-               [{:type :connection
-                 :args {
-                        :reg {:token token
-                              :port :quux
-                              :type {:kind :j-long}}
-                        :expr {:token token
-                               :port :foo
-                               :type "foo"}}}]})))))
-  ;TODO: ensure error-checking works
-  )
+(deftest module*-counter
+  (let [m (module* "counter" :outputs {:x ((uintm 8) 0)}
+                   :connections [#(connect (make-port* :x (uintm 8))
+                                          (inc (make-port* :x (uintm 8))))])
+        [state fns] (make-sim m)]
+    (is (= (get (exec-sim state fns 0) [:x]) ((uintm 8) 0)))  
+    (is (= (get (exec-sim state fns 5) [:x]) ((uintm 8) 5)))  
+    (is (= (get (exec-sim state fns 10) [:x]) ((uintm 8) 10)))))

@@ -1,5 +1,6 @@
 (ns piplin.modules
   (:use [piplin sim types])
+  (:use [clojure.string :only [join]])
   (:use [slingshot.slingshot :only [throw+]])
   (:require [clojure.zip :as z]))
 
@@ -174,10 +175,29 @@
             :ports ~(apply hash-map (apply concat exprs)) 
             :body @~connections})))))
 
-(defmacro defmodule
-  "Same as module, but conveniently defs it at the same time"
-  [name params & args]
-  `(defn ~name ~params (module ~(-> name gensym) ~@args)))
+(let [module-name-cache (atom {})]
+ (defn gen-module-name
+  "Generates a unique module name out of the given basename
+  and arguments. Tries to make the name human-readable."
+  [name & args]
+   (let [x (let [k (apply vector name args)]
+     (if-let [id (get @module-name-cache k)]
+       id 
+       (let [id (str name "__" (join "_" args))]
+         (swap! module-name-cache assoc k id)
+         id)))]
+     (clojure.pprint/pprint ["x is" x])
+     x)))
+
+(defn make-port*
+  "Takes a keyword name, an owning module token, and
+  the port's type and returns the port."
+  [name type]
+  (alter-value (mkast type :port []
+                      #(throw+
+                         (error "no longer using sim-fn")))
+               merge
+               {:port name}))
 
 (defn connect
   {:dynamic true}
@@ -194,6 +214,74 @@
             {:args {:reg reg 
                     :expr expr}}
             {}))
+
+(defn module*
+  "Takes the module's name, input, output, feedback,
+  submodules, and connections. The name is optional, and the
+  other 5 arguments are keyword args: :inputs :outputs
+  :feedback :modules :connections. The inputs are a map from keywords,
+  which are the inputs' names, to their types The outputs and
+  feedbacks are the same, but the values of the map are the
+  initial values of those state elements. The connections
+  are a list of functions which, when evaluated,
+  will call connect to populate all the necessary connections."
+  [& args]
+  (let [mod-name (first args)
+        ;`str?` holds whether the module has a given name
+        str? (string? mod-name)
+        args (if str? (rest args) args)
+        mod-name (if str?
+                   mod-name
+                   (name (gensym "module")))
+        
+        ;parses keyword arguments, defaulting them to {}
+        {:keys [inputs outputs feedback modules connections]}
+        (->> (apply hash-map args)
+          (merge-with #(or %2 %1)
+                      {:inputs {} :outputs {} :feedbock {}
+                       :modules {} :connections []})) 
+        
+        ;We define port objects for each input and state
+        ;element. These are given to the functions to make
+        ;the deferred ASTs that will be used in
+        ;simulation/synthesis.
+       
+        ;start by merging and rejecting duplicated keywords 
+        ports (->> (merge-with
+                    #(throw+ (error "Duplicate names:" %1 %2))
+                    inputs outputs feedback)
+                ;Next, we convert all the outputs and feedback to
+                ;their types (easier now than doing 2 merges).
+                (map #(if (pipinst? %) (typeof %) %))
+                ;We finally make each one a port
+                (map #(make-port* (key %) (val %))))
+
+        ;To make the connections, we must define a root connect
+        ;function that stores to an atom. Then, we can invoke
+        ;all of the thunks to populate the connection. Afterwards,
+        ;we can do error checking
+        body (atom [])
+        _ (binding [connect (fn [reg expr]
+                              ;TODO: could pass up to parent
+                              ;on unmatched tokens (but I think
+                              ;I'm removing tokens from ports)
+                              (swap! body conj
+                                     (connect-impl reg expr)))]
+            (doseq [f connections] (f)))]
+    {:type :module
+     :token mod-name
+     :inputs inputs
+     :outputs outputs
+     :feedback feedback
+     :modules modules
+     :ports ports
+     :body @body}
+    ))
+
+(defmacro defmodule
+  "Same as module, but conveniently defs it at the same time"
+  [name params & args]
+  `(defn ~name ~params (module (symbol (gen-module-name ~name ~params)) ~@args)))
 
 (defn entry [k v]
   (clojure.lang.MapEntry. k v))
