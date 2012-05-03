@@ -51,130 +51,6 @@
   to be exprs that should be walked and checked.
   )
 
-(defn explode [& msgs]
-  (throw (RuntimeException. (apply str msgs))))
-
-(defn- parse-sections
-  "take a vector of pairs of bindings and their
-  headers (config) as well as a seq of acceptable headers.
-  Returns a map of the section header to nil if
-  undefined or to a map of keys to values of the
-  binding. Converts the binding keys to keywords."
-  ([config headers]
-   (parse-sections (partition 2 config) headers {}))
-  ([params headers result]
-   (if (seq params)
-     (let [[section decls] (first params)]
-       (if-not (vector? decls)
-         (explode "Decls must be a vector")
-         (let [keys (map keyword (take-nth 2 decls))
-               vals (take-nth 2 (rest decls))
-               decls (zipmap keys vals)]
-           ;check here that decls are in the correct form
-           (if-not (some #{section} headers)
-             (explode section " not found in " headers)
-             (if (contains? result section)
-               (explode "multiple definition of " section)
-               (recur (rest params)
-                      headers
-                      (assoc result section decls)))))))
-     result)))
-
-(defn- make-port
-  "Takes a keyword name, an owning module token, and
-  a list which can be (eval)ed to get the port's type
-  and returns a list which can be (eval)ed to get
-  the port."
-  [name token type-syntax]
-  `(alter-value (mkast ~type-syntax :port [] #(throw+
-                                                (error "no longer using sim-fn")))
-                merge
-                {:port ~name 
-                 :token '~token}))
-
-(defn- tuplefn
-  "Takes a function of n arguments and an index <n
-  and returns a function of 1 argument that returns
-  the n-element tuple that was passed in with the
-  index element replaced by the return value of
-  applying the tuple to the given function."
-  [index f]
-  (fn [tuple]
-    (assoc tuple index (apply f tuple))))
-
-(defn make-connect-impl
-  "Takes a token of the module at hand and the symbol
-  that will be bound to the (atom []) of connections
-  that will be made and a symbol that will be bound to
-  the parent module's connect fn and returns the syntax
-  of the connect function that should be bound for
-  that module."
-  [token connections old-connect]
-  `(fn [~'reg ~'expr]
-    (if (= (:token (value ~'reg)) '~token)
-      (swap! ~connections
-             conj
-             (connect-impl
-               ~'reg
-               ~'expr))
-      (~old-connect ~'reg ~'expr))))
-
-(defmacro module
-  "module is the fundamental structural building block
-  in Piplin. It returns an AST fragment that can be
-  processed into a synthesizable Verilog design or into
-  a simulation. It has up to 4 declaration sections:
-  :inputs, :outputs, :feedback, and :modules. :inputs
-  is used to specify wires leading into this module.
-  :outputs specify registered outputs from this module.
-  :feedback is similar to :outputs, but they're only
-  readable from within the module. :modules is for
-  instantiating submodules in the final design."
-  [& [module-name config & body]]
-  (let [has-name (symbol? module-name)
-        body (if has-name body (cons config body))
-        config (if has-name config module-name)]
-
-    (if-not (even? (count config))
-      (explode "Odd number of elements in module args.")) 
-
-    (let [{:keys [inputs outputs feedback modules]}
-          (parse-sections
-            config [:inputs :outputs :feedback :modules])
-
-          token (if has-name
-                  (symbol (name (ns-name *ns*))
-                          (name module-name))
-                  (gensym "module")) 
-
-          connections (gensym "connections")
-          old-connect (gensym "old-connect")
-
-          registers (map (tuplefn 1
-                                  #(identity `(typeof ~%2)))
-                         (concat outputs feedback))
-          exprs (map (tuplefn 1
-                              #(make-port %1 token %2))
-                     (concat inputs registers))
-          bindings (mapcat (tuplefn 0
-                                    (fn [x y] (symbol (name x))))
-                           (concat exprs modules))]
-      `(let [~@bindings
-             ~connections (atom [])
-             ~old-connect connect]
-         (binding [connect ~(make-connect-impl
-                              token connections
-                              old-connect)]
-           ~@body
-           {:type :module
-            :token '~token
-            :inputs ~inputs
-            :outputs ~outputs
-            :feedback ~feedback
-            :modules ~modules
-            :ports ~(apply hash-map (apply concat exprs)) 
-            :body @~connections})))))
-
 (let [module-name-cache (atom {})]
  (defn gen-module-name
   "Generates a unique module name out of the given basename
@@ -247,6 +123,7 @@
         ;simulation/synthesis.
        
         ;start by merging and rejecting duplicated keywords 
+        ;TODO: refactor to use port generation function
         ports (->> (merge-with
                     #(throw+ (error "Duplicate names:" %1 %2))
                     inputs outputs feedback)
@@ -278,83 +155,56 @@
      :body @body}
     ))
 
+(defmacro module
+  "TODO: must check for repeated declarations"
+  [module-name config & body]
+  (let [has-name? (string? module-name)
+        body (if has-name? body (cons config body))
+        config (if has-name? config module-name)
+        module-name (if has-name? module-name (name (gensym "module")))
+        ;First, we extract the 4 sections
+        {:keys [inputs outputs feedback modules]}
+        (into {:inputs [] :outputs []
+               :feedback [] :modules []}
+              (apply hash-map config))
+        
+        ;Next, we construct a map from symbols to
+        ;their types
+        reg-types (map (fn [[k v]]
+                         [k `(typeof ~v)])
+                       (partition 2
+                         (concat outputs feedback)))
+        sym->type (concat reg-types
+                          (partition 2 inputs))
+        
+        ;Now we can create the port declarations
+        port-decls (mapcat (fn [[k v]]
+                          `(~k (make-port* ~(keyword k) ~v)))
+                        sym->type)
+        
+        ;Finally, we need to make the arguments compatible with
+        ;module*. To do this, we must keywordize all the symbol
+        ;names, and put them into maps
+        keywordize (fn [macro-format]
+                     (into {} (map (fn [[k v]]
+                                     [(keyword k) v])
+                                   (partition 2 macro-format))))
+        inputs (keywordize inputs)  
+        outputs (keywordize outputs)  
+        feedback (keywordize feedback)  
+        modules (keywordize modules)]
+    `(let [~@port-decls]
+       (module* ~module-name
+                :inputs ~inputs
+                :outputs ~outputs
+                :feedback ~feedback
+                :modules ~modules
+                :connections [(fn [] ~@body)]))))
+
 (defmacro defmodule
   "Same as module, but conveniently defs it at the same time"
   [name params & args]
   `(defn ~name ~params (module (symbol (gen-module-name ~name ~params)) ~@args)))
-
-(defn entry [k v]
-  (clojure.lang.MapEntry. k v))
-
-(defn entry? [e]
-  (instance? clojure.lang.MapEntry e))
-
-(defn map-zipper
-  "The map-zipper is a nested structure
-  of vectors and maps. There are 4 kinds
-  of nodes: vectors, maps, mapentries, and
-  other objects. The former 3 have children.
-  MapEntry children "
-  [root]
-  (z/zipper
-    #(or (map? %)
-         (vector? %)
-         (entry? %)
-         (not (pipinst? %)))
-    #(cond
-       (map? %) (seq %)
-       (vector? %) (seq %)
-       (entry? %) (seq %)
-       :else
-       (seq (value %)))
-    (fn [node children]
-      (cond
-        (map? node) (zipmap (map key children)
-                            (map val children))
-        (vector? node) (vec children)
-        (entry? node) (if-not (= (count children) 2)
-                        (throw (RuntimeException.
-                                 "MapEntry has 2 children"))
-                        (entry (first children)
-                               (second children)))))
-    root))
-
-(defn mz-key
-  "Gets a key from a mapentry zipper"
-  [loc]
-  (-> loc z/down))
-
-(defn mz-val
-  "Gets a value from a mapentry zipper"
-  [loc]
-  (-> loc z/down z/right))
-
-(defn go-down
-  "Gets a key k from beneath the given
-  map-zipper node"
-  [mz k]
-  (loop [loc (z/down mz)]
-    (cond
-      (nil? loc) nil
-      ;get val of entry
-      (= (key (z/node loc)) k) (mz-val loc)
-      :else (recur (z/right loc)))))
-
-(defn go-path-down
-  "Navigates a specific path from the current loc"
-  [mz path]
-  (if-let [path (seq path)]
-    (recur (go-down mz (first path)) (rest path))
-    mz))
-
-(defn zipseq
-  "Given a node, returns a lazy seq of zippers
-  representing each node to the right (no descent)"
-  [mz]
-  (take-while (comp not nil?)
-              (iterate
-                z/right (z/down mz))))
-
 
 (def ^:dynamic *module-path* [])
 (defn walk-modules

@@ -10,3 +10,12 @@
     (is (= (get (exec-sim state fns 0) [:x]) ((uintm 8) 0)))  
     (is (= (get (exec-sim state fns 5) [:x]) ((uintm 8) 5)))  
     (is (= (get (exec-sim state fns 10) [:x]) ((uintm 8) 10)))))
+
+(deftest module-counter
+  (let [m (module "counter" [:outputs [x ((uintm 8) 0)]] 
+                  (connect x
+                           (inc x)))
+        [state fns] (make-sim m)]
+    (is (= (get (exec-sim state fns 0) [:x]) ((uintm 8) 0)))  
+    (is (= (get (exec-sim state fns 5) [:x]) ((uintm 8) 5)))  
+    (is (= (get (exec-sim state fns 10) [:x]) ((uintm 8) 10)))))
