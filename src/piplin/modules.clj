@@ -104,11 +104,13 @@
   [& args]
   (let [mod-name (first args)
         ;`str?` holds whether the module has a given name
-        str? (string? mod-name)
-        args (if str? (rest args) args)
-        mod-name (if str?
-                   mod-name
-                   (name (gensym "module")))
+        sym? (symbol? mod-name)
+        args (if sym? (rest args) args)
+        mod-name (symbol (str *ns*)
+                         (if sym?
+                           (name mod-name)
+                           ;TODO: make the number be the line number
+                           (name (gensym "module"))))
         
         ;parses keyword arguments, defaulting them to {}
         {:keys [inputs outputs feedback modules connections]}
@@ -158,10 +160,10 @@
 (defmacro module
   "TODO: must check for repeated declarations"
   [module-name config & body]
-  (let [has-name? (string? module-name)
+  (let [has-name? (symbol? module-name)
         body (if has-name? body (cons config body))
         config (if has-name? config module-name)
-        module-name (if has-name? module-name (name (gensym "module")))
+        module-name (if has-name? module-name (gensym "module"))
         ;First, we extract the 4 sections
         {:keys [inputs outputs feedback modules]}
         (into {:inputs [] :outputs []
@@ -194,7 +196,7 @@
         feedback (keywordize feedback)  
         modules (keywordize modules)]
     `(let [~@port-decls]
-       (module* ~module-name
+       (module* '~module-name
                 :inputs ~inputs
                 :outputs ~outputs
                 :feedback ~feedback
