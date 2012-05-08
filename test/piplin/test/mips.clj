@@ -2,7 +2,7 @@
   (:require [piplin.math :as h])
   (:use [piplin.mips])
   (:use [clojure.test])
-  (:refer-clojure :as clj))
+  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not]))
 
 (deftest decode-add-imm
   (let [decoded (decode #b001001_00001_00010_1000_0000_0000_0000)]

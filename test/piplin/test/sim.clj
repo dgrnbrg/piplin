@@ -1,6 +1,6 @@
 (ns piplin.test.sim
   (:use [piplin sim modules math types])
-  (:require [clojure.core :as clj])
+  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not])
   (:use clojure.test))
 
 (deftest what-changed-test

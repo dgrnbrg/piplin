@@ -2,7 +2,7 @@
   (:use clojure.test)
   (:import slingshot.ExceptionInfo)
   (:use [slingshot.slingshot :only [throw+]])
-  (:require [clojure.core :as clj])
+  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not])
   (:use [piplin types math modules sim]))
 
 (deftest j-long-test

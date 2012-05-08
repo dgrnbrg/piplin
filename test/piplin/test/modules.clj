@@ -1,5 +1,6 @@
 (ns piplin.test.modules
   (:use clojure.test)
+  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not])
   (:use [piplin types math sim modules]))
 
 (deftest module*-counter
