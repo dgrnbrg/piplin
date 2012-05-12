@@ -68,12 +68,13 @@
 (defn make-port*
   "Takes a keyword name, an owning module token, and
   the port's type and returns the port."
-  [name type]
-  (alter-value (mkast type :port []
+  [name piplin-type port-type]
+  (alter-value (mkast piplin-type :port []
                       #(throw+
                          (error "no longer using sim-fn")))
                merge
-               {:port name}))
+               {:port name
+                :type port-type}))
 
 (defn connect
   {:dynamic true}
@@ -82,14 +83,15 @@
     (throw+ (error "Must call connect within a module"))
     (throw+ (error "Must connect to a register"))))
 
-;TODO: this should probably just be a simple map, not an ASTNode
 (defn connect-impl
   "This connects a register to an expr"
   [reg expr]
-  (piplin.types.ASTNode. :connection 
-            {:args {:reg reg 
-                    :expr expr}}
-            {}))
+  (when-not (#{:register :subport} (:type (value reg)))
+      (throw+ (error "Must be :register or :subport, was"
+                     (:type (value reg)))))  
+  {:type (:type (value reg))
+   :args {:reg reg 
+          :expr expr}})
 
 (defn module*
   "Takes the module's name, input, output, feedback,
@@ -124,16 +126,26 @@
         ;the deferred ASTs that will be used in
         ;simulation/synthesis.
        
-        ;start by merging and rejecting duplicated keywords 
-        ;TODO: refactor to use port generation function
-        ports (->> (merge-with
-                    #(throw+ (error "Duplicate names:" %1 %2))
-                    inputs outputs feedback)
+        ;Start by merging outputs and feedback and making
+        ;their ports
+        register-ports (->> (merge-with
+                              #(throw+ (error "Duplicate names:" %1 %2))
+                              outputs feedback)
                 ;Next, we convert all the outputs and feedback to
-                ;their types (easier now than doing 2 merges).
-                (map #(if (pipinst? %) (typeof %) %))
+                ;their types.
+                (map (fn [[k v]] [k (typeof v) :register]))
                 ;We finally make each one a port
-                (map #(make-port* (key %) (val %))))
+                (map #(apply make-port* %)))
+
+        ;Then, we make the input ports
+        input-ports 
+                (map #(make-port* (key %) (val %) :input) inputs)
+
+        ;Next we'll make the final list of ports.
+        ports (concat input-ports register-ports) 
+
+        ;TODO: reject duplicated keywords between inputs and
+        ;outputs/feedback
 
         ;To make the connections, we must define a root connect
         ;function that stores to an atom. Then, we can invoke
@@ -173,15 +185,16 @@
         ;Next, we construct a map from symbols to
         ;their types
         reg-types (map (fn [[k v]]
-                         [k `(typeof ~v)])
+                         [k `(typeof ~v) :register])
                        (partition 2
                          (concat outputs feedback)))
         sym->type (concat reg-types
-                          (partition 2 inputs))
+                          (map (fn [[k v]] [k v :input])
+                               (partition 2 inputs)))
         
         ;Now we can create the port declarations
-        port-decls (mapcat (fn [[k v]]
-                          `(~k (make-port* ~(keyword k) ~v)))
+        port-decls (mapcat (fn [[k v t]]
+                          `(~k (make-port* ~(keyword k) ~v ~t)))
                         sym->type)
         
         ;Finally, we need to make the arguments compatible with
@@ -208,18 +221,36 @@
   [name params & args]
   `(defn ~name ~params (module (symbol (gen-module-name ~name ~params)) ~@args)))
 
+(declare make-input-map)
+
+(def ^{:dynamic true
+       :doc "A map from inputs to functions
+            which, when evaluated, return their
+            value given the state of the sim
+            (currently passed as a dynamic var)."}
+  *input-fns*)
+
+(def ^{:dynamic true
+       :doc "A vector of the state elements needed
+            by the input fns."} *input-fn-ports* [])
+
 (def ^:dynamic *module-path* [])
 (defn walk-modules
   "Takes a map-zipper of the ast and applies
   the function combine as a reduce across the values
   given by (visit module) for every module."
   [ast visit combine]
-  (let [x (visit ast)]
+  (let [x (visit ast)
+        input-map (make-input-map ast)]
     (if (seq (:modules ast))
       (reduce combine x
               (map (fn [[name mod]]
-                     (binding [*module-path* (conj *module-path* name)] 
-                      (walk-modules mod visit combine)))
+                     (let [[input-fns input-ports] 
+                            (input-map name)]
+                       (binding [*module-path* (conj *module-path* name)
+                                 *input-fns* input-fns
+                                 *input-fn-ports* input-ports]
+                         (walk-modules mod visit combine))))
                    (:modules ast)))
       x)))
 
@@ -234,8 +265,8 @@
     (fn [ast]
       (doall ;note: force eagerness here for *module-path* correctness
         (map visit
-             (filter #(= (typeof %)
-                         :connection)
+             (filter #(= (:type %)
+                         :register)
                      (:body ast)))))
     combine))
 
@@ -248,6 +279,12 @@
                 (map #(walk-expr % visit combine)
                      subexprs)))
       x)))
+
+(defn subport
+  [submodule-name submodule-port]
+  {:type :subport
+   :module submodule-name
+   :port submodule-port})
 
 (comment
   How to get the combinational function for ports.
@@ -283,29 +320,64 @@
           arg-map (zipmap (keys args)
                           arg-fns)
           fn-vec (map #(get arg-map %) my-args)]
-      (if (= (:op (value expr)) :port) 
-        (let [path (conj *module-path* (:port (value expr)))]
-          (fn []
-            (get *sim-state* path)))
+      (if (= (:op (value expr)) 
+             :port) 
+        (condp = (:type (value expr))
+          :register
+          (let [path (conj *module-path* (:port (value expr)))]
+            (fn []
+              (get *sim-state* path)))
+          :input 
+          (get *input-fns* (:port (value expr))))
         (fn []
           (apply my-sim-fn (map #(%) fn-vec)))))))
 
+(declare get-required-state)
+
+(defn make-input-map
+  "Takes a module and returns a map from names of
+  its submodules to maps from names of the submodules'
+  inputs to their simfns."
+  [module]
+  (merge
+    (apply hash-map
+           (interleave
+             (keys (:modules module))
+             (repeat [{} []])))
+    (->> (:body module)
+      (filter #(= (:type %)
+                  :subport))
+      (map (fn make-input-pair
+             [ast]
+             (let [{{:keys [reg expr]} :args} ast
+                   {:keys [port module]} reg]
+               {module [{port (make-sim-fn expr)} (get-required-state expr)]})))
+      (apply merge-with
+             (fn [[x deps1] [y deps2]]
+               [(merge-with
+                  #(throw+ (error "duplicate connection" %1 %2)) 
+                  x y) (concat deps1 deps2)])))))
+
+(defn get-required-state
+  "Takes an expression and returns a seq
+  of the needed state elements to compute the expression."
+  [expr]
+  (walk-expr expr 
+             #(if-let [port (:port (value %))]
+                [(conj *module-path* port)]
+                nil)
+             concat))
+
 (defn make-connection
-  "Takes a map-zipper of the ast of a connection
-  and returns a pair of [f states]. f is a function
-  that takes the needed ports as arguments (listed in
-  states), binds them to the sim-fn-arg binding, and
-  invokes the no-arg sim-fn to get the result."
+  "Takes a connection to a feedback or output, compiles
+  the expr and returns a simulator function via every-cycle."
   [connection]
   (let [reg (get-in (value connection) [:args :reg])
         expr (get-in (value connection) [:args :expr])
         sim-fn (make-sim-fn expr)
         reg-state (conj *module-path* (:port (value reg))) 
-        ports (walk-expr connection 
-                         #(if-let [port (:port (value %))]
-                            [(conj *module-path* port)]
-                            nil)
-                         concat)]
+        ports (get-required-state expr)
+        ports (concat ports *input-fn-ports*)]
     (every-cycle
        (fn [& vals]
          (binding [*sim-state* (zipmap ports vals)]
