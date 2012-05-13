@@ -284,6 +284,7 @@
   [submodule-name submodule-port]
   {:type :subport
    :module submodule-name
+   :op :port
    :port submodule-port})
 
 (comment
@@ -328,11 +329,27 @@
             (fn []
               (get *sim-state* path)))
           :input 
-          (get *input-fns* (:port (value expr))))
+          (get *input-fns* (:port (value expr)))
+          :subport
+          (let [path (conj *module-path* (:module expr) (:port expr))]
+            (fn []
+              (get *sim-state* path))))
         (fn []
           (apply my-sim-fn (map #(%) fn-vec)))))))
 
-(declare get-required-state)
+(defn get-required-state
+  "Takes an expression and returns a list
+  of the needed state elements to compute the expression."
+  [expr]
+  (walk-expr expr 
+             #(when-let [port (:port (value %))]
+                (condp = (:type (value %))
+                  :register 
+                  [(conj *module-path* port)]
+                  :subport
+                  [(conj *module-path* (:module %) port)]
+                  nil))
+             concat))
 
 (defn make-input-map
   "Takes a module and returns a map from names of
@@ -357,16 +374,6 @@
                [(merge-with
                   #(throw+ (error "duplicate connection" %1 %2)) 
                   x y) (concat deps1 deps2)])))))
-
-(defn get-required-state
-  "Takes an expression and returns a seq
-  of the needed state elements to compute the expression."
-  [expr]
-  (walk-expr expr 
-             #(if-let [port (:port (value %))]
-                [(conj *module-path* port)]
-                nil)
-             concat))
 
 (defn make-connection
   "Takes a connection to a feedback or output, compiles
