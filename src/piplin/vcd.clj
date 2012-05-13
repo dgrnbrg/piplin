@@ -60,7 +60,7 @@
                         "$var wire "
                         (bit-width-of (typeof v)) " "
                         (@names k) " "
-                        (name k) " $end\n"))
+                        (join \_ (map name k)) " $end\n"))
                     (first trace)))
          "$upscope $end\n"
          "$enddefinitions $end\n"

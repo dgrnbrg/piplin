@@ -138,6 +138,6 @@
   (let [trace-atom (atom [])
         f (fn [& token-vals]
             (swap! trace-atom conj
-                   (zipmap (map second tokens) token-vals)))]
+                   (zipmap tokens token-vals)))]
     [(apply assoc fns (every-cycle f tokens nil))
    trace-atom]))
