@@ -2,6 +2,8 @@
   (:use [piplin sim types])
   (:use [clojure.string :only [join]])
   (:use [slingshot.slingshot :only [throw+]])
+  (:refer-clojure :exclude [replace])
+  (:use [clojure.string :only [join replace]])
   (:require [clojure.zip :as z]))
 
 (comment
@@ -55,14 +57,13 @@
  (defn gen-module-name
   "Generates a unique module name out of the given basename
   and arguments. Tries to make the name human-readable."
-  [name & args]
+   [name args]
    (let [x (let [k (apply vector name args)]
-     (if-let [id (get @module-name-cache k)]
-       id 
-       (let [id (str name "__" (join "_" args))]
-         (swap! module-name-cache assoc k id)
-         id)))]
-     (clojure.pprint/pprint ["x is" x])
+             (if-let [id (get @module-name-cache k)]
+               id 
+               (let [id (str name "__" (join "_" args))]
+                 (swap! module-name-cache assoc k id)
+                 id)))]
      x)))
 
 (defn make-port*
@@ -111,8 +112,14 @@
         mod-name (symbol (str *ns*)
                          (if sym?
                            (name mod-name)
-                           ;TODO: make the number be the line number
-                           (name (gensym "module"))))
+                           ;The module is called moduleNN, where
+                           ;NN is hopefully the line that it was declared on.
+                           (str "module"
+                                (-> (RuntimeException.)
+                                  .getStackTrace
+                                  (aget 2)
+                                  .getLineNumber
+                                  ))))
         
         ;parses keyword arguments, defaulting them to {}
         {:keys [inputs outputs feedback modules connections]}
@@ -172,7 +179,7 @@
 (defmacro module
   "TODO: must check for repeated declarations"
   [module-name config & body]
-  (let [has-name? (symbol? module-name)
+  (let [has-name? (not (vector? module-name))
         body (if has-name? body (cons config body))
         config (if has-name? config module-name)
         module-name (if has-name? module-name nil)
@@ -209,7 +216,10 @@
         feedback (keywordize feedback)  
         modules (keywordize modules)]
     `(let [~@port-decls]
-       (module* ~@(when module-name `('~module-name)) 
+       (module* ~@(cond
+                    (symbol? module-name) `('~module-name)
+                    (not (nil? module-name)) `(~module-name)  
+                    :else nil) 
                 :inputs ~inputs
                 :outputs ~outputs
                 :feedback ~feedback
@@ -219,7 +229,7 @@
 (defmacro defmodule
   "Same as module, but conveniently defs it at the same time"
   [name params & args]
-  `(defn ~name ~params (module (symbol (gen-module-name ~name ~params)) ~@args)))
+  `(defn ~name ~params (module (symbol (gen-module-name ~(str name) ~params)) ~@args)))
 
 (declare make-input-map)
 
