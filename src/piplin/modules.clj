@@ -175,7 +175,7 @@
   (let [has-name? (symbol? module-name)
         body (if has-name? body (cons config body))
         config (if has-name? config module-name)
-        module-name (if has-name? module-name (gensym "module"))
+        module-name (if has-name? module-name nil)
         ;First, we extract the 4 sections
         {:keys [inputs outputs feedback modules]}
         (into {:inputs [] :outputs []
@@ -209,7 +209,7 @@
         feedback (keywordize feedback)  
         modules (keywordize modules)]
     `(let [~@port-decls]
-       (module* '~module-name
+       (module* ~@(when module-name `('~module-name)) 
                 :inputs ~inputs
                 :outputs ~outputs
                 :feedback ~feedback
