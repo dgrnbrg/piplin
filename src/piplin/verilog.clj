@@ -365,8 +365,10 @@
 (defn init-name-table [module-inst]
   (->> module-inst
     :ports
-    map-invert
-    (reduce (fn [accum [k v]] (assoc accum k (name v))) {})))
+    (reduce (fn [accum port]
+              (let [{port-kw :port} (value port)]
+                (assoc accum port (name port-kw))))
+            {})))
 
 (defn module->verilog
   [module]
@@ -438,7 +440,7 @@
                       (str "      " name " <= " (lookup-expr name-table expr) ";\n"))
                     connections))
          "    end\n"
-         "endmodule;\n")))
+         "endmodule\n")))
 
 (defn regs-for-inputs
   [module]
@@ -464,6 +466,23 @@
          indent "  $display(\"failed assertion: " assertion-str "\");\n"
          indent "  $finish;\n"
          indent "end\n")))
+
+(defn assert-hierarchical-cycle
+  "indent is prepended as indentation (usually whitespace).
+  
+  dut-name is the name of the dut module; registers will
+  be asserted hierarchically rooted at the dut.
+  
+  cycle-map is a map from vectors of keywords representing
+  the hierarchical path to a register (excluding the dut's name)
+  to the values."
+  [indent dut-name cycle-map]
+  (reduce (fn [text [path val]]
+            (assert-hierarchical indent dut-name
+                                 (join \. (map name path))
+                                 (verilog-repr val)))
+          ""
+          cycle-map))
 
 (defn make-testbench
   "Produces verilog that will run a test
@@ -494,10 +513,10 @@
       "  initial begin\n"
       "    #10 rst = 0;\n"
       (->> samples
-        (map #(assert-hierarchical "    "
-                                   dut-name
-                                   (name (key (first %)))
-                                   (val (first %))))
+        
+        (map #(assert-hierarchical-cycle "    "
+                                         dut-name
+                                         %))
         (map #(str % "    #10\n"))
         join)
       "    $display(\"test passed\");\n"
