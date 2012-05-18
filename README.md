@@ -1,3 +1,5 @@
+[![Build Status](https://secure.travis-ci.org/dgrnbrg/piplin.png)](http://travis-ci.org/dgrnbrg/piplin)
+
 # piplin
 
 piplin is an hardware description language (HDL) written in Clojure.
