@@ -478,9 +478,10 @@
   to the values."
   [indent dut-name cycle-map]
   (reduce (fn [text [path val]]
-            (assert-hierarchical indent dut-name
-                                 (join \. (map name path))
-                                 (verilog-repr val)))
+            (str text
+                 (assert-hierarchical indent dut-name
+                                      (join \. (map name path))
+                                      (verilog-repr val))))
           ""
           cycle-map))
 
