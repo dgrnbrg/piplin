@@ -362,6 +362,21 @@
            (render-single-expr expr name-table)]
        [name-table (str text partial-text)]))))
 
+(defn module-decl
+  "Declares a module, using a map from strings
+  to stringsto populate the connections."
+  [decl-name module connections]
+  (str "  " (name (:token module)) " " decl-name "(\n"
+       "    .clock(clk), .reset(rst)" (when (seq connections) \,)
+       "\n"
+       (join ",\n"
+         (map (partial str "    ")
+                  (map (fn [[port conn]]
+                         (str \. port \( conn \)))
+                       connections)))
+       "\n"
+       "  );\n"))
+
 (defn init-name-table [module-inst]
   (->> module-inst
     :ports
@@ -387,6 +402,9 @@
         initials (->> (merge (:outputs module) (:feedback module))
                    (mapcat (fn [[k v]] [(name k) (verilog-repr v)]))
                    (apply hash-map))
+        submodules (->> (:modules module)
+                     (map (fn make-module-decls [[k v]]
+                            (module-decl (name k) v {}))))
         name-table (init-name-table module)
         connections (->> module
                       :body
@@ -407,6 +425,7 @@
          ");\n"
          "  input wire clock;\n"
          "  input wire reset;\n"
+         (join "\n" submodules)
          (when (seq inputs)
            (str "\n"
                 "  //inputs\n"
@@ -506,7 +525,13 @@
       (join (map (partial str "  ") input-decls))
       (join (map (partial str "  ") output-decls))
       "  " (name (:token module)) " " dut-name "(\n"
-      "    .clock(clk), .reset(rst),\n"
+      "    .clock(clk), .reset(rst)" (when
+                                       (->
+                                         (concat
+                                           input-connects
+                                           output-connects)
+                                         seq) \,)
+      "\n"
       (join (map (partial str "    ")
                  (concat input-connects output-connects))) "\n"
       "  );\n"
@@ -525,6 +550,29 @@
       "  end\n"
       "endmodule")))
 
+(defn modules->verilog
+  "This takes a module (the root module),
+  and returns a list of pairs where the first
+  element is a module, the second element is
+  that module's verilog."
+  [root]
+  (walk-modules root
+    (fn visit [module]
+      [[module (module->verilog module)]])
+    (fn combine [x y]
+      (let [left-modules (set (map first x))]
+        (if (left-modules (ffirst y))
+          x
+          (concat x y))))))
+
+(defn modules->all-in-one
+  "Takes a root module and returns a string
+  which is a single verilog file with the
+  entire module hierarchy included."
+  [root]
+  (->> (modules->verilog root)
+    (map second)
+    (join "\n")))
 
 ;ex: (verilog (+ ((uintm 3) 0) (uninst ((uintm 3) 1))) {})
 

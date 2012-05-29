@@ -13,7 +13,7 @@
                            (get-all-registers mod))
         _ (exec-sim state fns cycles)
         ]
-    (str (module->verilog mod)
+    (str (modules->all-in-one mod)
          "\n"
          (make-testbench mod @trace))))
 
@@ -39,4 +39,13 @@
 
 (deftest counter-test
   (icarus-test (module->verilog+testbench
-                 (counter 8) 10 [:x]))) 
+                 (counter 8) 100)))
+
+(defmodule multicounter [x y z]
+  [:modules [foo (counter x)
+             bar (counter y)
+             baz (counter z)]])
+
+(deftest multicounter-test
+  (icarus-test (module->verilog+testbench
+                 (multicounter 1 2 3) 100)))
