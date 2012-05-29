@@ -419,6 +419,20 @@
                               [(conj *module-path* k) v])
                             regs))))
 
+(defn get-all-registers
+  "Takes a module and returns a seq of all
+  registers in the hierarchy. The registers
+  are described as vectors of the form
+  `(conj *module-path* reg)`."
+  [root-module]
+  (walk-connects root-module
+                 #(identity
+                    (conj *module-path* 
+                          (-> (get-in % [:args :reg])
+                            value
+                            :port)))
+                 concat))
+
 (defn make-sim
   "Takes an elaborated hierarchy of modules and returns a
   pair of [state fns] that can be simulated with

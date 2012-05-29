@@ -7,12 +7,14 @@
   (:use [piplin types math modules sim verilog]))
 
 (defn module->verilog+testbench
-  [mod cycles & keys]
+  [mod cycles]
   (let [[state fns] (make-sim mod)
-        [fns trace] (apply trace-keys fns keys)
+        [fns trace] (apply trace-keys fns
+                           (get-all-registers mod))
         _ (exec-sim state fns cycles)
         ]
     (str (module->verilog mod)
+         "\n"
          (make-testbench mod @trace))))
 
 (defn icarus-test
