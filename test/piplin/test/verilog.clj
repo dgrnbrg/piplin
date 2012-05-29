@@ -49,3 +49,28 @@
 (deftest multicounter-test
   (icarus-test (module->verilog+testbench
                  (multicounter 1 2 3) 100)))
+
+(defmodule fib-counter [x]
+  [:modules [c (counter x)]
+   :feedback [prev ((uintm x) 0)]
+   :outputs [n ((uintm x) 0)]]
+  (connect prev (subport :c :x))
+  (connect n (+ prev (subport :c :x))))
+
+(deftest fib-counter-test
+  (icarus-test (module->verilog+testbench
+                 (fib-counter 32) 50)))
+
+(defmodule delayer []
+  [:inputs [in (uintm 8)]
+   :outputs [out ((uintm 8) 0)]]
+  (connect out in))
+
+(defmodule delayer-holder []
+  [:modules [c (counter 8)
+             d (delayer)]]
+  (connect (subport :d :in) (subport :c :x)))
+
+(deftest delayer-test
+  (icarus-test (module->verilog+testbench
+                 (delayer-holder) 50)))
