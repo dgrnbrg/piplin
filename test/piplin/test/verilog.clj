@@ -54,8 +54,8 @@
   [:modules [c (counter x)]
    :feedback [prev ((uintm x) 0)]
    :outputs [n ((uintm x) 0)]]
-  (connect prev (subport :c :x))
-  (connect n (+ prev (subport :c :x))))
+  (connect prev (subport c :c :x))
+  (connect n (+ prev (subport c :c :x))))
 
 (deftest fib-counter-test
   (icarus-test (module->verilog+testbench
@@ -69,7 +69,7 @@
 (defmodule delayer-holder []
   [:modules [c (counter 8)
              d (delayer)]]
-  (connect (subport :d :in) (subport :c :x)))
+  (connect (subport d :d :in) (subport c :c :x)))
 
 (deftest delayer-test
   (icarus-test (module->verilog+testbench

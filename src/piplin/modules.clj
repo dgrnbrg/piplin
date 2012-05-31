@@ -75,7 +75,7 @@
                          (error "no longer using sim-fn")))
                merge
                {:port name
-                :type port-type}))
+                :port-type port-type}))
 
 (defn connect
   {:dynamic true}
@@ -87,10 +87,10 @@
 (defn connect-impl
   "This connects a register to an expr"
   [reg expr]
-  (when-not (#{:register :subport} (:type (value reg)))
+  (when-not (#{:register :subport} (:port-type (value reg)))
       (throw+ (error "Must be :register or :subport, was"
-                     (:type (value reg)))))  
-  {:type (:type (value reg))
+                     (:port-type (value reg)))))  
+  {:type (:port-type (value reg))
    :args {:reg reg 
           :expr expr}})
 
@@ -214,8 +214,11 @@
         inputs (keywordize inputs)  
         outputs (keywordize outputs)  
         feedback (keywordize feedback)  
-        modules (keywordize modules)]
-    `(let [~@port-decls]
+        modules (keywordize modules)
+        module-decls (mapcat (fn [[k v]]
+                            [(symbol (name k)) v]) modules)]
+    `(let [~@port-decls
+           ~@module-decls]
        (module* ~@(cond
                     (symbol? module-name) `('~module-name)
                     (not (nil? module-name)) `(~module-name)  
@@ -291,11 +294,17 @@
       x)))
 
 (defn subport
-  [submodule-name submodule-port]
-  {:type :subport
-   :module submodule-name
-   :op :port
-   :port submodule-port})
+  [submodule submodule-name submodule-port]
+  (let [port-type (->> submodule
+                    ((juxt (comp typeof :outputs)
+                           :inputs))
+                    (apply merge)
+                    submodule-port)]
+    {:type port-type
+     :port-type :subport
+     :module submodule-name
+     :op :port
+     :port submodule-port}))
 
 (comment
   How to get the combinational function for ports.
@@ -333,13 +342,14 @@
           fn-vec (map #(get arg-map %) my-args)]
       (if (= (:op (value expr)) 
              :port) 
-        (condp = (:type (value expr))
+        (condp = (:port-type (value expr))
           :register
           (let [path (conj *module-path* (:port (value expr)))]
             (fn []
               (get *sim-state* path)))
           :input 
-          (get *input-fns* (:port (value expr)))
+          (let [f (get *input-fns* (:port (value expr)))]
+            f)
           :subport
           (let [path (conj *module-path* (:module expr) (:port expr))]
             (fn []
@@ -353,7 +363,7 @@
   [expr]
   (walk-expr expr 
              #(when-let [port (:port (value %))]
-                (condp = (:type (value %))
+                (condp = (:port-type (value %))
                   :register 
                   [(conj *module-path* port)]
                   :subport
