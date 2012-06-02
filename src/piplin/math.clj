@@ -84,10 +84,8 @@
       (mkast type :cast [expr] (partial cast type)))
     (promote type expr)))
 
-;TODO: why doesn't this work if I make it :j-integra?
-;:j-integral must participate in the promote system
 (defmethod promote 
-  :j-integral
+  :j-long
   [type obj]
   (condp isa-type? (kindof obj)
     :j-integral (clojure.core/long obj)
@@ -155,7 +153,7 @@
                          "and" obj))
     (isa-type? :j-integral (kindof obj)) (instance
                                            this
-                                           (promote (anontype :j-integral) ;TODO: this should be j-long
+                                           (promote (anontype :j-long)
                                                     obj))
     :else (throw+ (error "Don't know how to promote to :uintm from"
                          (typeof obj)))))
@@ -503,13 +501,16 @@
 (defmulti bit-width-of
   "Takes a type and returns the number
   of bits needed to represent that type"
-  ;TODO: error below never gets thrown
-  ;needs a test + fix
-;  #(if (pipinst? %)
- ;    (throw+ (error "Should be a type: " %))
-     :kind
-;     )
+  (fn bit-width-dispatch [type]
+    (if (pipinst? type)
+      :default
+      (:kind type)))
   :hierarchy types)
+
+(defmethod bit-width-of
+  :default
+  [expr]
+  (throw+ (error "Don't know how to get bit width of" expr "(this takes a type)")))
 
 (defmethod bit-width-of
   :bits
@@ -544,11 +545,6 @@
     (if (pipinst? bits)
       (cast type (from-bits type (value bits)))
       (mkast type :deserialize [bits] (partial deserialize type)))))
-
-(defmethod bit-width-of
-  :default
-  [expr]
-  (throw+ (error "Don't know how to get bit width of" expr)))
 
 (defmethod get-bits
   :default
@@ -848,8 +844,7 @@
      :bundle
      (let [schema (:schema (typeof bund))
            v-type (clj/get schema k)
-           v (cast v-type v)] ;TODO: reconsider if this should be a cast?
-       ; ^^^ yes, b/c the return type fixes this type
+           v (cast v-type v)]
        (if (pipinst? bund)
          ((typeof bund) (clj/assoc (value bund) k v))
          (mkast (typeof bund)

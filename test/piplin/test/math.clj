@@ -10,6 +10,9 @@
   (is (= 6 (* 2 3)))
   (is (thrown? ExceptionInfo (promote :j-long "lx"))))
 
+(deftest bit-width-of-non-type-test
+  (is (thrown? ExceptionInfo (bit-width-of ((uintm 8) 0)))))
+
 (deftest float-test
   (is (= 3.5 (+ 1.5 2))))
 
