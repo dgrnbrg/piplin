@@ -1,9 +1,10 @@
 (ns piplin.verilog
+  (:refer-clojure :exclude [replace])
   (:use [slingshot.slingshot])
   (:use [clojure.walk :only [postwalk]]) 
   (:use fleet) 
   (:use [clojure.set :only [map-invert]])
-  (:use [clojure.string :only [join]]) 
+  (:use [clojure.string :only [join replace]]) 
   (:use [piplin modules types])
   (:use [piplin [math :only [bit-width-of piplin-clojure-dispatch bits]]]))
 
@@ -18,6 +19,11 @@
 
 ;example
 (str (uintm-add-template 1 2 3 4))
+
+(defn sanitize-str
+  "Takes a string and makes it safe for verilog."
+  [s]
+  (replace s \- \_))
 
 (defn make-union-verilog
   [tag padding value]
@@ -366,7 +372,7 @@
   "Declares a module, using a map from strings
   to stringsto populate the connections."
   [decl-name module connections]
-  (str "  " (name (:token module)) " " decl-name "(\n"
+  (str "  " (sanitize-str (name (:token module))) " " decl-name "(\n"
        "    .clock(clk), .reset(rst)" (when (seq connections) \,)
        "\n"
        (join ",\n"
@@ -378,12 +384,31 @@
        "  );\n"))
 
 (defn init-name-table [module-inst]
-  (->> module-inst
-    :ports
-    (reduce (fn [accum port]
-              (let [{port-kw :port} (value port)]
-                (assoc accum port (name port-kw))))
-            {})))
+  (let [module-ports (->> module-inst
+                       :ports
+                       (reduce (fn [accum port]
+                                 (let [{port-kw :port} (value port)]
+                                   (assoc accum port (name port-kw))))
+                               {}))
+        ;We must find all the submodule port
+        ;references to add to the name-table
+        module-exprs (walk-connects module-inst
+                                    #(get-in % [:args :expr])
+                                    concat)
+        subports (mapcat (fn [expr]
+                        (walk-expr expr
+                          (fn [expr]
+                              (if (= (:port-type (value expr))
+                                    :subport)
+                               [expr] nil))
+                          concat)) module-exprs)
+        subports-map (->> (set subports)
+                       (mapcat (fn [{:keys [module port] :as subport}]
+                                 [subport (str (name module)
+                                               \.
+                                               (name port))]))
+                       (apply hash-map))]
+    (merge subports-map module-ports)))
 
 (defn module->verilog
   [module]
@@ -418,7 +443,7 @@
                               (verilog expr name-table text))
                             [name-table ""] (vals connections))
         ]
-    (str "module " (name (:token module)) "(\n"
+    (str "module " (sanitize-str (name (:token module))) "(\n"
          "  clock,\n"
          "  reset,\n"
          (join ",\n" (map #(str "  " (name %)) ports)) "\n"
@@ -476,7 +501,7 @@
   [module]
   [[]
    (map #(str \. (-> % key name) "()")
-        (mapcat #(get module %) [:outputs :feedback]))])
+        (mapcat #(get module %) [:outputs]))]) ;TODO: should this include :feedback?
 
 (defn assert-hierarchical
   [indent dut-name var val]
@@ -524,7 +549,7 @@
       "\n"
       (join (map (partial str "  ") input-decls))
       (join (map (partial str "  ") output-decls))
-      "  " (name (:token module)) " " dut-name "(\n"
+      "  " (sanitize-str (name (:token module))) " " dut-name "(\n"
       "    .clock(clk), .reset(rst)" (when
                                        (->
                                          (concat

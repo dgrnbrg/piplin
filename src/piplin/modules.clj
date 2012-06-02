@@ -293,10 +293,20 @@
                      subexprs)))
       x)))
 
+(defn- map-keys
+  "Takes a map and a function, and
+  returns a new map with that function
+  applied to all of the keys."
+  [m f]
+  (->> (mapcat (fn map-keys-helper [[k v]]
+                 [k (f v)]) m)
+    (apply hash-map)))
+
 (defn subport
   [submodule submodule-name submodule-port]
   (let [port-type (->> submodule
-                    ((juxt (comp typeof :outputs)
+                    ((juxt (comp #(map-keys % typeof)
+                                 :outputs)
                            :inputs))
                     (apply merge)
                     submodule-port)]
