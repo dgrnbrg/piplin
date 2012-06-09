@@ -42,3 +42,28 @@
     (is (= (get (exec-sim state fns 7) [:sub :x]) ((uintm 8) 21)))  
     (is (= (get (exec-sim state fns 8) [:sub :x]) ((uintm 8) 28)))  
     (is (= (get (exec-sim state fns 9) [:sub :x]) ((uintm 8) 36)))))
+
+(defmodule counter [n]
+  [:outputs [x ((uintm n) 0)]]
+  (connect x (inc x)))
+
+(defmodule delayer []
+  [:inputs [in (uintm 8)]
+   :outputs [out ((uintm 8) 0)]]
+  (connect out in))
+
+(defmodule delayer-holder []
+  [:modules [c (counter 8)
+             d (delayer)]]
+  (connect (subport d :d :in) (subport c :c :x)))
+
+(deftest delayer-test
+  (let [m (delayer-holder)
+        [state fns] (make-sim m)]
+    (is (= (get (exec-sim state fns 0) [:d :out]) ((uintm 8) 0)))  
+    (is (= (get (exec-sim state fns 1) [:d :out]) ((uintm 8) 0)))  
+    (is (= (get (exec-sim state fns 2) [:d :out]) ((uintm 8) 1)))  
+    (is (= (get (exec-sim state fns 3) [:d :out]) ((uintm 8) 2)))
+    (is (= (get (exec-sim state fns 4) [:d :out]) ((uintm 8) 3)))  
+    (is (= (get (exec-sim state fns 5) [:d :out]) ((uintm 8) 4)))  
+    (is (= (get (exec-sim state fns 6) [:d :out]) ((uintm 8) 5)))))
