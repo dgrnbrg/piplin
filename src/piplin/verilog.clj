@@ -92,7 +92,8 @@
     (if-let [name (get table expr)]
       name
       (do
-       (throw+ (error expr "not found in" table))))))
+        "UNKNOWN_QUANTITY"
+       #_(throw+ (error expr "not found in" table))))))
 
 (defmulti verilog-of
   (fn [ast name-lookup] (if (pipinst? ast)
@@ -370,10 +371,10 @@
 
 (defn module-decl
   "Declares a module, using a map from strings
-  to stringsto populate the connections."
+  to strings to populate the connections."
   [decl-name module connections]
   (str "  " (sanitize-str (name (:token module))) " " decl-name "(\n"
-       "    .clock(clk), .reset(rst)" (when (seq connections) \,)
+       "    .clock(clock), .reset(reset)" (when (seq connections) \,)
        "\n"
        (join ",\n"
          (map (partial str "    ")
@@ -433,6 +434,7 @@
         name-table (init-name-table module)
         connections (->> module
                       :body
+                      (filter #(= (:type %) :register))
                       (map (comp :args value))
                       (mapcat (fn [{:keys [reg expr]}]
                              [(-> reg value :port name)
@@ -505,9 +507,10 @@
 
 (defn assert-hierarchical
   [indent dut-name var val]
-  (let [assertion-str (str dut-name \. var " != " val)]
+  (let [dut-var (str dut-name \. var) 
+        assertion-str (str dut-var " !== " val)]
     (str indent "if (" assertion-str ") begin\n"
-         indent "  $display(\"failed assertion: " assertion-str "\");\n"
+         indent "  $display(\"failed assertion: " assertion-str ", instead is %b\", " dut-var ");\n"
          indent "  $finish;\n"
          indent "end\n")))
 
@@ -562,6 +565,8 @@
       "  );\n"
       "\n"
       "  initial begin\n"
+      ;"    $dumpfile(\"dump.vcd\");\n"
+      ;"    $dumpvars(0);\n"
       "    #10 rst = 0;\n"
       (->> samples
         
