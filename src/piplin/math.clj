@@ -85,6 +85,17 @@
     (promote type expr)))
 
 (defmethod promote 
+  :j-int
+  [type obj]
+  (condp isa-type? (kindof obj)
+    :j-integral (clojure.core/int obj)
+    :uintm (let [n (:n (typeof obj))]
+             (if (< n 32)
+               (value obj)
+               (throw+ (error obj "must be 32 bits or less"))))
+    (throw+ (error "Cannot promote" obj "to Long"))))
+
+(defmethod promote 
   :j-long
   [type obj]
   (condp isa-type? (kindof obj)

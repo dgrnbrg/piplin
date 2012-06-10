@@ -1,9 +1,9 @@
 (ns piplin.test.math
   (:use clojure.test)
-  (:import slingshot.ExceptionInfo)
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not])
-  (:use [piplin types math modules sim]))
+  (:use [piplin types math modules sim])
+  (:import clojure.lang.ExceptionInfo))
 
 (deftest j-long-test
   (is (= 3 (+ 1 2)))

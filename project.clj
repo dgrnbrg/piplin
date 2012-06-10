@@ -1,6 +1,6 @@
 (defproject piplin "1.0.0-SNAPSHOT"
   :description "FIXME: write description"
-  :dependencies [[org.clojure/clojure "1.3.0"]
+  :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/core.logic "0.6.7"]
                  [fleet "0.9.5"]
                  [slingshot "0.10.1"]
