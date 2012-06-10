@@ -278,6 +278,21 @@
     (fn [ast]
       (doall ;note: force eagerness here for *module-path* correctness
         (map visit
+             (:body ast))))
+    combine))
+
+;TODO: refactor walk-registers to use walk-connects
+(defn walk-registers
+  "Takes a map-zipper of the ast and applies
+  the function combine as a reduce operation
+  across the values given by (visit connect)
+  for every connection in every module"
+  [ast visit combine]
+  (walk-modules
+   ast 
+    (fn [ast]
+      (doall ;note: force eagerness here for *module-path* correctness
+        (map visit
              (filter #(= (:type %)
                          :register)
                      (:body ast)))))
@@ -445,7 +460,7 @@
   are described as vectors of the form
   `(conj *module-path* reg)`."
   [root-module]
-  (walk-connects root-module
+  (walk-registers root-module
                  #(identity
                     (conj *module-path* 
                           (-> (get-in % [:args :reg])
@@ -460,7 +475,7 @@
   [root]
   (let [initial-state (walk-modules root get-qual-state
                                     merge)
-        connections (walk-connects root make-connection
+        connections (walk-registers root make-connection
                                    concat)
         connections (->> connections
                       (apply concat)

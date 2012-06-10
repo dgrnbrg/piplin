@@ -434,16 +434,22 @@
         name-table (init-name-table module)
         connections (->> module
                       :body
-                      (filter #(= (:type %) :register))
+                      (filter #(= :register (:type %)))
                       (map (comp :args value))
-                      (mapcat (fn [{:keys [reg expr]}]
+                      (map (fn [{:keys [reg expr]}]
                              [(-> reg value :port name)
-                              expr]))
-                      (apply hash-map))
+                              expr])))
+        input-connections (->> module
+                      :body
+                      (filter #(= (:type %) :subport))
+                      (map (comp :args value))
+                      (map (fn [{:keys [reg expr]}]
+                               [(->> reg value ((juxt :module :port)) (map name) (join \.))
+                                expr])))
         [name-table body] (reduce
                             (fn [[name-table text] expr]
                               (verilog expr name-table text))
-                            [name-table ""] (vals connections))
+                            [name-table ""] (map second (concat input-connections connections)))
         ]
     (str "module " (sanitize-str (name (:token module))) "(\n"
          "  clock,\n"
@@ -486,6 +492,10 @@
                       (str "      " name " <= " (lookup-expr name-table expr) ";\n"))
                     connections))
          "    end\n"
+         "\n"
+         (join (map (fn [[name expr]]
+                      (str "  assign " name " = " (lookup-expr name-table expr) ";\n"))
+                    input-connections))
          "endmodule\n")))
 
 (defn regs-for-inputs
