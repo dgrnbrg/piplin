@@ -429,6 +429,7 @@
   [x y]
   (bit-and (value x) (value y)))
 
+;TODO: (bit-or #b00 #b110010) should throw an exception
 (defbinopimpl bit-or :uintm [:j-integral]
   [x y]
   (bit-or (value x) (value y)))
