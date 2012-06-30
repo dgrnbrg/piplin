@@ -18,3 +18,5 @@ my-design
 piplin_trace.vcd
 
 sample.v
+
+.lein-plugins/checksum
