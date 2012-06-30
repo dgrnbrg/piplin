@@ -20,3 +20,5 @@ piplin_trace.vcd
 sample.v
 
 .lein-plugins/checksum
+
+target/stale/dependencies
