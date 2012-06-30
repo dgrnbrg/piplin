@@ -8,6 +8,7 @@
   (:use [piplin modules types])
   (:use [piplin [math :only [bit-width-of piplin-clojure-dispatch bits]]]))
 
+;TODO: solve performance issues--massive slow
 
 (def uintm-add-template
   (fleet [bits x y out]

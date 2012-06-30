@@ -198,3 +198,5 @@
             ;w/o the (serialize x) (i.e. connecting w/
             ;just x works, and throws a nonsensical exception)
             (serialize x))))
+
+(seven-seg-tester 22 nil) ;TODO: make this work
