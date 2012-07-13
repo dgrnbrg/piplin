@@ -170,12 +170,12 @@
   (letfn [(vert [b]
             (if (pattern b) "|" " "))
           (horiz [b]
-            (if (pattern b) "--" "  "))]
+            (if (pattern b) "----" "    "))]
     (str
       " " (horiz :top) " \n"
-      (vert :upper-left) "  " (vert :upper-right) "\n"
+      (vert :upper-left) (horiz ::nil) (vert :upper-right) "\n"
       " " (horiz :middle) " \n"
-      (vert :lower-left) "  " (vert :lower-right) "\n"
+      (vert :lower-left) (horiz ::nil) (vert :lower-right) "\n"
       " " (horiz :bottom) " \n"
       )))
 
