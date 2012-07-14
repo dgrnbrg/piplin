@@ -3,8 +3,7 @@
   (:use [clojure.set :only [map-invert intersection difference]])
   (:require [clojure set [core :as clj]])
   (:refer-clojure :exclude [cast + - * bit-and bit-or bit-xor bit-not inc dec > < >= <= not = not= get assoc assoc-in cond condp])
-  (:use (piplin types))
-  (:use [piplin.modules :only [connect]]))
+  (:use (piplin types)))
 
 ;Here, we allow nil to participate in the ITyped
 ;protocol. nil support is incomplete.
@@ -80,9 +79,27 @@
       (promote type expr)
       (-> expr meta :distribute)
       ((-> expr meta :distribute) type)
-      :else
+      :else ;TODO: fail before making an ast if it'll never succeed
+      ;this happens if you try to (cast (bits 2) (uninst #b0))
       (mkast type :cast [expr] (partial cast type)))
     (promote type expr)))
+
+(defn connect
+  {:dynamic true}
+  [reg expr]
+  (if (:token reg)
+    (throw+ (error "Must call connect within a module"))
+    (throw+ (error "Must connect to a register"))))
+
+(defn connect-impl
+  "This connects a register to an expr"
+  [reg expr]
+  (when-not (#{:register :subport} (:port-type (value reg)))
+      (throw+ (error "Must be :register or :subport, was"
+                     (:port-type (value reg)))))  
+  {:type (:port-type (value reg))
+   :args {:reg reg 
+          :expr (cast (typeof reg) expr)}})
 
 (defmethod promote 
   :j-int
@@ -650,9 +667,9 @@
         v2-connections (atom {})
         v1-connect #(swap! v1-connections clj/assoc %1 %2)
         v2-connect #(swap! v2-connections clj/assoc %1 %2)
-        v1 (binding [piplin.modules/connect v1-connect]
+        v1 (binding [connect v1-connect]
              (v1-thunk))
-        v2 (binding [piplin.modules/connect v2-connect]
+        v2 (binding [connect v2-connect]
              (v2-thunk))]
     (clj/cond
       ;TODO: this code breaks if set isn't called below

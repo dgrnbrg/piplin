@@ -75,7 +75,7 @@
 
 (deftest sim-uintm-bits-test
   (let [mod (module [:outputs [c (promote (uintm 8) 0)
-                               d (promote (bits 8) 0)]]
+                               d (promote (bits 4) 0)]]
                     (connect c (+ c 1))
                     (connect d (bit-slice (serialize c) 0 4)))
         sim (make-sim mod)
@@ -85,20 +85,17 @@
                           init-fns
                           10)
                 [:c])
-           (instance (uintm 8) 10))
-        "ran and counted up to 10")
+           (instance (uintm 8) 10)))
     (is (= (get (exec-sim init-state
                           init-fns
                           10)
                 [:d])
-           (instance (bits 4) [1 0 0 1]))
-        "ran and counted up to 10 bits")
+           (instance (bits 4) [1 0 0 1])))
     (is (= (get (exec-sim init-state
                           init-fns
                           18)
                 [:d])
-           (instance (bits 4) [0 0 0 1]))
-        "ran and counted up to 10 bits")))
+           (instance (bits 4) [0 0 0 1])))))
 
 (deftest sim-cast-test
   (let [mod (module [:outputs [odd false
@@ -513,7 +510,7 @@
                   (connect v (cast u {:y {:car :b 
                                            :cdr 3}})))
               (:y {:keys [car cdr]}
-                  (connect o 33)
+                  (connect o 31)
                   (mux2 (< cdr 7)
                         (connect v (cast u {:y {:car :c 
                                                 :cdr (inc cdr)}}))
@@ -553,7 +550,7 @@
                 (connect v (cast u {:y {:car :b 
                                         :cdr 3}}))) 
               (let [{:keys [car cdr]} (get-value :y v)] 
-                (connect o (uninst 33))
+                (connect o (uninst 31))
                 (mux2 (< cdr 7)
                       (connect v (cast u {:y {:car :c 
                                               :cdr (inc cdr)}}))
