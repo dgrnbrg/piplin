@@ -536,6 +536,8 @@
   to the values."
   [indent dut-name cycle-map]
   (reduce (fn [text [path val]]
+            (when-not (vector? path)
+              (throw+ "Path must be a vector"))
             (str text
                  (assert-hierarchical indent dut-name
                                       (join \. (map name path))
@@ -635,5 +637,5 @@
   (module->verilog (counter 8)))
 (comment
 (println (make-testbench (counter 8)
-  (map (fn [x] {:x (verilog-repr ((uintm 8) x))})
+  (map (fn [x] {[:x] ((uintm 8) x)})
        (take 10 (iterate inc 0))))))
