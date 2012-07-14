@@ -4,48 +4,8 @@
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :exclude [replace])
   (:use [clojure.string :only [join replace]])
-  (:use [piplin.math :only [connect connect-impl]])
-  (:require [clojure.zip :as z]))
+  (:use [piplin.math :only [connect connect-impl]]))
 
-(comment
-  The syntax for a module is
-
-; (module [:inputs
-           [a type
-            b type]
-           :outputs
-           [o1 init-val]
-           :feedback
-           [x init-val]
-           :modules
-           [sub1 (instantiate)
-            sub2 (instantiate) :only [:port1 :port2]]
-;   body...)
-
-  The body should include connections for everything that
-  needs one.
-
-  There are 4 sections, provided in this order, each of
-  which should have a nonempty list of symbol/value pairs,
-  like "let". The value varies from being a type to an
-  initialization value to a module instance.
-
-  Module instances can use :exclude and :only like for imports
-  to only refer to certain ports and leave the rest unconncted.
-
-  The body can contain connections between registers. It's the
-  responsibility of a semantic validation/error checking pass
-  over the tree to verify that inputs and outputs are fully
-  connected.
-
-  The :inputs section is for inputs to the process. The
-  :outputs section is for registered outputs from the
-  process. The :feedback section is for registers that
-  aren't outputs (kind of like a private :output). :modules
-  is for other submodules, and then all the specified ports
-  (no spec = all ports) must be connected somewhere in
-  the body.
-  )
 
 (comment
   All exprs must list their subexprs that should be checked
