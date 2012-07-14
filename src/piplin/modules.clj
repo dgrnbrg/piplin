@@ -117,7 +117,7 @@
                            (str "module"
                                 (-> (RuntimeException.)
                                   .getStackTrace
-                                  (aget 2)
+                                  ^java.lang.StackTraceElement (aget 2)
                                   .getLineNumber
                                   ))))
         

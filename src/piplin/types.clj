@@ -127,8 +127,8 @@
   java.lang.Object
   (equals [this other]
     (and (instance? ASTNode other)
-         (= (.type other) type)
-         (= (.map other) map)))
+         (= (.type ^ASTNode other) type)
+         (= (.map ^ASTNode other) map)))
   (hashCode [this]
     (int (mod (+ (.hashCode type) (* 17 (.hashCode map)))
          Integer/MAX_VALUE)))
@@ -164,7 +164,7 @@
   (.write w ")"))
 
 (defmethod clojure.pprint/simple-dispatch ASTNode
-  [node]
+  [^ASTNode node]
   (.write ^java.io.Writer *out* "AST")
   (clojure.pprint/pprint-logical-block
     :prefix "(" :suffix ")"
@@ -232,7 +232,7 @@
 
 (defn alter-value
   "Takes an ASTNode and alters its value"
-  [astnode f & more]
+  [^ASTNode astnode f & more]
   (ASTNode. (.type astnode)
             (apply f (.map astnode) more)
             (.metamap astnode)))
@@ -273,7 +273,8 @@
          constargs# (filter #(not ((-> frags# keys set) %))
                             ~kwargs)
          permargs# (concat constargs# kwargs#)
-         perm# (map #(.indexOf ~kwargs %) permargs#)
+         type-hack# ~kwargs
+         perm# (map #(.indexOf ^java.util.List type-hack# %) permargs#)
          const-vec# (map #(get imms# %) constargs#)
          f# (fn [& args#]
               (let [jumbled-args# (concat const-vec# args#)

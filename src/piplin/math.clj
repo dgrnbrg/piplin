@@ -1211,13 +1211,13 @@
                  (conj v ch))
                (clojure.lang.LispReader/read1 rdr)))
       (let [bit-vec (vec (map {(int \0) 0 (int \1) 1} v))]
-        (.unread rdr ch)
+        (.unread ^java.io.PushbackReader rdr ch)
         `((bits ~(count bit-vec)) ~bit-vec)))))
 
 (defn dispatch-reader-macro  [ch fun]
   (let  [dm  (.get  (doto  (.getDeclaredField clojure.lang.LispReader "dispatchMacros")
                       (.setAccessible true))
                    nil)]
-    (aset dm  (int ch) fun)))
+    (aset ^"[Lclojure.lang.IFn;" dm (int ch) fun)))
 
 (dispatch-reader-macro \b binary-literal)
