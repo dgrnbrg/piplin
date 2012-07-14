@@ -4,7 +4,7 @@
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not])
   (:use [clojure.java.shell :only [sh]])
-  (:use [piplin types math modules sim verilog]))
+  (:use [piplin types math modules sim verilog [seven-segment-decoder :only [seven-seg-tester]]]))
 
 (defn module->verilog+testbench
   [mod cycles]
@@ -29,7 +29,7 @@
         _ (sh "rm" "-f"
               (str n ".vvp")
               (str n ".v"))]
-    (is (= 0 (:exit iverilog)) "compilation failed")
+    (is (= 0 (:exit iverilog)) iverilog)
     (is (re-find #"test passed" (:out vvp)) "tests didn't pass")
     (is (= 0 (:exit vvp)) "tested failed-return value")))
 
@@ -59,7 +59,7 @@
 
 (deftest fib-counter-test
   (icarus-test (module->verilog+testbench
-                 (fib-counter 32) 50)))
+                 (fib-counter 32) 100)))
 
 (defmodule delayer []
   [:inputs [in (uintm 8)]
@@ -74,3 +74,19 @@
 (deftest delayer-test
   (icarus-test (module->verilog+testbench
                  (delayer-holder) 50)))
+
+(deftest seven-seg-test
+  (icarus-test (module->verilog+testbench
+                 (seven-seg-tester 1) 10)) 
+  (icarus-test (module->verilog+testbench
+                 (seven-seg-tester 2) 10)) 
+  (icarus-test (module->verilog+testbench
+                 (seven-seg-tester 3) 10)) 
+  (icarus-test (module->verilog+testbench
+                 (seven-seg-tester 4) 30)) 
+  (icarus-test (module->verilog+testbench
+                 (seven-seg-tester 8) 300)) 
+  (icarus-test (module->verilog+testbench
+                 (seven-seg-tester 9) 600))
+  (icarus-test (module->verilog+testbench
+                 (seven-seg-tester 10) 1025)))

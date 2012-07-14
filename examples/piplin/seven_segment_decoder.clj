@@ -43,7 +43,7 @@
   [bit-width mapping]
   (let [max-value (Math/pow 2 bit-width)
         required-digits (int (Math/ceil (log16 max-value)))
-        padding-needed (mod bit-width 4)]
+        padding-needed (mod (- 4 bit-width) 4)]
     (module [:inputs [in (bits bit-width)]
              :outputs [out (cast (bits (* 7 required-digits)) 0)]]
             (let [in-padded (bit-cat
@@ -183,7 +183,7 @@
 ;it shows me every branch, not just the true branch
 
 (defn seven-seg-tester
-  [bit-width cycles]
+  [bit-width]
   (let [deco (decoder bit-width sample-mapping)]
     (module tb [:feedback [x ((uintm bit-width) 0)]
                 :outputs [x_out (cast (typeof (subport deco :deco :out)) 0)]
