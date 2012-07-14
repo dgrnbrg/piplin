@@ -1,6 +1,7 @@
 (ns piplin.types
-  (:use [slingshot.slingshot :only [throw+ try+]]
-        [clojure.pprint]))
+  (:use [slingshot.slingshot :only [throw+ try+]])
+  (:use [clojure.string :only [join]])
+  (:require [clojure.pprint]))
 
 (comment
 ;  TODO: email jim@dueys.net questions about monads
@@ -154,23 +155,29 @@
     (let [x ((get metamap :pipinst?) this)]
       x)))
 
-(defn astnode-dispatch  [f]
-  (clojure.pprint/simple-dispatch
-    (if (instance? ASTNode f)
-      (let [value (value f)
-            type (typeof f)]
-        (comment (if (map? value) 
-          (assoc value :type type))) 
-        [:type type :value value])
-      f)))
+(defmethod clojure.core/print-method ASTNode
+  [^ASTNode o ^java.io.Writer w]
+  (.write w "AST(")
+  (clojure.core/print-method (.type o) w)
+  (.write w ", ")
+  (clojure.core/print-method (.map o) w)
+  (.write w ")"))
 
-    (comment (cl-format true
-      "~<{~;~<type ~_~w~:>, ~_~<map ~_~w~:>, ~_~<metamap ~_~w~:>~;}~:>"
-      [[(.type f)]  [(.map f)]  [(.metamap f)]])) 
-
-(defn pprint-ast [f]
-  (with-pprint-dispatch astnode-dispatch
-    (pprint f)))
+(defmethod clojure.pprint/simple-dispatch ASTNode
+  [node]
+  (.write ^java.io.Writer *out* "AST")
+  (clojure.pprint/pprint-logical-block
+    :prefix "(" :suffix ")"
+    (clojure.pprint/pprint-logical-block
+      (.write ^java.io.Writer *out* "type: ")
+      (clojure.pprint/pprint-newline :miser) 
+      (.write ^java.io.Writer *out* (print-str (.type node))) 
+      (clojure.pprint/pprint-newline :linear)) 
+    (clojure.pprint/pprint-logical-block
+      (.write ^java.io.Writer *out* "data:")
+      (clojure.pprint/pprint-newline :linear)
+      (clojure.pprint/write-out (.map node)))) 
+  )
 
 (defn instance
   "Creates an instance of the type with value val"
@@ -213,7 +220,14 @@
        (applyTo [~'this  ~'argseq]
          (when-not (= (count ~'argseq) 1)
            (throw (IllegalArgumentException. "1 argument only")))
-         (instance ~'this (first ~'argseq)))) 
+         (instance ~'this (first ~'argseq))))
+     (defmethod clojure.core/print-method ~name [~'o ^java.io.Writer w#]
+       (.write w# (str ~(str name)
+                       \[
+                       (join ", "
+                             (list ~@(map (fn [arg]
+                                            `(~(keyword arg) ~'o)) args))) 
+                       \])))
      (derive-type ~name :piplin-type)))
 
 (defn alter-value
