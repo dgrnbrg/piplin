@@ -50,7 +50,7 @@
                               (cast (bits padding-needed) 0)
                               in)
                   slices (for [low (range 0 bit-width 4)]
-                           (bit-slice in low (+ low 4)))
+                           (bit-slice in-padded low (+ low 4)))
                   digits (map #(decode-digit % mapping) slices)]
               (connect out (apply bit-cat
                                   (reverse digits)))))))
@@ -143,7 +143,6 @@
   (letfn [(decode [in]
             (-> (decoder-mapping in)
               (show-pattern-bits mapping)))]
-    ;TODO: condp doesn't check bit widths either
     (condp = in
       #b0000 (decode #b0000)
       #b0001 (decode #b0001)
@@ -185,18 +184,14 @@
 
 (defn seven-seg-tester
   [bit-width cycles]
-  (module tb [:feedback [x ((uintm bit-width) 0)]
-           :outputs [x_out (cast (bits (* 7 bit-width)) 0)]
-           :modules [deco (decoder bit-width sample-mapping)]]
-          (connect x (inc x))
+  (let [deco (decoder bit-width sample-mapping)]
+    (module tb [:feedback [x ((uintm bit-width) 0)]
+                :outputs [x_out (cast (typeof (subport deco :deco :out)) 0)]
+                :modules [deco deco]]
+            (connect x (inc x))
           (connect x_out (subport deco
                                   :deco
                                   :out))
           (connect
             (subport deco :deco :in)
-            ;TODO: no error if I try to connect this
-            ;w/o the (serialize x) (i.e. connecting w/
-            ;just x works, and throws a nonsensical exception)
-            (serialize x))))
-
-(seven-seg-tester 22 nil) ;TODO: make this work
+            (serialize x)))))
