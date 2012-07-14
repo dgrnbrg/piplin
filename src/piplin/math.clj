@@ -1,8 +1,8 @@
 (ns piplin.math
   (:use [slingshot.slingshot])
   (:use [clojure.set :only [map-invert intersection difference]])
-  (:require [clojure.set])
-  (:require [clojure.core :as clj])
+  (:require [clojure set [core :as clj]])
+  (:refer-clojure :exclude [cast + - * bit-and bit-or bit-xor bit-not inc dec > < >= <= not = not= get assoc assoc-in cond condp])
   (:use (piplin types))
   (:use [piplin.modules :only [connect]]))
 
@@ -73,7 +73,7 @@
   astfrag."
   [type expr]
   (if (typeof expr)
-    (cond
+    (clj/cond
       (clj/= (typeof expr) type)
       expr
       (pipinst? expr)
@@ -87,10 +87,10 @@
 (defmethod promote 
   :j-int
   [type obj]
-  (condp isa-type? (kindof obj)
+  (clj/condp isa-type? (kindof obj)
     :j-integral (clojure.core/int obj)
     :uintm (let [n (:n (typeof obj))]
-             (if (< n 32)
+             (if (clj/< n 32)
                (value obj)
                (throw+ (error obj "must be 32 bits or less"))))
     (throw+ (error "Cannot promote" obj "to Long"))))
@@ -98,7 +98,7 @@
 (defmethod promote 
   :j-long
   [type obj]
-  (condp isa-type? (kindof obj)
+  (clj/condp isa-type? (kindof obj)
     :j-integral (clojure.core/long obj)
     :uintm (value obj)
     (throw+ (error "Cannot promote" obj "to Long"))))
@@ -137,17 +137,17 @@
 (defmethod constrain
   :uintm
   [this init-val]
-  (bit-and init-val (dec (bit-shift-left 1 (:n this)))))
+  (clj/bit-and init-val (clj/dec (bit-shift-left 1 (:n this)))))
 
 (defmethod check
   :uintm
   [inst]
   (let [n (-> inst typeof :n)
         v (value inst)
-        maxval (dec (bit-shift-left 1 n))]
+        maxval (clj/dec (bit-shift-left 1 n))]
     (when (neg? v)
       (throw+ (error "uintm must be positive:" v)))
-    (when (> v maxval)
+    (when (clj/> v maxval)
       (throw+ (error "uintm" n "must be less than" maxval
                      ", got:" v))))
   inst)
@@ -155,7 +155,7 @@
 (defmethod promote
   :uintm
   [this obj]
-  (cond
+  (clj/cond
     (clj/= (typeof obj) this) obj ;Already correct
     (clj/= (kindof obj)
        (:kind this)) (throw+
@@ -461,7 +461,7 @@
   (when-let [n (-> obj typeof :n)]
     (when-not (clj/= (:n type) n)
       (throw+ (error "Bit size mismatch"))))
-  (condp isa-type? (kindof obj)
+  (clj/condp isa-type? (kindof obj)
     :bits obj
     :uintm (instance type
                      (long-to-bitvec (value obj)
@@ -648,13 +648,13 @@
   [sel v1-thunk v2-thunk]
   (let [v1-connections (atom {})
         v2-connections (atom {})
-        v1-connect #(swap! v1-connections assoc %1 %2)
-        v2-connect #(swap! v2-connections assoc %1 %2)
+        v1-connect #(swap! v1-connections clj/assoc %1 %2)
+        v2-connect #(swap! v2-connections clj/assoc %1 %2)
         v1 (binding [piplin.modules/connect v1-connect]
              (v1-thunk))
         v2 (binding [piplin.modules/connect v2-connect]
              (v2-thunk))]
-    (cond
+    (clj/cond
       ;TODO: this code breaks if set isn't called below
       ;I don't understand why/don't think that should happen
       (clj/not= (set (keys @v1-connections)) (set (keys @v2-connections)))
@@ -663,8 +663,8 @@
       (->> @v1-connections
         keys
         (map #(connect % (mux2-impl sel
-                                    (get @v1-connections %) 
-                                    (get @v2-connections %))))
+                                    (clj/get @v1-connections %) 
+                                    (clj/get @v2-connections %))))
         dorun)
       :else,
       (mux2-impl sel v1 v2))))
@@ -677,7 +677,7 @@
   :boolean
   [type obj]
   (clj/= 1
-     (cond
+     (clj/cond
        (clj/= (typeof obj) type) (if obj 1 0)
        (or (clj/= true obj) (clj/= false obj)) (if obj 1 0)
        (clj/= (typeof obj) (bits 1)) (first (value obj))
@@ -746,7 +746,7 @@
                   "Set must be made of only kewords"
                   (remove keyword? coll))))
       (if (map? coll)
-        (cond
+        (clj/cond
           (some #(not= (kindof %) :bits) (vals coll))
           (throw+ (error "Maps values must all be bits")) 
           (some #(clj/not= (-> (seq coll)
@@ -773,7 +773,7 @@
 (defmethod promote
   :enum
   [type obj]
-  (cond
+  (clj/cond
     (clj/= (typeof obj) type) obj
     (and (keyword? obj)
          (obj (:keymap type))) (instance type obj)
@@ -784,11 +784,11 @@
   :enum
   [type bits]
   (let [lookup (reduce (fn [m [k v]]
-                         (assoc m (value v) k))
+                         (clj/assoc m (value v) k))
                        {}
                        (:keymap type))
-        k (get lookup bits)]
-    (cond
+        k (clj/get lookup bits)]
+    (clj/cond
       (nil? k)
       (throw+ (error bits "is not a valid element of the enum" (typeof bits)))
       :else
@@ -834,7 +834,7 @@
 (defn get
   "Gets the given key from the bundle"
   [bund key]
-  (condp = (piplin-clojure-dispatch bund) 
+  (clj/condp = (piplin-clojure-dispatch bund) 
     :use-core-impl 
     (clj/get bund key) 
     :bundle 
@@ -850,7 +850,7 @@
   "Returns a new bundle whose key k is equal to v.
   All other keys are unchanged."
   ([bund k v]
-   (condp = (piplin-clojure-dispatch bund)
+   (clj/condp = (piplin-clojure-dispatch bund)
      :use-core-impl
      (clj/assoc bund k v)
      :bundle
@@ -883,7 +883,7 @@
   "Takes a map of keys to types and returns
   a bundle type with that schema."
   [schema]
-  (cond
+  (clj/cond
     (not (map? schema))
     (throw+ (error "Schema must be a map"))
     (some (comp not keyword?) (keys schema))
@@ -898,7 +898,7 @@
 (defmethod promote
   :bundle
   [type obj]
-  (cond
+  (clj/cond
     (clj/= (typeof obj) type) obj
     (map? obj)
     (let  [schema (:schema type)]
