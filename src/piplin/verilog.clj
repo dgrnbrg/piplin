@@ -2,24 +2,10 @@
   (:refer-clojure :exclude [replace])
   (:use [slingshot.slingshot])
   (:use [clojure.walk :only [postwalk]]) 
-  (:use fleet) 
   (:use [clojure.set :only [map-invert]])
   (:use [clojure.string :only [join replace]]) 
   (:use [piplin modules types])
   (:use [piplin [math :only [bit-width-of piplin-clojure-dispatch bits]]]))
-
-;TODO: solve performance issues--massive slow
-
-(def uintm-add-template
-  (fleet [bits x y out]
-         "uintm_add #(<(str bits)>)
-           <(gensym \"uintm_add\")>(
-             .x(<(str x)>),
-             .y(<(str y)>),
-             .out(<(str out)>));"))
-
-;example
-(str (uintm-add-template 1 2 3 4))
 
 (defn sanitize-str
   "Takes a string and makes it safe for verilog."
