@@ -319,7 +319,8 @@
              (instance? piplin.types.ASTNode y)))  
     (clj/= x y)
     (and (pipinst? x) (pipinst? y))
-    (clojure.core/= (value x) (value y))
+    (let [[x y] (type-unify (kindof x) x y)]
+      (clj/= (value x) (value y)))
     :else
     (mkast (anontype :boolean) := [x y] =)))
 (defmethod = ::n-ary
