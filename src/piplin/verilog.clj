@@ -20,7 +20,8 @@
        ", " value "}"))
 
 (defmulti verilog-repr
-  kindof)
+  kindof
+  :hierarchy types)
 (defmethod verilog-repr :default
   [x]
   (throw+ (error "cannot convert to verilog:" x)))
@@ -41,7 +42,9 @@
   (let [t (typeof x)
         b (value x)
         w (bit-width-of t)]
-    (str w "'b" (join b))))
+    (if (zero? w)
+      "0'b0"
+      (str w "'b" (join b)))))
 
 (defmethod verilog-repr :enum
   [x]
@@ -323,6 +326,7 @@
             body
             terminator)])))
 
+;todo this can take a long time
 (defn verilog
   "first, recurses to non-const members of the expr.
   then, renders all const members of the expr.
@@ -332,29 +336,33 @@
   ([expr name-table]
    (verilog expr name-table "")) 
   ([expr name-table text]
-   (if (pipinst? expr)
-     (render-single-expr expr name-table)
-     (let [args (vals (:args (value expr)))
-           [name-table text]
-           (reduce
-             (fn [[name-table text] expr]
-               (verilog expr
-                        name-table
-                        text))
+   (letfn [(render-expr [expr name-table text]
+             (let [[name-table partial-text]
+                   (render-single-expr expr name-table)]
+               [name-table (str text partial-text)]))]
+     (if (pipinst? expr)
+       (render-expr expr name-table text)
+       (let [args (vals (:args (value expr)))
              [name-table text]
-             args)
-           consts (vals (:consts (value expr)))
-           [name-table text]
-           (reduce
-             (fn [[name-table text] expr]
-               (verilog expr
-                        name-table
-                        text))
+             (if (seq args)
+               (reduce
+                 (fn [[name-table text] expr]
+                   (verilog expr
+                            name-table
+                            text))
+                 [name-table text]
+                 args)
+               [name-table text])
+             consts (vals (:consts (value expr)))
              [name-table text]
-             args)
-           [name-table partial-text]
-           (render-single-expr expr name-table)]
-       [name-table (str text partial-text)]))))
+             (reduce
+               (fn [[name-table text] expr]
+                 (verilog expr
+                          name-table
+                          text))
+               [name-table text]
+               consts)]
+         (render-expr expr name-table text))))))
 
 (defn module-decl
   "Declares a module, using a map from strings
