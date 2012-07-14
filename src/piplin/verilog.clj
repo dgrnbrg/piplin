@@ -26,6 +26,14 @@
   [x]
   (throw+ (error "cannot convert to verilog:" x)))
 
+;TODO: why must this method be included?
+;I cannot figure out where it fits in the output
+;probably used by bit-slice as a const, but not actually
+;used so it doesn't appear in output
+(defmethod verilog-repr :j-long
+  [x]
+  (str "j-long is unconvertible {" x \}))
+
 (defmethod verilog-repr :uintm
   [x]
   (let [t (typeof x)
