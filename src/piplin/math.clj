@@ -105,7 +105,7 @@
   :j-int
   [type obj]
   (clj/condp isa-type? (kindof obj)
-    :j-integral (clojure.core/int obj)
+    :j-integral (clj/int obj)
     :uintm (let [n (:n (typeof obj))]
              (if (clj/< n 32)
                (value obj)
@@ -116,7 +116,7 @@
   :j-long
   [type obj]
   (clj/condp isa-type? (kindof obj)
-    :j-integral (clojure.core/long obj)
+    :j-integral (clj/long obj)
     :uintm (value obj)
     (throw+ (error "Cannot promote" obj "to Long"))))
 
@@ -290,9 +290,9 @@
   [x]
   (if (typeof x)
     (if (pipinst? x)
-      (clojure.core/not x) 
+      (clj/not x) 
       (mkast (anontype :boolean) :not [x] not))
-    (clojure.core/not x)))
+    (clj/not x)))
 
 (defmulti =
   "= is a very common function. It must be
@@ -310,14 +310,14 @@
 (defmethod = [:use-core-impl :use-core-impl] [x y]
   (clj/= x y))
 (defmethod = :default [x y]
-  (clojure.core/cond
+  (clj/cond
     (and (nil? x) (nil? y))
     true
     (or (nil? x) (nil? y))
     false
     (not (or (instance? piplin.types.ASTNode x)
              (instance? piplin.types.ASTNode y)))  
-    (clojure.core/= x y)
+    (clj/= x y)
     (and (pipinst? x) (pipinst? y))
     (clojure.core/= (value x) (value y))
     :else
@@ -856,7 +856,7 @@
     (clj/get bund key) 
     :bundle 
     (if (pipinst? bund)
-      (clojure.core/get (value bund) key)
+      (clj/get (value bund) key)
       (mkast (get-in (typeof bund) [:schema key])
              :bundle-key
              [bund key]
