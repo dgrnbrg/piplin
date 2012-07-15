@@ -7,4 +7,5 @@
                  [org.clojure/algo.generic "0.1.0"]]
   :min-lein-version "2.0.0"
   :plugins [[lein-marginalia "0.7.0"] [lein-pprint "1.1.1"]]
+  :source-paths ["src" "examples"]
   :description "FIXME: write description")
