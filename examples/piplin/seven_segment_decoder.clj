@@ -189,9 +189,7 @@
                 :outputs [x_out (cast (typeof (subport deco :deco :out)) 0)]
                 :modules [deco deco]]
             (connect x (inc x))
-          (connect x_out (subport deco
-                                  :deco
-                                  :out))
+          (connect x_out deco$out)
           (connect
-            (subport deco :deco :in)
+            deco$in
             (serialize x)))))

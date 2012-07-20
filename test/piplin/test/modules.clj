@@ -30,7 +30,7 @@
                                 :feedback [step ((uintm 8) 0)]
                                 :modules [sub m]]
                      (connect step (inc step))
-                     (connect (subport sub :sub :step) step))
+                     (connect sub$step step))
         [state fns] (make-sim root)]
     (is (= (get (exec-sim state fns 0) [:sub :x]) ((uintm 8) 0)))  
     (is (= (get (exec-sim state fns 1) [:sub :x]) ((uintm 8) 0)))  
@@ -55,7 +55,7 @@
 (defmodule delayer-holder []
   [:modules [c (counter 8)
              d (delayer)]]
-  (connect (subport d :d :in) (subport c :c :x)))
+  (connect d$in c$x))
 
 (deftest delayer-test
   (let [m (delayer-holder)
