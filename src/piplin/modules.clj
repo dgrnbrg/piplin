@@ -3,7 +3,7 @@
   (:use [clojure.string :only [join]])
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :exclude [replace])
-  (:use [clojure.string :only [join replace]])
+  (:use [clojure.string :only [join replace split]])
   (:use [piplin.math :only [connect connect-impl]]))
 
 
@@ -132,7 +132,7 @@
         (into {:inputs [] :outputs []
                :feedback [] :modules []}
               (apply hash-map config))
-        
+
         ;Next, we construct a map from symbols to
         ;their types
         reg-types (map (fn [[k v]]
@@ -160,9 +160,30 @@
         feedback (keywordize feedback)  
         modules (keywordize modules)
         module-decls (mapcat (fn [[k v]]
-                            [(symbol (name k)) v]) modules)]
+                            [(symbol (name k)) v]) modules)
+
+        ;first, we flatten the body and filter for symbols that start
+        ;with a module's name
+        module-names (map (comp #(str % \$) name) (keys modules))
+        symbols (->> (flatten body)
+                  (filter (fn [node]
+                            (symbol? node))) 
+                  (mapcat (fn [node]
+                            (let [name (name node)]
+                              (when (some #(.startsWith name %1) module-names)
+                                (let [[x y] (split name #"\$")]
+                                  [node `(->>
+                                           ~(symbol x)
+                                           :ports
+                                           (some #(and (= ~(keyword y)
+                                                          (:port (value %)))
+                                                       (subport ~(symbol x)
+                                                                ~(keyword x)
+                                                                ~(keyword y)))))])))))
+                  distinct)]
     `(let [~@port-decls
-           ~@module-decls]
+           ~@module-decls
+           ~@symbols]
        (module* ~@(cond
                     (symbol? module-name) `('~module-name)
                     (not (nil? module-name)) `(~module-name)  
@@ -262,6 +283,7 @@
     (apply hash-map)))
 
 (defn subport
+  {:post [#(every? (comp not nil?) (vals %))]}
   [submodule submodule-name submodule-port]
   (let [port-type (->> submodule
                     ((juxt (comp #(map-keys % typeof)
