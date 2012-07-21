@@ -1,4 +1,5 @@
 (ns piplin.test.types
+  (:refer-clojure :exclude [cast])
   (:use clojure.test)
   (:use clojure.tools.macro)
   (:use [slingshot.slingshot :only [throw+]])

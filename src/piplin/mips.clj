@@ -1,12 +1,15 @@
 (ns piplin.mips
+  (:refer-clojure :exclude [cast get assoc assoc-in condp cond = not=])
   (:use [slingshot.slingshot])
-  (:use [piplin types sim modules])
+  (:use [piplin types sim modules mux])
+  (:use [piplin.types binops uintm enum bundle union bits])
   (:require [clojure.core :as clj])
-  (:require [piplin.math :as h]))
+  (:require [piplin.types.numbers])
+  (:require [piplin.types.core-impl :as h]))
 
 
 (def mips-ops
-  (h/enum {:func #b000_000
+  (enum {:func #b000_000
            :addi #b001_000
            :addiu #b001_001
            :andi #b001_100
@@ -32,7 +35,7 @@
            } :allow-dups))
 
 (def mips-short-funcs
-  (h/enum {:sll #b000_000
+  (enum {:sll #b000_000
            :sllv #b000_100
            :sra #b000_011
            :srl #b000_010
@@ -41,7 +44,7 @@
            }))
 
 (def mips-funcs
-  (h/enum {:add #b000_0010_0000
+  (enum {:add #b000_0010_0000
            :addu #b000_0010_0001
            :and #b000_0010_0100
            :div #b000_0001_1010 ;todo
@@ -60,11 +63,11 @@
            }))
 
 (def mips-branches
-  (h/enum {:bgez #b00001
+  (enum {:bgez #b00001
            :bgezal #b10001
            :bltzal #b10000}))
 
-(def reg (h/enum #{:0 :1 :2 :3
+(def reg (enum #{:0 :1 :2 :3
                    :4 :5 :6 :7
                    :8 :9 :10 :11
                    :12 :13 :14 :15
@@ -73,11 +76,11 @@
                    :24 :25 :26 :27
                    :28 :29 :30 :31}))
 
-(def u32m (h/uintm 32))
+(def u32m (uintm 32))
 
-(def reg-or-imm (h/union {:reg reg :imm u32m}))
+(def reg-or-imm (union {:reg reg :imm u32m}))
 
-(def alu-op (h/enum #{:add
+(def alu-op (enum #{:add
                       :addu
                       :sub
                       :and
@@ -90,17 +93,17 @@
                       }))
 
 (def alu-unresolved-cmd
-  (h/bundle {:op alu-op
+  (bundle {:op alu-op
              :x reg-or-imm
              :y reg-or-imm
              :dst reg})) 
 
-(def alu-cmd (h/bundle {:op alu-op
+(def alu-cmd (bundle {:op alu-op
                         :x u32m
                         :y u32m
                         :dst reg}))
 
-(def wb-result (h/bundle {:data u32m
+(def wb-result (bundle {:data u32m
                           :dst reg}))
 
 (comment
@@ -127,9 +130,9 @@
 (defn zext32
   "zero extend bits to 32"
   [b]
-  (h/deserialize u32m
-    (h/bit-cat
-      (h/cast (h/bits (- 32 (h/bit-width-of (typeof b)))) 0)
+  (deserialize u32m
+    (bit-cat
+      (cast (bits (- 32 (bit-width-of (typeof b)))) 0)
       b)))
 
 (defn decode-func
@@ -140,7 +143,7 @@
              :y {:reg rt}
              :dst rd}]
     (->>
-      (h/condp h/= (h/deserialize mips-short-funcs short-func)
+      (condp = (deserialize mips-short-funcs short-func)
         :sll (-> cmd
                (assoc
                  :op :sll)
@@ -166,7 +169,7 @@
         (assoc
           cmd
           :op
-          (h/condp h/= (h/deserialize mips-funcs func)
+          (condp = (deserialize mips-funcs func)
             :add :add
             :addu :addu
             :and :and
@@ -177,7 +180,7 @@
             :srl :srlv
             :sub :sub
             :subu :subu)))
-      (h/cast alu-unresolved-cmd)
+      (cast alu-unresolved-cmd)
       identity
       )))
 
@@ -185,16 +188,16 @@
   "Takes an instruction and returns an
   alu-cmd or mem-cmd"
   [inst]
-  (when-not (= (typeof inst) (h/bits 32))
+  (when-not (= (typeof inst) (bits 32))
     (throw (IllegalArgumentException. "must be bits32")))
   (->>
-    (let [b (partial h/bit-slice inst)
+    (let [b (partial bit-slice inst)
           op (b 26 32)
-          rs (h/deserialize reg (b 21 26)) 
-          rt (h/deserialize reg (b 16 21)) 
+          rs (deserialize reg (b 21 26)) 
+          rt (deserialize reg (b 16 21)) 
           imm (zext32 (b 0 16)) 
           target (b 0 26)
-          rd (h/deserialize reg (b 11 16)) 
+          rd (deserialize reg (b 11 16)) 
           sa (b 6 11)
           short-func (b 0 6)
           func (b 0 11)
@@ -202,12 +205,12 @@
                        :y {:imm imm}
                        :dst rt}
           ]
-      (h/mux2 (h/= (h/deserialize mips-ops op) :func)
+      (mux2 (= (deserialize mips-ops op) :func)
         (decode-func func short-func
                      rs rt rd sa)
-        (h/cast alu-unresolved-cmd
+        (cast alu-unresolved-cmd
                 (assoc partial-imm :op
-                       (h/condp h/= (h/deserialize mips-ops op)
+                       (condp = (deserialize mips-ops op)
                          :addi :add
                          :addiu :addu
                          :andi :and
@@ -221,7 +224,7 @@
                          ;loads
                          ;stores
                          )))))
-    (h/cast alu-unresolved-cmd)
+    (cast alu-unresolved-cmd)
     ))
 
 (defn alu
@@ -230,7 +233,7 @@
   [cmd]
   (let [{:keys [op x y dst]} cmd]
     (->>
-      {:data (h/condp op h/=
+      {:data (condp op =
                :add (h/+ x y)
                :sub (h/- x y)) 
        :dst dst}

@@ -2,7 +2,8 @@
   (:use clojure.test)
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not])
-  (:use [piplin types math modules sim])
+  (:use [piplin types math modules sim connect mux])
+  (:use [piplin.types bits boolean bundle enum numbers union core-impl binops uintm])
   (:import clojure.lang.ExceptionInfo))
 
 (deftest j-long-test
@@ -472,7 +473,7 @@
 
 (deftest condp-test
   (let [e (enum #{:a :b :c :d})
-        f #(piplin.math/condp = (uninst (e %))
+        f #(condp = (uninst (e %))
              :a ((uintm 8) 22)
              :b ((uintm 8) 32)
              :c ((uintm 8) 44)
@@ -483,14 +484,14 @@
     (is (= ((make-sim-fn (f :c))) ((uintm 8) 44)))  
     (is (= ((make-sim-fn (f :d))) ((uintm 8) 0)))
     (is (thrown? ExceptionInfo
-                 (piplin.math/condp = (uninst (e :a))
+                 (condp = (uninst (e :a))
                    :a ((uintm 8) 22)
                    :e ((uintm 8) 32)
                    :c ((uintm 8) 44)
                    :d ((uintm 8) 0)))
         "invalid key to enum") 
     (is (thrown? ExceptionInfo
-                 (piplin.math/condp = (uninst (e :a))
+                 (condp = (uninst (e :a))
                    :a ((uintm 8) 22)
                    :b ((uintm 7) 32)
                    :c ((uintm 8) 44)

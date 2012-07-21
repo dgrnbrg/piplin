@@ -1,11 +1,12 @@
 (ns piplin.verilog
-  (:refer-clojure :exclude [replace])
+  (:refer-clojure :exclude [replace cast])
   (:use [slingshot.slingshot])
   (:use [clojure.walk :only [postwalk]]) 
   (:use [clojure.set :only [map-invert]])
   (:use [clojure.string :only [join replace]]) 
   (:use [piplin modules types])
-  (:use [piplin [math :only [bit-width-of piplin-clojure-dispatch bits]]]))
+  (:use [piplin.types [bits :only [bit-width-of bits serialize]]])
+  (:use [piplin.types :only [piplin-clojure-dispatch]]))
 
 (defn sanitize-str
   "Takes a string and makes it safe for verilog."
@@ -81,7 +82,7 @@
 
 (defmethod verilog-repr :bundle
   [x]
-  (verilog-repr (piplin.math/serialize x)))
+  (verilog-repr (serialize x)))
 
 (defn lookup-expr
   [table expr]

@@ -2,9 +2,9 @@
   (:use [piplin sim types])
   (:use [clojure.string :only [join]])
   (:use [slingshot.slingshot :only [throw+]])
-  (:refer-clojure :exclude [replace])
+  (:refer-clojure :exclude [replace cast])
   (:use [clojure.string :only [join replace split]])
-  (:use [piplin.math :only [connect connect-impl]]))
+  (:use [piplin.connect :only [connect connect-impl]]))
 
 
 (comment

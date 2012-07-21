@@ -1,6 +1,7 @@
 (ns piplin.types
   (:use [slingshot.slingshot :only [throw+ try+]])
   (:use [clojure.string :only [join]])
+  (:refer-clojure :exclude [cast])
   (:require [clojure.pprint]))
 
 (comment
@@ -318,3 +319,44 @@
   the given distribution fn"
   [ast f]
   (vary-meta ast assoc :distribute f))
+
+(defn log2
+  "Log base 2"
+  [v]
+  (let [log2v (-> (value v)
+                Math/log
+                (/ (Math/log 2))
+                (+ 0.5)
+                int)]
+    (promote (typeof v) log2v)))
+
+(defn piplin-clojure-dispatch
+  "Returns the kind of the piplin type or
+  :use-core-impl if it has no piplin type"
+  [x]
+  (try+
+    (kindof x)
+    (catch piplin.types.CompilerError ce
+      :use-core-impl)))
+
+;Allow the about types to participate in ITyped
+(defn cast
+  "Converts the given expr to the given type.
+  If the expr is immediate, this returns the
+  same thing as (promote type expr). If the
+  expr is a runtime value, this returns an
+  astfrag."
+  [type expr]
+  (if (typeof expr)
+    (cond
+      (= (typeof expr) type)
+      expr
+      (pipinst? expr)
+      (promote type expr)
+      (-> expr meta :distribute)
+      ((-> expr meta :distribute) type)
+      :else ;TODO: fail before making an ast if it'll never succeed
+      ;this happens if you try to (cast (bits 2) (uninst #b0))
+      (mkast type :cast [expr] (partial cast type)))
+    (promote type expr)))
+
