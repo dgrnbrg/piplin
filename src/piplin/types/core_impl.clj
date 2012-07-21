@@ -1,6 +1,7 @@
 (ns piplin.types.core-impl
   (:refer-clojure :exclude [= not= bit-and bit-or bit-xor bit-not + - * inc dec > >= < <= cast])
   (:require [piplin.types])
+  (:require [piplin.types.numbers])
   (:require [clojure.core :as clj])
   (:use [slingshot.slingshot])
   (:use [piplin.types.binops]))

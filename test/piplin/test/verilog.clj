@@ -5,7 +5,7 @@
   (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not])
   (:use [clojure.java.shell :only [sh]])
   (:use [piplin.types bits boolean bundle enum numbers union core-impl binops uintm])
-  (:use [piplin types math modules connect mux sim verilog [seven-segment-decoder :only [seven-seg-tester]]]))
+  (:use [piplin connect types math modules mux sim verilog [seven-segment-decoder :only [seven-seg-tester]]]))
 
 (defn module->verilog+testbench
   [mod cycles]

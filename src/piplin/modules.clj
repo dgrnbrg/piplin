@@ -4,8 +4,17 @@
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :exclude [replace cast])
   (:use [clojure.string :only [join replace split]])
-  (:use [piplin.connect :only [connect connect-impl]]))
+  (:require [piplin.connect :as conn]))
 
+(defn connect-impl
+  "This connects a register to an expr"
+  [reg expr]
+  (when-not (#{:register :subport} (:port-type (value reg)))
+      (throw+ (error "Must be :register or :subport, was"
+                     (:port-type (value reg)))))  
+  {:type (:port-type (value reg))
+   :args {:reg reg 
+          :expr (cast (typeof reg) expr)}})
 
 (comment
   All exprs must list their subexprs that should be checked
@@ -103,7 +112,7 @@
         ;all of the thunks to populate the connection. Afterwards,
         ;we can do error checking
         body (atom [])
-        _ (binding [connect (fn [reg expr]
+        _ (binding [conn/connect (fn [reg expr]
                               ;TODO: could pass up to parent
                               ;on unmatched tokens (but I think
                               ;I'm removing tokens from ports)

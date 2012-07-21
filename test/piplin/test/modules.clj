@@ -1,8 +1,8 @@
 (ns piplin.test.modules
   (:use clojure.test)
-  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not])
-  (:use [piplin.types bits boolean bundle enum numbers union core-impl binops uintm])
-  (:use [piplin types math sim modules connect (mux)]))
+  (:refer-clojure :as clj :exclude [not= + - * inc dec < > <= >= = cast not bit-and bit-or bit-xor bit-not])
+  (:use [piplin.types boolean numbers core-impl binops uintm])
+  (:use [piplin types math sim modules connect]))
 
 (deftest module*-counter
   (let [m (module* 'counter :outputs {:x ((uintm 8) 0)}

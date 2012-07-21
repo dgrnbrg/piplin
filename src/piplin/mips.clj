@@ -4,7 +4,6 @@
   (:use [piplin types sim modules mux])
   (:use [piplin.types binops uintm enum bundle union bits])
   (:require [clojure.core :as clj])
-  (:require [piplin.types.numbers])
   (:require [piplin.types.core-impl :as h]))
 
 

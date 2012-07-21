@@ -1,8 +1,8 @@
 (ns piplin.test.sim
   (:use [piplin sim modules math types])
-  (:use [piplin types modules sim connect mux])
-  (:use [piplin.types bits boolean bundle enum numbers union core-impl binops uintm])
-  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not])
+  (:use [piplin types modules sim mux connect])
+  (:use [piplin.types numbers core-impl binops uintm])
+  (:refer-clojure :as clj :exclude [not= cond + - * inc dec bit-or bit-xor bit-and bit-not condp < > <= >= = cast])
   (:use clojure.test))
 
 (deftest what-changed-test
