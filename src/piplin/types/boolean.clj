@@ -1,4 +1,6 @@
 (ns piplin.types.boolean
+  "This namespaces contains support for booleans. It also
+  provides an implementation of `not`."
   (:refer-clojure :exclude [not cast])
   (:require [clojure.core :as clj])
   (:use [piplin.types])

@@ -1,4 +1,11 @@
 (ns piplin.types.enum
+  "This namespace provides enum support. Enums are
+  a way to represent a constrained set of keywords.
+  They also allow you to define the bit patterns for
+  each keyword.
+  
+  This namespace also adds keywords to the piplin type
+  system so that they can be coerced to enum elements."
   (:refer-clojure :exclude [= not= cast])
   (:use [slingshot.slingshot])
   (:use [piplin.types])

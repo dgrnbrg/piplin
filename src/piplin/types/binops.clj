@@ -1,4 +1,7 @@
 (ns piplin.types.binops
+  "This namespace contains functions for doing binary and n-ary
+  dispatch, and macros for generating automatic type promotion
+  for binops. It also defines `=` and `not=` as multimethods."
   (:refer-clojure :exclude [= not= cast])
   (:require [clojure.core :as clj])
   (:use [slingshot.slingshot])

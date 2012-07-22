@@ -1,4 +1,18 @@
 (ns piplin.types.bits
+  "This namespace contains logic to manage bit types.
+  
+  First, it defines the `bits` type, which supports `bit-and`, `bit-or`,
+  `bit-xor`, and `bit-not`.
+  
+  It defines the important multimethods `bit-width-of`, `from-bits`,
+  and `get-bits`, which must be implemented by every type that wants
+  to have its immediate forms synthesizable, as well as to participate
+  in any bit-width related calculations. The need only operate on pipinsts.
+  
+  `serialize` and `deserialize` form the standard API for converting
+  between any type and bits.
+  
+  Finally, this namespaces adds the reader literal form `#b0101` for bits."
   (:use [slingshot.slingshot])
   (:refer-clojure :exclude [cast])
   (:use [piplin.types])

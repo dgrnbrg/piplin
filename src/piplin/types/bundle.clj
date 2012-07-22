@@ -1,4 +1,7 @@
 (ns piplin.types.bundle
+  "This namespaces provides an implementation of bundles, which
+  are piplin's record type. It provides `assoc`, `assoc-in`, and `get`
+  that are compatible with bundles and clojure maps."
   (:refer-clojure :exclude [get assoc assoc-in cast])
   (:require [clojure.core :as clj])
   (:require [piplin.util :as util])

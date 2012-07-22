@@ -1,4 +1,12 @@
 (ns piplin.types.core-impl
+  "This namespace provides multimethod implementations of many
+  clojure core functions. It has them by default dispatch to clojure's
+  core implementation, but opens the possibility to adding support for
+  many bitwise and numeric types in piplin.
+  
+  There are also several macros useful for making unary and binary functions
+  that delegate to clojure.core implementations, which is useful for
+  adding support for currently unsupported operations."
   (:refer-clojure :exclude [= not= bit-and bit-or bit-xor bit-not + - * inc dec > >= < <= cast])
   (:require [piplin.types])
   (:require [piplin.types.numbers])
