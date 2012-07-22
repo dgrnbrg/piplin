@@ -2,7 +2,7 @@
   (:use [clojure.string :only [join]])
   (:use [piplin.types :only [typeof value]]) 
   (:use [clojure.java.shell :only [sh]])
-  (:use [piplin.math :only [bit-width-of serialize]]))
+  (:use [piplin.types.bits :only [bit-width-of serialize]]))
 
 ;VCD support for piplin
 
