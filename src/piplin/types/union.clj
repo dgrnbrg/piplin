@@ -149,10 +149,14 @@
   "Takes a union u and a clause for each
   key in the schema. Clauses are of the form:
 
-  (:key ...)
+      (:key binding ...)
 
-  where :key is the keyword and ... is an
-  implicit do within a cond-like form."
+  where :key is the keyword, binding is the form
+  that the value is bound to, and ... is an
+  implicit do within a cond-like form.
+  
+  You can use any destructuring syntax as the
+  binding form."
   [u & clauses]
   (let [u-sym (gensym "u")
         clauses (map (fn [[k name & body]]
@@ -171,3 +175,9 @@
          (mux/condp binops/= (get-tag ~u-sym)
            ~@(apply concat (butlast clauses))
            ~(second (last clauses)))))))
+
+(defn maybe
+  "Creates a maybe type. This is a union where the possibilities
+  are `:just` the given type, or `:nothing` with `nil` as the value."
+  [t]
+  (union {:just t :nothing (anontype :null)}))

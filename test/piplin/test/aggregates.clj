@@ -189,3 +189,15 @@
            ((uintm 5) 22)))
     ))
 
+(deftest maybe-test
+  (let [maybe-uintm8 (maybe (uintm 8))
+        just-uintm8 (cast maybe-uintm8 {:just 3})
+        nothing (cast maybe-uintm8 {:nothing nil})]
+    (is (= (union-match just-uintm8
+                        (:just x :success) 
+                        (:nothing _ :fail))
+           :success))
+    (is (= (union-match nothing
+                        (:just x :fail) 
+                        (:nothing _ :success))
+           :success))))
