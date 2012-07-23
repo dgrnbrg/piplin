@@ -457,6 +457,15 @@
                       (apply hash-map))]
     [initial-state connections]))
 
+(defn trace-module
+  "Compiles and sims a module and returns the trace."
+  [mod cycles]
+  (let [[state fns] (make-sim mod)
+        [fns trace] (apply trace-keys fns
+                           (get-all-registers mod))
+        _ (exec-sim state fns cycles)]
+    @trace))
+
 (comment
   First make nested modules connect and information hiding
   work properly. Next, add a semantic check to verify
