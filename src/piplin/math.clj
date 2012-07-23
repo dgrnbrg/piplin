@@ -7,11 +7,6 @@
 
 ;Here, we allow nil to participate in the ITyped
 ;protocol. nil support is incomplete.
-(extend-protocol ITyped
-  nil
-  (typeof [this] (anontype :null))
-  (value [this] nil)
-  (pipinst? [this] true))
 
 (defn trace
   "Takes a function and an expr and returns an
