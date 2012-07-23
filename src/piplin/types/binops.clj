@@ -43,6 +43,16 @@
            (assoc-dist-fn
              #(~op (cast % ~'lhs) (cast % ~'rhs))))))))
 
+(defmacro defunopimpl
+  [op k & fntail]
+  `(defmethod ~op ~k
+     [x#]
+     (if (pipinst? x#)
+       (instance (typeof x#)
+                 ((fn ~@fntail) x#)
+                 :constrain)
+       (mkast (typeof x#) ~(keyword op) [x#] ~op))))
+
 (defn make-binop-explict-coercions
   "Takes a kind and a vector of kinds and returns
   a list of syntax for defmethods that will invoke

@@ -17,7 +17,7 @@
   (:refer-clojure :exclude [cast])
   (:use [piplin.types])
   (:require [piplin.types.core-impl :as impl])
-  (:use [piplin.types.binops :only [defbinopimpl]]))
+  (:use [piplin.types.binops :only [defbinopimpl defunopimpl]]))
 
 (defpiplintype Bits [n])
 (defn bits
@@ -36,7 +36,7 @@
       (throw+ (error
                 "bits must be a vector of 0s and 1s:" v)))
     (when-not (= (count v) n)
-      (throw+ (error "bit vector must be of length" n (count v)))))
+      (throw+ (error "bit vector must be of length" n "but was" (count v)))))
   inst)
 
 (defmulti from-bits
@@ -172,30 +172,27 @@
       (throw+ (error "Bit size mismatch"))))
   (condp isa-type? (kindof obj)
     :bits obj
-    :uintm (instance type
-                     (long-to-bitvec (value obj)
-                                     (:n type)))
     :j-integral (instance type
                           (long-to-bitvec obj
                                           (:n type)))
     (throw+ (error "Cannot promote" obj "to bits"))))
 
-(defbinopimpl impl/bit-and :bits [:uintm :j-integral]
+(defbinopimpl impl/bit-and :bits [:j-integral]
   [x y]
   (vec (map #(bit-and %1 %2)
             (value x) (value y))))
 
-(defbinopimpl impl/bit-or :bits [:uintm :j-integral]
+(defbinopimpl impl/bit-or :bits [:j-integral]
   [x y]
   (vec (map #(bit-or %1 %2)
             (value x) (value y))))
 
-(defbinopimpl impl/bit-xor :bits [:uintm :j-integral]
+(defbinopimpl impl/bit-xor :bits [:j-integral]
   [x y]
   (vec (map #(bit-xor %1 %2)
             (value x) (value y))))
 
-(defmethod impl/bit-not :bits
+(defunopimpl impl/bit-not :bits
   [x]
   (vec (map bit-not (value x))))
 

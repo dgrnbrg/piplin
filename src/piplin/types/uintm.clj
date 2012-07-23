@@ -1,7 +1,7 @@
 (ns piplin.types.uintm
   (:require [piplin.types.core-impl :as impl])
   (:use [piplin.types
-         [binops :only [defbinopimpl defcoercions]]
+         [binops :only [defbinopimpl defcoercions defunopimpl]]
          bits])
   (:use [piplin.types :exclude [cast]])
   (:use [slingshot.slingshot]))
@@ -115,7 +115,7 @@
   [x y]
   (impl/bit-xor (value x) (value y)))
 
-(defmethod impl/bit-not :uintm
+(defunopimpl impl/bit-not :uintm
   [x]
   (bit-not (value x)))
 
