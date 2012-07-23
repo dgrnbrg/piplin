@@ -5,6 +5,7 @@
   (:use [clojure.set :only [map-invert]])
   (:use [clojure.string :only [join replace]]) 
   (:use [piplin modules types])
+  (:require [piplin.sim])
   (:use [piplin.types [bits :only [bit-width-of bits serialize]]])
   (:use [piplin.types :only [piplin-clojure-dispatch]]))
 
@@ -632,13 +633,13 @@
   (:x x (bit-slice (serialize x) 1 4))
   (:y {:keys [car cdr]} #b00_1)) {}) second print))
 
-;this is super cool:
-(comment
-  (defmodule counter [n]
-    [:outputs [x ((uintm n) 0)]]
-    (connect x (inc x)))
-  (module->verilog (counter 8)))
-(comment
-(println (make-testbench (counter 8)
-  (map (fn [x] {[:x] ((uintm 8) x)})
-       (take 10 (iterate inc 0))))))
+(defn module->verilog+testbench
+  [mod cycles]
+  (let [[state fns] (make-sim mod)
+        [fns trace] (apply piplin.sim/trace-keys fns
+                           (get-all-registers mod))
+        _ (piplin.sim/exec-sim state fns cycles)
+        ]
+    (str (modules->all-in-one mod)
+         "\n"
+         (make-testbench mod @trace))))

@@ -7,17 +7,6 @@
   (:use [piplin.types bits boolean bundle enum numbers union core-impl binops uintm])
   (:use [piplin connect types math modules mux sim verilog [seven-segment-decoder :only [seven-seg-tester]]]))
 
-(defn module->verilog+testbench
-  [mod cycles]
-  (let [[state fns] (make-sim mod)
-        [fns trace] (apply trace-keys fns
-                           (get-all-registers mod))
-        _ (exec-sim state fns cycles)
-        ]
-    (str (modules->all-in-one mod)
-         "\n"
-         (make-testbench mod @trace))))
-
 (defn icarus-test
   [verilog-test]
   (let [n ".piplin_icarus_test"
