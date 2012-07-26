@@ -56,6 +56,13 @@
     (assoc m k (assoc-in (get m k) ks v))
     (assoc m k v)))
 
+(defmethod piplin.types/valAt-multi
+  :bundle
+  ([bundle key]
+   (piplin.types/valAt-multi bundle key nil))
+  ([bundle key notfound]
+   (get bundle key)))
+
 (defpiplintype Bundle [schema])
 (defn bundle
   "Takes a map of keys to types and returns
@@ -70,8 +77,7 @@
     (throw+ (error "values must be piplin or java types:" schema))
     :else
     (merge (Bundle. schema)
-           {:valAt get
-            :kind :bundle})))
+           {:kind :bundle})))
 
 
 (defmethod promote

@@ -124,6 +124,29 @@
   [& args]
   (throw (UnsupportedOperationException. (str "Not supported! " (first args)))))
 
+(defmulti nth-multi
+  "This is a multimethod for supporting the Indexed interface
+  in ASTNodes."
+  (fn [type & args] 
+    (kindof type))
+  :hierarchy types)
+
+(defmethod nth-multi
+  :default
+  [type & args]
+  (throw+ (str type " doesn't support nth (or clojure.lang.Indexed)")))
+
+(defmulti valAt-multi
+  "This is a multimethod for supporting the ILookup interface
+  in ASTNodes."
+  (fn [type & args]
+    (kindof type))
+  :hierarchy types)
+
+(defmethod valAt-multi :default
+  [obj & args]
+  (throw+ (str (typeof obj) "doesn't support interface ILookup")))
+
 (deftype ASTNode [type map metamap]
   java.lang.Object
   (equals [this other]
@@ -139,10 +162,30 @@
   clojure.lang.ILookup 
   (valAt 
     [this key]
-    ((get type
-          :valAt
-          unsupported)
-       this key))
+    (valAt-multi this key))
+  (valAt 
+    [this key notfound]
+    (valAt-multi this key notfound))
+
+  #_clojure.lang.IPersistentVector
+  #_(length [this])
+  #_(assocN [this i val])
+  #_(cons [this o])
+  #_clojure.lang.Associative
+  #_(containsKey [this key])
+  #_(entryAt [this key])
+  #_(assoc [this key val])
+  #_clojure.lang.Sequential
+  #_clojure.lang.IPersistentStack
+  #_(peek [this])
+  #_(pop [this])
+  #_clojure.lang.Reversible
+  #_(rseq [this])
+  clojure.lang.Indexed
+  (nth [this i]
+    (nth-multi [this i]))
+  (nth [this i notfound]
+    (nth-multi [this i notfound]))
 
   clojure.lang.IMeta
   (meta [this] metamap)
