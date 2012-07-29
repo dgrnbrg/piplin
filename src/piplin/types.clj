@@ -202,18 +202,8 @@
 
   clojure.lang.Seqable
   (seq [this]
-    (seq-multi))
+    (seq-multi this))
 
-  #_clojure.lang.IPersistentVector
-  #_(length [this])
-  #_(assocN [this i val])
-  #_(cons [this o])
-  #_clojure.lang.Sequential
-  #_clojure.lang.IPersistentStack
-  #_(peek [this])
-  #_(pop [this])
-  #_clojure.lang.Reversible
-  #_(rseq [this])
   clojure.lang.Indexed
   (nth [this i]
     (nth-multi [this i]))
