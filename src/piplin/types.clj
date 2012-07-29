@@ -206,9 +206,9 @@
 
   clojure.lang.Indexed
   (nth [this i]
-    (nth-multi [this i]))
+    (nth-multi this i))
   (nth [this i notfound]
-    (nth-multi [this i notfound]))
+    (nth-multi this i notfound))
 
   clojure.lang.IMeta
   (meta [this] metamap)
