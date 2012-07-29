@@ -34,6 +34,11 @@
             [bundle key]
             get))))
 
+(defmethod piplin.types/count-multi
+  :bundle
+  [bundle] 
+  (count (:schema (typeof bundle))))
+
 (defpiplintype Bundle [schema])
 (defn bundle
   "Takes a map of keys to types and returns
