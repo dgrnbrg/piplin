@@ -2,66 +2,37 @@
   "This namespaces provides an implementation of bundles, which
   are piplin's record type. It provides `assoc`, `assoc-in`, and `get`
   that are compatible with bundles and clojure maps."
-  (:refer-clojure :exclude [get assoc assoc-in cast])
+  (:refer-clojure :exclude [cast])
   (:require [clojure.core :as clj])
   (:require [piplin.util :as util])
   (:use [slingshot.slingshot])
   (:use [piplin.types])
   (:use [piplin.types.bits]))
 
-(defn get
-  "Gets the given key from the bundle"
-  [bund key]
-  (clj/condp = (piplin-clojure-dispatch bund) 
-    :use-core-impl 
-    (clj/get bund key) 
-    :bundle 
+(defmethod piplin.types/assoc-multi
+  :bundle
+  [bund k v]
+  (let [schema (:schema (typeof bund))
+        v-type (clj/get schema k)
+        v (cast v-type v)]
     (if (pipinst? bund)
-      (clj/get (value bund) key)
-      (mkast (get-in (typeof bund) [:schema key])
-             :bundle-key
-             [bund key]
-             get))
-    (throw+ (error "Don't know how to get from" bund))))
-
-(defn assoc
-  "Returns a new bundle whose key k is equal to v.
-  All other keys are unchanged."
-  ([bund k v]
-   (clj/condp = (piplin-clojure-dispatch bund)
-     :use-core-impl
-     (clj/assoc bund k v)
-     :bundle
-     (let [schema (:schema (typeof bund))
-           v-type (clj/get schema k)
-           v (cast v-type v)]
-       (if (pipinst? bund)
-         ((typeof bund) (clj/assoc (value bund) k v))
-         (mkast (typeof bund)
-                :bundle-assoc
-                [bund k v]
-                assoc)))
-     (throw+ (error "Don't know how to assoc" bund))))      
-  ([bund k v & kvs]
-   (if (seq kvs)
-     (recur (assoc bund k v)
-            (first kvs)
-            (second kvs)
-            (nnext kvs))
-     (assoc bund k v))))
-
-(defn assoc-in
-  [m [k & ks] v]
-  (if ks
-    (assoc m k (assoc-in (get m k) ks v))
-    (assoc m k v)))
+      ((typeof bund) (clj/assoc (value bund) k v))
+      (mkast (typeof bund)
+             :bundle-assoc
+             [bund k v]
+             assoc))))
 
 (defmethod piplin.types/valAt-multi
   :bundle
   ([bundle key]
    (piplin.types/valAt-multi bundle key nil))
   ([bundle key notfound]
-   (get bundle key)))
+   (if (pipinst? bundle)
+     (clj/get (value bundle) key)
+     (mkast (get-in (typeof bundle) [:schema key])
+            :bundle-key
+            [bundle key]
+            get))))
 
 (defpiplintype Bundle [schema])
 (defn bundle

@@ -1,10 +1,9 @@
 (ns piplin.test.mips
   (:use [piplin.types
-         [bundle :only [get]]
          [binops :only [=]]])
   (:use [piplin.mips])
   (:use [clojure.test])
-  (:refer-clojure :as clj :exclude [= get]))
+  (:refer-clojure :as clj :exclude [=]))
 
 (deftest decode-add-imm
   (let [decoded (decode #b001001_00001_00010_1000_0000_0000_0000)]

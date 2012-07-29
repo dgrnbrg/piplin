@@ -124,28 +124,31 @@
   [& args]
   (throw (UnsupportedOperationException. (str "Not supported! " (first args)))))
 
-(defmulti nth-multi
-  "This is a multimethod for supporting the Indexed interface
-  in ASTNodes."
-  (fn [type & args] 
-    (kindof type))
-  :hierarchy types)
+(defmacro def-multi-dispatch
+  "This defines a multimethod that throw an informative error by default,
+  but allows for ASTNodes to be extended by kind to support various
+  internal clojure interfaces, to enable destructuring, mapping, etc."
+  [basename]
+  (let [name (symbol (str basename "-multi"))]
+    `(do
+       (defmulti ~name
+         (fn [type# & args#]
+           (kindof type#))
+         :hierarchy types)
+       (defmethod ~name :default
+         [type# & args#]
+         (throw+ (str type# " doesn't support " ~(str basename)))))))
 
-(defmethod nth-multi
-  :default
-  [type & args]
-  (throw+ (str type " doesn't support nth (or clojure.lang.Indexed)")))
-
-(defmulti valAt-multi
-  "This is a multimethod for supporting the ILookup interface
-  in ASTNodes."
-  (fn [type & args]
-    (kindof type))
-  :hierarchy types)
-
-(defmethod valAt-multi :default
-  [obj & args]
-  (throw+ (str (typeof obj) "doesn't support interface ILookup")))
+(def-multi-dispatch nth)
+(def-multi-dispatch valAt)
+(def-multi-dispatch seq)
+(def-multi-dispatch cons)
+(def-multi-dispatch empty)
+(def-multi-dispatch assoc)
+(def-multi-dispatch without)
+(def-multi-dispatch containsKey)
+(def-multi-dispatch entryAt)
+(def-multi-dispatch count)
 
 (deftype ASTNode [type map metamap]
   java.lang.Object
@@ -167,14 +170,44 @@
     [this key notfound]
     (valAt-multi this key notfound))
 
+  clojure.lang.IPersistentCollection
+  (equiv [this other]
+    (.equals this other))
+  (cons [this o]
+    (cons this o))
+  (empty [this]
+    (empty-multi this))
+
+  clojure.lang.IPersistentMap
+  (assoc [this key val]
+    (assoc-multi this key val))
+  (assocEx [this key val]
+    (assoc-multi this key val))
+  (without [this key]
+    (without-multi this key))
+
+  clojure.lang.Associative
+  (containsKey [this key]
+    (containsKey-multi this key))
+  (entryAt [this key]
+    (entryAt-multi this key))
+
+  clojure.lang.Counted
+  (count [this]
+    (count-multi this))
+
+  java.lang.Iterable
+  (iterator [this]
+    (seq this))
+
+  clojure.lang.Seqable
+  (seq [this]
+    (seq-multi))
+
   #_clojure.lang.IPersistentVector
   #_(length [this])
   #_(assocN [this i val])
   #_(cons [this o])
-  #_clojure.lang.Associative
-  #_(containsKey [this key])
-  #_(entryAt [this key])
-  #_(assoc [this key val])
   #_clojure.lang.Sequential
   #_clojure.lang.IPersistentStack
   #_(peek [this])

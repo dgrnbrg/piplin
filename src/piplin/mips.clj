@@ -1,5 +1,5 @@
 (ns piplin.mips
-  (:refer-clojure :exclude [cast get assoc assoc-in condp cond = not=])
+  (:refer-clojure :exclude [cast condp cond = not=])
   (:use [slingshot.slingshot])
   (:use [piplin types sim modules mux])
   (:use [piplin.types binops uintm enum bundle union bits])
@@ -130,9 +130,9 @@
   "zero extend bits to 32"
   [b]
   (deserialize u32m
-               (bit-cat
-                 (cast (bits (- 32 (bit-width-of (typeof b)))) 0)
-                 b)))
+    (bit-cat
+      (cast (bits (- 32 (bit-width-of (typeof b)))) 0)
+      b)))
 
 (defn decode-func
   "Takes a partially decoded function and completes
