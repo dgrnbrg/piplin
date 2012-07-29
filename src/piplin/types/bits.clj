@@ -106,6 +106,11 @@
   [expr]
   (throw+ (error "Cannot convert " expr " to bits")))
 
+(defmethod get-bits
+  :bits
+  [expr]
+  (value expr))
+
 (defn slice-impl
   "Does slicing of bits"
   [expr low high]
