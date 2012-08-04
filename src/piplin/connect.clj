@@ -6,6 +6,6 @@
 (defn connect
   {:dynamic true}
   [reg expr]
-  (if (:token reg)
+  (if (:token (value reg))
     (throw+ (error "Must call connect within a module"))
     (throw+ (error "Must connect to a register"))))
