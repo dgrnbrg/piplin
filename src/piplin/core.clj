@@ -12,7 +12,7 @@
       (let [sym (-<> (meta var)
                      (assoc <> :ns *ns*)
                      (with-meta sym <>))]
-        (if (.hasRoot var)
+        (if (.hasRoot ^clojure.lang.Var var)
           (intern *ns* sym @var) 
           (intern *ns* sym)))
       (throw+ (str ns-sym \/ sym " does not exist")))))

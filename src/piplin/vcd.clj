@@ -2,6 +2,7 @@
   (:use [clojure.string :only [join]])
   (:use [piplin.types :only [typeof value]]) 
   (:use [clojure.java.shell :only [sh]])
+  (:use [clojure.java.io :only [file]])
   (:use [piplin.types.bits :only [bit-width-of serialize]]))
 
 ;VCD support for piplin
@@ -85,7 +86,7 @@
   "Writes the trace to the file with the
   given name (path is a String)"
   [path trace]
-  (spit (java.io.File. path) (trace->vcd trace)))
+  (spit (file path) (trace->vcd trace)))
 
 (defn trace->gtkwave
   "Opens the given trace in GTKWave"

@@ -292,8 +292,8 @@
        (.write w# (str ~(str name)
                        \[
                        (join ", "
-                             (list ~@(map (fn [arg]
-                                            `(~(keyword arg) ~'o)) args))) 
+                             (map pr-str [~@(map (fn [arg]
+                                            `(~(keyword arg) ~'o)) args)])) 
                        \])))
      (derive-type ~name :piplin-type)))
 
