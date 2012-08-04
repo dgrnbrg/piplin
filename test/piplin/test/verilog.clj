@@ -28,7 +28,7 @@
   (connect x (inc x)))
 
 (deftest counter-test
-  (icarus-test (module->verilog+testbench
+  (icarus-test (modules->verilog+testbench
                  (counter 8) 100)))
 
 (defmodule multicounter [x y z]
@@ -37,7 +37,7 @@
              baz (counter z)]])
 
 (deftest multicounter-test
-  (icarus-test (module->verilog+testbench
+  (icarus-test (modules->verilog+testbench
                  (multicounter 1 2 3) 100)))
 
 (defmodule fib-counter [x]
@@ -48,7 +48,7 @@
   (connect n (+ prev (subport c :c :x))))
 
 (deftest fib-counter-test
-  (icarus-test (module->verilog+testbench
+  (icarus-test (modules->verilog+testbench
                  (fib-counter 32) 100)))
 
 (defmodule delayer []
@@ -62,21 +62,21 @@
   (connect (subport d :d :in) (subport c :c :x)))
 
 (deftest delayer-test
-  (icarus-test (module->verilog+testbench
+  (icarus-test (modules->verilog+testbench
                  (delayer-holder) 50)))
 
 (deftest seven-seg-test
-  (icarus-test (module->verilog+testbench
+  (icarus-test (modules->verilog+testbench
                  (seven-seg-tester 1) 10)) 
-  (icarus-test (module->verilog+testbench
+  (icarus-test (modules->verilog+testbench
                  (seven-seg-tester 2) 10)) 
-  (icarus-test (module->verilog+testbench
+  (icarus-test (modules->verilog+testbench
                  (seven-seg-tester 3) 10)) 
-  (icarus-test (module->verilog+testbench
+  (icarus-test (modules->verilog+testbench
                  (seven-seg-tester 4) 30)) 
-  (icarus-test (module->verilog+testbench
+  (icarus-test (modules->verilog+testbench
                  (seven-seg-tester 8) 300)) 
-  (icarus-test (module->verilog+testbench
+  (icarus-test (modules->verilog+testbench
                  (seven-seg-tester 9) 600))
-  (icarus-test (module->verilog+testbench
+  (icarus-test (modules->verilog+testbench
                  (seven-seg-tester 10) 1025)))

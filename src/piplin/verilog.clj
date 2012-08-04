@@ -632,7 +632,7 @@
   (:x x (bit-slice (serialize x) 1 4))
   (:y {:keys [car cdr]} #b00_1)) {}) second print))
 
-(defn module->verilog+testbench
+(defn modules->verilog+testbench
   [mod cycles]
   (str (modules->all-in-one mod)
        "\n"
