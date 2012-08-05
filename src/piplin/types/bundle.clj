@@ -67,9 +67,9 @@
                                     (set (keys obj))))]
         (throw+ (error "These keys either didn't have a value"
                        "or aren't part of the schema:" bad)))
-      (let [casted-obj (apply conj {}
-                              (map (fn [[k v]]
-                                     [k (cast v (get obj k))]) 
+      (let [casted-obj (into {}
+                             (map (fn [[k v]]
+                                    [k (cast v (get obj k))]) 
                                    schema))] 
         (if (every? pipinst? (vals obj))
           (instance type casted-obj :constrain) 
