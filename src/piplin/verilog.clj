@@ -84,6 +84,10 @@
   [x]
   (verilog-repr (serialize x)))
 
+(defmethod verilog-repr :array
+  [x]
+  (verilog-repr (serialize x)))
+
 (defn lookup-expr
   [table expr]
   (if (pipinst? expr)
@@ -206,6 +210,18 @@
         offsets (compute-key-offsets (typeof bund))
         [high low] (get offsets key)]
     (str (lookup-expr name-lookup bund) "[" high ":" low "]")))
+
+(defmethod verilog-of :make-array
+  [ast name-lookup]
+  (let [keys (->> (typeof ast)
+               :array-len
+               range
+               (map (comp keyword str)))
+        array-inst (merged-args ast)
+        ordered-vals (map #(lookup-expr name-lookup
+                                        (get array-inst %))
+                          keys)]
+    (str "{" (join ", " ordered-vals) "}")) )
 
 (defmethod verilog-of :slice
   [ast name-lookup]
