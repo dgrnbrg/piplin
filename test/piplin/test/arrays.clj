@@ -22,9 +22,9 @@
 
 (deftest array-uninst
   (let [a (array (p/anontype :boolean) 7)
-        inst (piplin.types/uninst (a (repeat 7 false)))]
-    (is (not= inst (a (repeat 7 false))))  
-    (is (= ((piplin.modules/make-sim-fn inst)) (a (repeat 7 false))))))
+        inst (piplin.types/uninst (p/cast a (repeat 7 false)))]
+    (is (not= inst (p/cast a (repeat 7 false))))  
+    (is (= ((piplin.modules/make-sim-fn inst)) (p/cast a (repeat 7 false))))))
 
 (p/defmodule filler []
   [:outputs [a (p/cast (array (p/anontype :boolean) 8)

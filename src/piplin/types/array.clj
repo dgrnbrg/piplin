@@ -27,9 +27,10 @@
         (throw+ (error "Array is not of length"
                        (:array-length type)
                        "=>" obj)))
-      (instance type (map (partial promote
-                                   (:array-type type))
-                          s)))
+      (instance type (into {}
+                           (map (fn [[k v]]
+                                  [k (promote (:array-type type) v)])
+                                s))))
     (do
       (when-not (seqable? obj)
         (throw+ "Can only promote seqables to piplin array"))
@@ -39,14 +40,25 @@
           (throw+ (str "Expected " array-len
                        " elements, but got "
                        (count s) "elements")))
-        (let [casted-obj (mapv (partial cast array-type) s)] 
-          (if (every? pipinst? s)
+        (let [casted-obj (zipmap (->> (range array-len)
+                                   (map (comp keyword str)))
+                                 (map (partial cast array-type)
+                                      s))] 
+          (if (every? pipinst? (vals casted-obj))
             (instance type casted-obj :constrain)
             (mkast-explicit-keys type :make-array
                                  (map keyword (range array-len))
                                  casted-obj
                                  (fn [& args]
                                    (promote type args)))))))))
+
+(defmethod check
+  :array
+  [obj]
+  (when (and (pipinst? obj)
+             (some (comp not pipinst?)  (vals (value obj))))
+    (throw+ (error "Array looks like a pipinst, but contains non-pipinst values:" (vals (value obj)))))
+  obj)
 
 (defmethod bit-width-of
   :array
@@ -56,9 +68,13 @@
 (defmethod get-bits
   :array
   [expr]
-  (let [inst (value expr)]
-    (->> inst
-      (map serialize)
+  (let [inst (value expr)
+        keys (->> (typeof expr)
+               :array-len
+               range
+               (map (comp keyword str)))]
+    (->> keys
+      (map #(serialize (inst %1)))
       (apply bit-cat)
       value)))
 
@@ -66,7 +82,7 @@
   :array
   [type bs]
   (let [{array-type :array-type array-len :array-len} type
-        objs (partition (bit-width-of array-type) bs)]
+        objs (partition (bit-width-of array-type) bs)] 
     (mapv (partial from-bits array-type) objs)))
 
 (defmethod piplin.types/nth-multi
@@ -75,11 +91,20 @@
    (piplin.types/nth-multi array i nil))
   ([array i notfound]
    (if (pipinst? array)
-     (nth (value array) i notfound)
+     (get (value array) (-> i str keyword) notfound)
      (mkast (:array-type (typeof array))
             :array-nth
             [array i]
             nth))))
+
+(defmethod piplin.types/entryAt-multi
+  :array
+  ([array i]
+   (let [alen (:array-len (typeof array))]
+     (when (>= i alen)
+       (throw+ (str "Array is only " alen
+                    "long; tried to access index " i))) 
+     (nth array i))))
 
 (defmethod piplin.types/assoc-multi
   :array
