@@ -51,3 +51,44 @@
              [true true true true true false false false]))
     (is (p/= ((p/exec-sim state fns 10) [:a])
              [true true true true true true true false]))))
+
+(def states (p/enum #{:foo :bar :baz :quux}))
+
+(def replay-data (p/cast (array states 30) (take 30 (cycle [:foo :bar :foo :baz :foo :quux]))))
+
+(p/defmodule replayer [data]
+  [:feedback [tape data
+              index ((p/uintm (p/log2 (count data))) 0)]
+   :outputs [o (p/cast (p/maybe (piplin.types/typeof (nth data 0))) {:nothing nil})]]
+  (p/connect index (p/inc index))
+  (p/connect o {:just (get data index)}))
+
+(deftest replay-test
+  (let [m (replayer replay-data)
+        [state fns] (p/make-sim m)
+        ->type #(p/cast (p/maybe states) {:just %})]
+    (is (p/= (get (p/exec-sim state fns 1) [:o]) (->type :foo)))  
+    (is (p/= (get (p/exec-sim state fns 2) [:o]) (->type :bar)))  
+    (is (p/= (get (p/exec-sim state fns 4) [:o]) (->type :baz)))  
+    (is (p/= (get (p/exec-sim state fns 17) [:o]) (->type :foo)))))
+
+(p/defmodule sequencer [data]
+  [:feedback [tape data
+              index ((p/uintm (p/log2 (count data))) 0)]
+   :outputs [rfile (p/cast (array (p/uintm 4) 3) [0 0 0])]]
+  (p/connect index (p/inc index))
+  (p/connect rfile
+             (p/condp p/= (get tape index)
+               :bar (update-in rfile [0] p/inc)
+               :baz (update-in rfile [1] p/inc)
+               :quux (update-in rfile [2] p/inc)
+               rfile)))
+
+(deftest sequencer-test
+  (let [m (sequencer replay-data)
+        [state fns] (p/make-sim m)]
+    (is (p/= (get (p/exec-sim state fns 1) [:rfile]) [0 0 0]))
+    (is (p/= (get (p/exec-sim state fns 2) [:rfile]) [1 0 0]))
+    (is (p/= (get (p/exec-sim state fns 4) [:rfile]) [1 1 0]))
+    (is (p/= (get (p/exec-sim state fns 6) [:rfile]) [1 1 1]))  
+    (is (p/= (get (p/exec-sim state fns 36) [:rfile]) [6 6 6]))))

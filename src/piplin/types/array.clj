@@ -92,10 +92,21 @@
   ([array i notfound]
    (if (pipinst? array)
      (get (value array) (-> i str keyword) notfound)
+     (get array i))))
+
+;TODO: ensure that i is the correct bit width, or a constant
+(defmethod piplin.types/valAt-multi
+  :array
+  ([array i]
+   (piplin.types/valAt-multi array i nil))
+  ([array i notfound]
+   (if (and (pipinst? i)
+            (pipinst? array))
+     (get (value array) (-> i value str keyword) notfound)
      (mkast (:array-type (typeof array))
-            :array-nth
+            :array-get 
             [array i]
-            nth))))
+            get))))
 
 (defmethod piplin.types/entryAt-multi
   :array
@@ -113,7 +124,9 @@
         v (cast array-type v)]
     (when (or (neg? index)
               (>= index array-len)))
-    (if (pipinst? array)
+    (if (and (pipinst? array)
+             (pipinst? index)
+             (pipinst? v))
       ((typeof array) (assoc (value array) index v))
       (mkast (typeof array)
              :array-assoc
