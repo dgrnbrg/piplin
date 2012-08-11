@@ -90,9 +90,7 @@
   ([array i]
    (piplin.types/nth-multi array i nil))
   ([array i notfound]
-   (if (pipinst? array)
-     (get (value array) (-> i str keyword) notfound)
-     (get array i))))
+   (get array i)))
 
 ;TODO: ensure that i is the correct bit width, or a constant
 (defmethod piplin.types/valAt-multi
@@ -115,19 +113,22 @@
      (when (>= i alen)
        (throw+ (str "Array is only " alen
                     "long; tried to access index " i))) 
-     (nth array i))))
+     (get array i))))
 
 (defmethod piplin.types/assoc-multi
   :array
   [array index v]
   (let [{:keys [array-type array-len]} (typeof array)
         v (cast array-type v)]
-    (when (or (neg? index)
-              (>= index array-len)))
     (if (and (pipinst? array)
              (pipinst? index)
              (pipinst? v))
-      ((typeof array) (assoc (value array) index v))
+      (do
+        (when (or (neg? (value index))
+                  (>= (value index) array-len))
+          (throw+ "Index must be between 0 and" array-len
+                  "but was" (value index)))
+        ((typeof array) (assoc (value array) ((comp keyword str) (value index)) v)))
       (mkast (typeof array)
              :array-assoc
              [array index v]
@@ -137,3 +138,14 @@
   :array
   [array]
   (:array-len (typeof array)))
+
+(defmethod piplin.types/seq-multi
+  :array
+  [array]
+  (when-not (pipinst? array)
+    (throw+ (error "Can only use seq on pipinst arrays")))
+  (let [{:keys [array-len]} (typeof array)
+        val-map (value array)]
+    (->> (range array-len)
+      (map (comp keyword str))
+      (map val-map))))
