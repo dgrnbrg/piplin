@@ -1,6 +1,7 @@
 (ns piplin.test.arrays
   (:refer-clojure :exclude [cast])
   (:use [clojure.test])
+  (:use piplin.test.util)
   (:require [piplin.core :as p])
   (:use [piplin.types [array]]))
 
@@ -92,3 +93,33 @@
     (is (p/= (get (p/exec-sim state fns 4) [:rfile]) [1 1 0]))
     (is (p/= (get (p/exec-sim state fns 6) [:rfile]) [1 1 1]))  
     (is (p/= (get (p/exec-sim state fns 36) [:rfile]) [6 6 6]))))
+
+(p/defmodule memory-file []
+  [:feedback [mem (p/cast (array (p/uintm 4) 4) [0 0 0 0])
+              i ((p/uintm 2) 0)]]
+  (p/connect i (p/inc i))
+  (p/connect (get mem i) (p/inc (get mem i))))
+
+(deftest memory-test
+  (let [m (memory-file)
+        [state fns] (p/make-sim m)]
+    (is (p/= (get (p/exec-sim state fns 1) [:mem]) [1 0 0 0]))  
+    (is (p/= (get (p/exec-sim state fns 3) [:mem]) [1 1 1 0]))  
+    (is (p/= (get (p/exec-sim state fns 8) [:mem]) [2 2 2 2]))  
+    (is (p/= (get (p/exec-sim state fns 34) [:mem]) [9 9 8 8]))))
+
+(deftest memory-verilog-test
+  (icarus-test (p/modules->verilog+testbench
+                 (memory-file) 1)) 
+  (icarus-test (p/modules->verilog+testbench
+                 (memory-file) 2)) 
+  (icarus-test (p/modules->verilog+testbench
+                 (memory-file) 3)) 
+  (icarus-test (p/modules->verilog+testbench
+                 (memory-file) 4))
+  (icarus-test (p/modules->verilog+testbench
+                 (memory-file) 10))  
+  (icarus-test (p/modules->verilog+testbench
+                 (memory-file) 30))  
+  (icarus-test (p/modules->verilog+testbench
+                 (memory-file) 50))) 

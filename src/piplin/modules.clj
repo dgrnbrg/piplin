@@ -9,12 +9,14 @@
 (defn connect-impl
   "This connects a register to an expr"
   [reg expr]
-  (when-not (#{:register :subport} (:port-type (value reg)))
-      (throw+ (error "Must be :register or :subport, was"
-                     (:port-type (value reg)))))  
-  {:type (:port-type (value reg))
-   :args {:reg reg 
-          :expr (cast (typeof reg) expr)}})
+  (let [port-type (:port-type (value reg))]
+    (when-not (or (#{:register :subport} port-type)
+                  (= :array-get (-> reg value :op)))
+      (throw+ (error "Must be :register or :subport or the whole thing must be an array location (not displayed yet TODO), was"
+                     port-type)))
+    {:type (or port-type :register)
+     :args {:reg reg 
+            :expr (cast (typeof reg) expr)}}))
 
 (comment
   All exprs must list their subexprs that should be checked
@@ -401,16 +403,27 @@
   [connection]
   (let [reg (get-in (value connection) [:args :reg])
         expr (get-in (value connection) [:args :expr])
+        index-expr (let [reg (value reg)]
+                     (when (= (:op reg) :array-get)
+                       (get-in reg [:args :i])))
         sim-fn (make-sim-fn expr)
+        index-fn (when index-expr (make-sim-fn index-expr))
+        reg (if-not index-expr reg
+              (-> reg value :args :array))
         reg-state (conj *module-path* (:port (value reg))) 
         ports (get-required-state expr)
         ports (concat ports *input-fn-ports*)]
     (every-cycle
-       (fn [& vals]
-         (binding [*sim-state* (zipmap ports vals)]
-           (sim-fn)))
-       ports
-       reg-state)))
+      (fn [& vals]
+        (binding [*sim-state* (zipmap ports vals)]
+          (let [ans (sim-fn)]
+            (if-not index-expr
+              ans
+              (assoc (get *sim-state* reg-state)
+                     (index-fn)
+                     ans)))))
+      ports
+      reg-state)))
 
 (defn- get-qual-state
   "This function takes a module and returns a
@@ -438,9 +451,12 @@
   (walk-registers root-module
                  #(identity
                     (conj *module-path* 
-                          (-> (get-in % [:args :reg])
-                            value
-                            :port)))
+                          (let [reg (value (get-in % [:args :reg]))]
+                            (-> (if (= (:op reg) :array-get)
+                                  (get-in reg [:args :array])
+                                  reg)
+                              value 
+                              :port))))
                  concat))
 
 (defn make-sim

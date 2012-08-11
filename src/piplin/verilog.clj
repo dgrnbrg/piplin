@@ -221,7 +221,39 @@
         ordered-vals (map #(lookup-expr name-lookup
                                         (get array-inst %))
                           keys)]
-    (str "{" (join ", " ordered-vals) "}")) )
+    (str "{" (join ", " ordered-vals) "}")))
+
+(defmethod verilog-of :array-get
+  [ast name-lookup]
+  (let [{:keys [array i]} (merged-args ast)
+        subtype-width (bit-width-of (:array-type (typeof array)))
+        index (lookup-expr name-lookup i)]
+    (str
+      (lookup-expr name-lookup array)
+      "[" 
+      (lookup-expr name-lookup i)
+      "]")))
+
+(defmethod verilog-of :array-nth
+  [ast name-lookup]
+  (let [{:keys [array i]} (merged-args ast)]
+    (lookup-expr name-lookup (get array (keyword (str i))))))
+
+#_(defmethod verilog-of :array-assoc
+  [ast name-lookup]
+  (let [{:keys [array index v]} (merged-args ast)
+        {:keys [array-len array-type]} (typeof array)
+        upper-bound (dec (* (bit-width-of array-type) (inc index))) 
+        lower-bound (* (bit-width-of array-type) index)
+        array-sym (lookup-expr name-lookup array)
+        arg-sym (lookup-expr name-lookup v)]
+    (str "{"
+         (when-not (= (dec (bit-width-of (typeof ast))) high)
+           (str bund "[" (dec w) ":" (inc high) "], "))
+         v
+         (when-not (= low 0)
+           (str ", " bund "[" (dec low) ":0]"))
+         "}")))
 
 (defmethod verilog-of :slice
   [ast name-lookup]
@@ -318,7 +350,7 @@
 (defn array-width-decl [x]
   (if (zero? x)
     ""
-    (str "[" (dec x) ":0] ")))
+    (str "[" (dec x) ":0]")))
 
 (defn render-single-expr
   "Takes an expr and a name table and
@@ -339,7 +371,7 @@
     (let [name (name (gensym))
           indent "  "
           bit-width (bit-width-of (typeof expr))
-          wire-decl (str "wire " (array-width-decl bit-width))
+          wire-decl (str "wire " (array-width-decl bit-width) " ")
           assign " = "
           body (verilog-of expr name-table)
           terminator ";\n"]
@@ -437,17 +469,34 @@
     (throw+ (error module "must be a module")))
   (let [ports  (mapcat (comp keys #(get module %)) [:inputs :outputs])
         inputs (->> (:inputs module)
-                 (mapcat (fn [[k v]] [(name k) (bit-width-of v)]))
-                 (apply hash-map))
+                 (map (fn [[k v]] [(name k) (bit-width-of v)]))
+                 (into {})) 
         outputs (->> (:outputs module)
-                  (mapcat (fn [[k v]] [(name k) (bit-width-of (typeof v))]))
-                  (apply hash-map))
+                  (map (fn [[k v]]
+                         (if (= :array (kindof v))
+                           [(name k)
+                            (bit-width-of (:array-type (typeof v)))
+                            (:array-len (typeof v))]
+                           [(name k)
+                            (bit-width-of (typeof v))
+                            nil]))))
         feedbacks (->> (:feedback module)
-                  (mapcat (fn [[k v]] [(name k) (bit-width-of (typeof v))]))
-                  (apply hash-map))
+                    (map (fn [[k v]]
+                           (if (= :array (kindof v))
+                             [(name k)
+                              (bit-width-of (:array-type (typeof v)))
+                              (:array-len (typeof v))]
+                             [(name k)
+                              (bit-width-of (typeof v))
+                              nil]))))
         initials (->> (merge (:outputs module) (:feedback module))
-                   (mapcat (fn [[k v]] [(name k) (verilog-repr v)]))
-                   (apply hash-map))
+                   (mapcat (fn [[k v]]
+                             (if-not (= :array (kindof v))
+                               [[(name k) (verilog-repr v)]]
+                               (map (fn [index v]
+                                      [(str (name k) \[ index \])
+                                       (verilog-repr v)])
+                                    (range) v)))))
         submodules (->> (:modules module)
                      (map (fn make-module-decls [[k v]]
                             (module-decl (name k) v {}))))
@@ -456,9 +505,15 @@
                       :body
                       (filter #(= :register (:type %)))
                       (map (comp :args value))
-                      (map (fn [{:keys [reg expr]}]
-                             [(-> reg value :port name)
-                              expr])))
+                      (map (fn [{:keys [reg expr] :as r}]
+                             (let [index-expr (let [reg (value reg)]
+                                                (when (= (:op reg) :array-get)
+                                                  (get-in reg [:args :i])))
+                                   reg (if-not index-expr reg
+                                         (-> reg value :args :array))]
+                               [(-> reg value :port name)
+                                expr
+                                index-expr]))))
         input-connections (->> module
                       :body
                       (filter #(= (:type %) :subport))
@@ -469,7 +524,10 @@
         [name-table body] (reduce
                             (fn [[name-table text] expr]
                               (verilog expr name-table text))
-                            [name-table ""] (map second (concat input-connections connections)))
+                            [name-table ""] (concat
+                                              (map second input-connections)
+                                              (filter identity
+                                               (mapcat next connections))))
         ]
     (str "module " (sanitize-str (name (:token module))) "(\n"
          "  clock,\n"
@@ -483,19 +541,24 @@
            (str "\n"
                 "  //inputs\n"
                 (join (map (fn [[input width]]
-                             (str "  input wire " (array-width-decl width) input ";\n"))
+                             (str "  input wire " (array-width-decl width) " " input ";\n"))
                            inputs))))
          (when (seq outputs)
            (str "\n"
                 "  //outputs\n"
-                (join (map (fn [[output width]]
-                             (str "  output reg " (array-width-decl width) output ";\n"))
+                (join (map (fn [[output width len]]
+                             (if-not len
+                               (str "  output reg " (array-width-decl width) " " output ";\n")
+                               (str "  output reg " (array-width-decl width) " " output " " (array-width-decl len) ";\n")) 
+                             )
                            outputs))))
          (when (seq feedbacks)
            (str "\n"
                 "  //feedback\n"
-                (join (map (fn [[feedback width]]
-                             (str "  reg " (array-width-decl width) feedback ";\n"))
+                (join (map (fn [[feedback width len]]
+                             (if-not len
+                               (str "  reg " (array-width-decl width) " " feedback ";\n")
+                               (str "  reg " (array-width-decl width) " " feedback " " (array-width-decl len) ";\n")))
                            feedbacks))))
          "\n"
          "\n"
@@ -508,8 +571,11 @@
                       (str "      " name " <= " val ";\n"))
                     initials))
          "    end else begin\n"
-         (join (map (fn [[name expr]]
-                      (str "      " name " <= " (lookup-expr name-table expr) ";\n"))
+         (join (map (fn [[name expr index-expr]]
+                      (str "      " name
+                           (when index-expr
+                             (str \[ (lookup-expr name-table index-expr) \]))
+                           " <= " (lookup-expr name-table expr) ";\n"))
                     connections))
          "    end\n"
          "\n"
@@ -523,6 +589,7 @@
   [(map #(let [w (-> % val bit-width-of)]
            (str "reg "
                 (array-width-decl w)
+                " "
                 (-> % key name)
                 " = " w "'b" (join (repeat w \z)) ";\n"))
         (:inputs module))
@@ -557,10 +624,20 @@
   (reduce (fn [text [path val]]
             (when-not (vector? path)
               (throw+ "Path must be a vector"))
-            (str text
-                 (assert-hierarchical indent dut-name
-                                      (join \. (map name path))
-                                      (verilog-repr val))))
+            (let [array? (= :array (kindof val))]
+              (str text
+                   (if-not array?
+                     (assert-hierarchical indent dut-name
+                                          (join \. (map name path))
+                                          (verilog-repr val))
+                     (->> (map (fn [val index]
+                                 (assert-hierarchical
+                                   indent dut-name
+                                   (str (join \. (map name path))
+                                        \[ index \])
+                                   (verilog-repr val)))
+                               val (range))
+                       (join "\n"))))))
           ""
           cycle-map))
 
