@@ -197,9 +197,9 @@
   (vec (map #(bit-xor %1 %2)
             (value x) (value y))))
 
-(defunopimpl impl/bit-not :bits
+(defunopimpl impl/bit-not :bits 
   [x]
-  (vec (map bit-not (value x))))
+  (vec (map (partial - 1) (value x))))
 
 (defn str-to-bits
   [s]

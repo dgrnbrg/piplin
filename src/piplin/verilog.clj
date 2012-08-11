@@ -323,6 +323,11 @@
   (let-args ast name-lookup [lhs rhs]
             (str lhs " ^ " rhs)))
 
+(defmethod verilog-of :bit-not
+  [ast name-lookup]
+  (let-args ast name-lookup [x]
+            (str "~" x)))
+
 (defmethod verilog-of :=
   [ast name-lookup]
    (let [{:keys [x y]} (merged-args ast)]

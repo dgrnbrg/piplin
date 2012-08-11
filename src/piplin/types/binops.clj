@@ -44,14 +44,17 @@
              #(~op (cast % ~'lhs) (cast % ~'rhs))))))))
 
 (defmacro defunopimpl
-  [op k & fntail]
-  `(defmethod ~op ~k
-     [x#]
-     (if (pipinst? x#)
-       (instance (typeof x#)
-                 ((fn ~@fntail) x#)
-                 :constrain)
-       (mkast (typeof x#) ~(keyword op) [x#] ~op))))
+  [op k & [args & fntail]]
+  (assert (clj/= 1 (count args)))
+  (let [arg-name (first args)
+        unmangled-kw (keyword (name op))]
+    `(defmethod ~op ~k
+       ~args
+       (if (pipinst? ~arg-name)
+         (instance (typeof ~arg-name)
+                   ((fn ~args ~@fntail) ~arg-name)
+                   :constrain)
+         (mkast (typeof ~arg-name) ~unmangled-kw ~args ~op)))))
 
 (defn make-binop-explict-coercions
   "Takes a kind and a vector of kinds and returns
