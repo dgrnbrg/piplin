@@ -31,6 +31,9 @@
   #(with-meta % (assoc (meta #'piplin.connect/connect)
                        :ns *ns*)))
 
+;Other important inclusions
+(require 'piplin.types.null)
+
 ;This is the list of functions we should reexport
 (redefine
   ;Module stuff
