@@ -1,5 +1,6 @@
 (ns piplin.verilog
   (:refer-clojure :exclude [replace cast])
+  (:require [piplin.walk :as walk])
   (:use [slingshot.slingshot])
   (:use [clojure.walk :only [postwalk]]) 
   (:use [clojure.set :only [map-invert]])
@@ -390,41 +391,13 @@
 
 ;todo this can take a long time
 (defn verilog
-  "first, recurses to non-const members of the expr.
-  then, renders all const members of the expr.
-  finally, renders the expr itself.
-
-  returns the updated name-table and text"
   ([expr name-table]
-   (verilog expr name-table "")) 
+   (verilog expr name-table ""))
   ([expr name-table text]
-   (letfn [(render-expr [expr name-table text]
-             (let [[name-table partial-text]
-                   (render-single-expr expr name-table)]
-               [name-table (str text partial-text)]))]
-     (if (pipinst? expr)
-       (render-expr expr name-table text)
-       (let [args (vals (:args (value expr)))
-             [name-table text]
-             (if (seq args)
-               (reduce
-                 (fn [[name-table text] expr]
-                   (verilog expr
-                            name-table
-                            text))
-                 [name-table text]
-                 args)
-               [name-table text])
-             consts (vals (:consts (value expr)))
-             [name-table text]
-             (reduce
-               (fn [[name-table text] expr]
-                 (verilog expr
-                          name-table
-                          text))
-               [name-table text]
-               consts)]
-         (render-expr expr name-table text))))))
+   (let [[name-table body]
+         (walk/compile expr render-single-expr
+                       name-table [])]
+     [name-table (str text (join body))]))) 
 
 (defn module-decl
   "Declares a module, using a map from strings
