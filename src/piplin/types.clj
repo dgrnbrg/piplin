@@ -376,7 +376,7 @@
                        :noop
                        [expr]
                        (fn [_] pipinst))]
-    (vary-meta (alter-value pipinst assoc :args {})
+    (vary-meta pipinst
                assoc :pipinst? (fn [x] false))))
 
 (defn assoc-dist-fn
