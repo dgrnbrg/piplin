@@ -365,14 +365,11 @@
   [expr name-table]
   (cond
     (pipinst? expr)
-    [(assoc name-table expr (verilog-repr expr)) ""]
+    [nil ""]
     (= :use-core-impl (piplin-clojure-dispatch expr))
     (do
       (println "WARNING: trying to render clojure type, skipping")
-      [name-table ""])
-    ;The is common subexpression elimination
-    (contains? name-table expr)
-    [name-table ""]
+      [nil ""])
     :else
     (let [name (name (gensym))
           indent "  "
@@ -381,7 +378,7 @@
           assign " = "
           body (verilog-of expr name-table)
           terminator ";\n"]
-      [(assoc name-table expr name)
+      [name
        (str indent
             wire-decl
             name

@@ -14,16 +14,23 @@
 
 (defn compile
   "Takes an expr, a function that takes an expr and a map
-  of exprs to names and returns the code for the expr and
-  the updated name table, and it returns a list of all
-  the code in order.
+  of exprs to names and returns the form for the expr and
+  its generated name, and it returns a list of all the
+  forms in order.
   
-  You can provides pre-initialized name-lookup or code list."
-  [expr f name-table body]
+  You can provide pre-initialized name-lookup or form list."
+  [expr expr->name+form name-table body]
   (letfn [(render-expr [expr name-table body]
-            (let [[name-table partial]
-                  (f expr name-table)]
-              [name-table (conj body partial)]))]
+            (if (contains? name-table expr)
+              [name-table body]
+              (let [[name form]
+                    (expr->name+form expr name-table)]
+                (if name
+                  [(assoc name-table
+                          expr
+                          name)
+                   (conj body form)]
+                  [name-table body]))))]
     (if (pipinst? expr)
       (render-expr expr name-table body)
       (let [args (vals (merged-args expr))
@@ -32,10 +39,10 @@
               (reduce
                 (fn [[name-table body] expr]
                   (compile expr
-                           f
+                           expr->name+form
                            name-table
                            body))
                 [name-table body]
                 args)
               [name-table body])]
-        (render-expr expr name-table body)))) )
+        (render-expr expr name-table body)))))
