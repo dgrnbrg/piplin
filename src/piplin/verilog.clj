@@ -116,16 +116,16 @@
   [ast name-lookup]
   (lookup-expr name-lookup ast))
 
-(defn merged-args
+(defn get-args
   [ast]
-  (apply merge (map (value ast) [:args :consts])))
+  (:args (value ast)))
 
 (defmacro let-args
   [ast name-lookup argvec & body]
   (let [lookups (mapcat #(vector %
                               `(lookup-expr ~name-lookup ~%))
                      argvec)]
-    `(let [{:keys ~argvec} (merged-args ~ast)
+    `(let [{:keys ~argvec} (get-args ~ast)
            ~@lookups]
        ~@body)))
 
@@ -133,7 +133,7 @@
   [ast name-lookup]
   (let [t (typeof ast)
         {:keys [schema enum]} t
-        {:keys [tag val]} (merged-args ast)
+        {:keys [tag val]} (get-args ast)
         w (bit-width-of t)
         padding (- w
                    (bit-width-of enum)
@@ -146,7 +146,7 @@
 (defmethod verilog-of :get-value
   [ast name-lookup]
   (let [valtype (typeof ast) 
-        union (:u (merged-args ast))
+        union (:u (get-args ast))
         top  (dec (bit-width-of valtype))]
     (str (lookup-expr name-lookup union)
          "[" top (when-not (zero? top) ":0") "]"))) 
@@ -154,7 +154,7 @@
 (defmethod verilog-of :get-tag
   [ast name-lookup]
   (let [enum (typeof ast) 
-        union (:u (merged-args ast))
+        union (:u (get-args ast))
         top (dec (bit-width-of (typeof union)))
         bottom (inc (- top (bit-width-of enum)))]
     (str (lookup-expr name-lookup union)
@@ -166,7 +166,7 @@
 (defmethod verilog-of :make-bundle
   [ast name-lookup]
   (let [schema-ks (keys (:schema (typeof ast)))
-        bundle-inst (merged-args ast)
+        bundle-inst (get-args ast)
         ordered-vals (map #(lookup-expr name-lookup
                                         (get bundle-inst %))
                           schema-ks)]
@@ -190,7 +190,7 @@
 
 (defmethod verilog-of :bundle-assoc
   [ast name-lookup]
-  (let [{:keys [bund k v]} (merged-args ast)
+  (let [{:keys [bund k v]} (get-args ast)
         t (typeof ast)
         offsets (compute-key-offsets t)
         w (bit-width-of t)
@@ -207,7 +207,7 @@
 
 (defmethod verilog-of :bundle-key
   [ast name-lookup]
-  (let [{:keys [bund key]} (merged-args ast)
+  (let [{:keys [bund key]} (get-args ast)
         offsets (compute-key-offsets (typeof bund))
         [high low] (get offsets key)]
     (str (lookup-expr name-lookup bund) "[" high ":" low "]")))
@@ -218,7 +218,7 @@
                :array-len
                range
                (map (comp keyword str)))
-        array-inst (merged-args ast)
+        array-inst (get-args ast)
         ordered-vals (map #(lookup-expr name-lookup
                                         (get array-inst %))
                           keys)]
@@ -226,7 +226,7 @@
 
 (defmethod verilog-of :array-get
   [ast name-lookup]
-  (let [{:keys [array i]} (merged-args ast)
+  (let [{:keys [array i]} (get-args ast)
         subtype-width (bit-width-of (:array-type (typeof array)))
         index (lookup-expr name-lookup i)]
     (str
@@ -237,12 +237,12 @@
 
 (defmethod verilog-of :array-nth
   [ast name-lookup]
-  (let [{:keys [array i]} (merged-args ast)]
+  (let [{:keys [array i]} (get-args ast)]
     (lookup-expr name-lookup (get array (keyword (str i))))))
 
 #_(defmethod verilog-of :array-assoc
   [ast name-lookup]
-  (let [{:keys [array index v]} (merged-args ast)
+  (let [{:keys [array index v]} (get-args ast)
         {:keys [array-len array-type]} (typeof array)
         upper-bound (dec (* (bit-width-of array-type) (inc index))) 
         lower-bound (* (bit-width-of array-type) index)
@@ -258,7 +258,7 @@
 
 (defmethod verilog-of :slice
   [ast name-lookup]
-  (let [{:keys [expr high low]} (merged-args ast)]
+  (let [{:keys [expr high low]} (get-args ast)]
     (str (lookup-expr name-lookup expr) "[" (dec high) ":" low "]")))
 
 (defmethod verilog-of :bit-cat
@@ -269,7 +269,7 @@
 (defmethod verilog-of :mux2
   [ast name-lookup]
   (let [t (typeof ast)
-        {:keys [sel v1 v2]} (merged-args ast)]
+        {:keys [sel v1 v2]} (get-args ast)]
     (str (lookup-expr name-lookup sel) " ? "
          (lookup-expr name-lookup v1) " : "
          (lookup-expr name-lookup v2))))
@@ -331,12 +331,12 @@
 
 (defmethod verilog-of :=
   [ast name-lookup]
-   (let [{:keys [x y]} (merged-args ast)]
+   (let [{:keys [x y]} (get-args ast)]
      (str (lookup-expr name-lookup x) " == " (lookup-expr name-lookup y))))
 
 (defn verilog-noop-passthrough
   [ast name-lookup]
-  (let [args (merged-args ast)]
+  (let [args (get-args ast)]
     (when-not (contains? args :expr)
       (throw+ (error "must have an :expr" args)))
     (when (not= 1 (count args))

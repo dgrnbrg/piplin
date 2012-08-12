@@ -8,10 +8,6 @@
   [expr f init]
   )
 
-(defn merged-args
-  [ast]
-  (apply merge (map (value ast) [:args :consts])))
-
 (defn compile
   "Takes an expr, a function that takes an expr and a map
   of exprs to names and returns the form for the expr and
@@ -33,7 +29,7 @@
                   [name-table body]))))]
     (if (pipinst? expr)
       (render-expr expr name-table body)
-      (let [args (vals (merged-args expr))
+      (let [args (vals (-> expr value :args))
             [name-table body]
             (if (seq args)
               (reduce

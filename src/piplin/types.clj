@@ -354,8 +354,7 @@
                 (apply ~f final-args#)))]
      (ASTNode. ~type
                {:op ~op 
-                :args frags#
-                :consts imms#}
+                :args ~argmap}
                {:pipinst? (fn [& ~'a] false)
                 :sim-factory [f# kwargs#]})))
 
