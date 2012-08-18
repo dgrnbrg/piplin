@@ -1,7 +1,8 @@
 (ns piplin.types.numbers
   (:refer-clojure :exclude [cast])
   (:use [slingshot.slingshot])
-  (:use [piplin.types]))
+  (:use [piplin.types]) 
+  (:use [piplin.protocols]))
 
 (derive-type java.lang.Long :piplin-type)
 (derive-type java.lang.Integer :piplin-type)

@@ -15,7 +15,7 @@
   Finally, this namespaces adds the reader literal form `#b0101` for bits."
   (:use [slingshot.slingshot])
   (:refer-clojure :exclude [cast])
-  (:use [piplin.types])
+  (:use [piplin protocols types])
   (:require [piplin.types.core-impl :as impl])
   (:use [piplin.types.binops :only [defbinopimpl defunopimpl]]))
 

@@ -8,7 +8,7 @@
   system so that they can be coerced to enum elements."
   (:refer-clojure :exclude [= not= cast])
   (:use [slingshot.slingshot])
-  (:use [piplin.types])
+  (:use [piplin protocols types])
   (:use [piplin.types binops bits]))
 
 (derive-type clojure.lang.Keyword :piplin-type)

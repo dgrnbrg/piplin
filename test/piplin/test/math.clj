@@ -2,7 +2,7 @@
   (:use clojure.test)
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not])
-  (:use [piplin types math modules sim connect])
+  (:use [piplin types math modules sim connect protocols])
   (:use [piplin.types bits boolean enum numbers core-impl binops uintm])
   (:import clojure.lang.ExceptionInfo))
 

@@ -3,7 +3,7 @@
   (:use [clojure.set :only [map-invert intersection difference]])
   (:require [clojure set [core :as clj]])
   (:refer-clojure :exclude [cast + - * bit-and bit-or bit-xor bit-not inc dec > < >= <= not = not= get assoc assoc-in cond condp])
-  (:use (piplin types)))
+  (:use (piplin types protocols)))
 
 ;Here, we allow nil to participate in the ITyped
 ;protocol. nil support is incomplete.

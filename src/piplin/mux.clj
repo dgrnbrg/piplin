@@ -1,7 +1,7 @@
 (ns piplin.mux
   (:require [clojure.core :as clj])
   (:refer-clojure :exclude [cond condp cast])
-  (:use [piplin types connect])
+  (:use [piplin types connect protocols])
   (:use [slingshot.slingshot]))
 
 (defn mux2-impl

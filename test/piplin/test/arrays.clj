@@ -12,13 +12,13 @@
         roundtrip (->> inst
                     (p/serialize)
                     (p/deserialize a)) ]
-    (is (piplin.types/pipinst? inst))
+    (is (piplin.protocols/pipinst? inst))
     (is ((p/uintm 8) 8) x)  
     (is ((p/uintm 8) 7) y)  
     (is ((p/uintm 8) 0) z)  
     (is ((p/uintm 8) 3) w)
     (is (= 4 (count inst)))
-    (is (piplin.types/pipinst? roundtrip))
+    (is (piplin.protocols/pipinst? roundtrip))
     (is (p/= inst roundtrip))))
 
 (deftest array-uninst
@@ -60,7 +60,7 @@
 (p/defmodule replayer [data]
   [:feedback [tape data
               index ((p/uintm (p/log2 (count data))) 0)]
-   :outputs [o (p/cast (p/maybe (piplin.types/typeof (nth data 0))) {:nothing nil})]]
+   :outputs [o (p/cast (p/maybe (piplin.protocols/typeof (nth data 0))) {:nothing nil})]]
   (p/connect index (p/inc index))
   (p/connect o {:just (get data index)}))
 

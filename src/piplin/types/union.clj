@@ -5,7 +5,7 @@
   (:require clojure.set)
   (:require [piplin.types.binops :as binops])
   (:require [piplin.util :as util])
-  (:use [piplin.types]
+  (:use [piplin protocols types]
         [piplin.types bits enum]))
 
 (defpiplintype Union [schema enum])

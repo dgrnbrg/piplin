@@ -1,6 +1,6 @@
 (ns piplin.connect
   (:refer-clojure :exclude [cast])
-  (:use [piplin.types])
+  (:use [piplin protocols types])
   (:use [slingshot.slingshot]))
 
 (defn connect

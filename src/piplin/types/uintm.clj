@@ -3,7 +3,7 @@
   (:use [piplin.types
          [binops :only [defbinopimpl defcoercions defunopimpl]]
          bits])
-  (:use [piplin.types :exclude [cast]])
+  (:use [piplin [types :exclude [cast]] protocols])
   (:use [slingshot.slingshot]))
 
 ;We define the uintm type. This is

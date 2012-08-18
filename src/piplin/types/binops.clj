@@ -5,7 +5,7 @@
   (:refer-clojure :exclude [= not= cast])
   (:require [clojure.core :as clj])
   (:use [slingshot.slingshot])
-  (:use [piplin types]))
+  (:use [piplin types protocols]))
 
 (defn binary-dispatch
   "Simplified binary dispatch logic."

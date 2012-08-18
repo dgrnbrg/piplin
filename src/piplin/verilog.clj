@@ -7,7 +7,7 @@
   (:use [clojure.string :only [join replace]]) 
   (:use [piplin modules types])
   (:use [piplin.types [bits :only [bit-width-of bits serialize]]])
-  (:use [piplin.types :only [piplin-clojure-dispatch]]))
+  (:use [piplin [types :only [piplin-clojure-dispatch]] protocols]))
 
 (defn sanitize-str
   "Takes a string and makes it safe for verilog."

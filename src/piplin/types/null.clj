@@ -1,6 +1,6 @@
 (ns piplin.types.null
   (:refer-clojure :exclude [cast])
-  (:use [piplin types])
+  (:use [piplin types protocols])
   (:use [piplin.types bits])
   (:use [slingshot.slingshot]))
 

@@ -6,7 +6,7 @@
   (:require [clojure.core :as clj])
   (:require [piplin.util :as util])
   (:use [slingshot.slingshot])
-  (:use [piplin.types])
+  (:use [piplin protocols types])
   (:use [piplin.types.bits]))
 
 (defmethod piplin.types/assoc-multi

@@ -1,7 +1,7 @@
 (ns piplin.mips
   (:refer-clojure :exclude [cast condp cond = not=])
   (:use [slingshot.slingshot])
-  (:use [piplin types sim modules mux])
+  (:use [piplin types sim modules mux protocols])
   (:use [piplin.types binops uintm enum bundle union bits])
   (:require [clojure.core :as clj])
   (:require [piplin.types.core-impl :as h]))

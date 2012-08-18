@@ -3,7 +3,7 @@
   (:use clojure.test)
   (:use clojure.tools.macro)
   (:use [slingshot.slingshot :only [throw+]])
-  (:use piplin.types))
+  (:use [piplin protocols types]))
 
 (deftest test-error
   (let [e (error "some bad" "stuff")]

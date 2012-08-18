@@ -1,7 +1,7 @@
 (ns piplin.test.null
   (:refer-clojure :exclude [cast])
   (:use clojure.test)
-  (:use [piplin.types])
+  (:use [piplin protocols types])
   (:use [piplin.types bits null]))
 
 (deftest serdes-nil

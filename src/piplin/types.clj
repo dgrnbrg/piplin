@@ -2,6 +2,7 @@
   (:use [slingshot.slingshot :only [throw+ try+]])
   (:use [clojure.string :only [join]])
   (:refer-clojure :exclude [cast])
+  (:use piplin.protocols)
   (:require [clojure.pprint]))
 
 (comment
@@ -17,14 +18,6 @@
 (defn isa-type?
   [type unknown]
   (isa? @types unknown type))
-
-(defprotocol ITyped
-  "Things with types in piplin implement this."
-  (typeof [this] "Return type obj for this obj.")
-  (value [this] "Return the value of this")
-  (pipinst? [this] "Returns true if this is an
-                   instance of the type (as opposed
-                   to a symbolic representation)"))
 
 (defrecord CompilerError [msg])
 
@@ -42,6 +35,7 @@
     (value [this] (throw (IllegalArgumentException.
                          (str "Cannot get value of "
                               this)))))
+
 (extend-protocol ITyped
   Object
   (typeof [this] (:type this))
@@ -215,7 +209,7 @@
   clojure.lang.IObj
   (withMeta [this metamap] (ASTNode. type map metamap))
 
-  piplin.types.ITyped
+  ITyped
   (typeof [this] type)
   (value [this] map)
   (pipinst? [this]

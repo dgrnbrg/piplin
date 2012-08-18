@@ -2,7 +2,7 @@
   "This namespace provides a fixed-length homogenous array type."
   (:refer-clojure :exclude [cast])
   (:use [slingshot.slingshot])
-  (:use [piplin.types])
+  (:use [piplin protocols types])
   (:use [clojure.core.incubator :only [seqable?]])
   (:use [piplin.types.bits]))
 

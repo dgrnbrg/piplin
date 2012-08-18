@@ -1,6 +1,6 @@
 (ns piplin.vcd
   (:use [clojure.string :only [join]])
-  (:use [piplin.types :only [typeof value]]) 
+  (:use [piplin.protocols :only [typeof value]]) 
   (:use [clojure.java.shell :only [sh]])
   (:use [clojure.java.io :only [file]])
   (:use [piplin.types.bits :only [bit-width-of serialize]]))

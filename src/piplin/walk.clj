@@ -1,6 +1,6 @@
 (ns piplin.walk
   (:refer-clojure :exclude [compile cast])
-  (:use [piplin types])) 
+  (:use [piplin types protocols])) 
 
 (defn walk
   "Takes an expr, a function to reduce over with a depth

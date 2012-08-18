@@ -3,7 +3,7 @@
   provides an implementation of `not`."
   (:refer-clojure :exclude [not cast])
   (:require [clojure.core :as clj])
-  (:use [piplin.types])
+  (:use [piplin protocols types])
   (:use [piplin.types.bits])
   (:use [slingshot.slingshot]))
 

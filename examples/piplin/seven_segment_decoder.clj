@@ -3,7 +3,7 @@
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not])
   (:use [piplin.types bits boolean bundle enum numbers union core-impl binops uintm])
-  (:use [piplin types math modules sim connect mux]))
+  (:use [piplin types math modules sim connect mux protocols]))
 
 (defn log16
   "log base 16"
