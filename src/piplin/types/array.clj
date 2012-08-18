@@ -4,7 +4,7 @@
   (:use [slingshot.slingshot])
   (:use [piplin protocols types])
   (:use [clojure.core.incubator :only [seqable?]])
-  (:use [piplin.types.bits]))
+  (:use [piplin.types bits [uintm :only [uintm]]]))
 
 (defpiplintype Array [array-len array-type])
 (defn array
@@ -19,18 +19,19 @@
 (defmethod promote
   :array
   [type obj]
+  ;TODO: if type or obj is an error, return it instead, or maybe do best effort, or ...
   (if (and (pipinst? obj)
            (= (kindof obj) :array))
-    (let [{atype :array-type alen :array-length} (typeof obj)
+    (let [{atype :array-type alen :array-len} (typeof obj)
           s (value obj)]
-      (when-not (= alen (:array-length type))
-        (throw+ (error "Array is not of length"
-                       (:array-length type)
-                       "=>" obj)))
-      (instance type (into {}
-                           (map (fn [[k v]]
-                                  [k (promote (:array-type type) v)])
-                                s))))
+      (if-not (= alen (:array-len type))
+        (ast-error type (str "Array is not of length"
+                             (:array-len type) 
+                             "=>" obj))
+        (instance type (into {}
+                             (map (fn [[k v]]
+                                    [k (promote (:array-type type) v)])
+                                  s)))))
     (do
       (when-not (seqable? obj)
         (throw+ "Can only promote seqables to piplin array"))
@@ -98,13 +99,14 @@
   ([array i]
    (piplin.types/valAt-multi array i nil))
   ([array i notfound]
-   (if (and (pipinst? i)
+   (let [i (cast (uintm (log2 (-> array typeof :array-len))) i)]
+     (if (and (pipinst? i)
             (pipinst? array))
      (get (value array) (-> i value str keyword) notfound)
      (mkast (:array-type (typeof array))
             :array-get 
             [array i]
-            get))))
+            get)))))
 
 (defmethod piplin.types/entryAt-multi
   :array

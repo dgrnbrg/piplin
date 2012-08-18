@@ -10,6 +10,7 @@
 (derive-type java.lang.Byte :piplin-type)
 (derive-type java.lang.Float :piplin-type)
 (derive-type java.lang.Double :piplin-type)
+(derive-type :j-integral :piplin-type)
 
 ;Allow the about types to participate in ITyped
 (extend-protocol ITyped

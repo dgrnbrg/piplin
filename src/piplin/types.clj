@@ -9,7 +9,7 @@
 ;  TODO: email jim@dueys.net questions about monads
   since the error handling is really quite monadic)
 
-(def types (atom (make-hierarchy)))
+(defonce types (atom (make-hierarchy)))
 
 (defn derive-type
   [child parent]

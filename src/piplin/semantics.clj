@@ -2,7 +2,7 @@
   #_(:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp])
   (:use [piplin.protocols]
         [piplin.types :only [kindof]]
-        [piplin.modules :only [walk-modules]]))
+        [piplin.modules :only [walk-modules walk-expr]]))
 
 ;The following are needed semantic checks:
 ;* Whether the index's bit width matches up to the array's
@@ -34,7 +34,11 @@
             ports)
     @messages))
 
-(defn collect-ast-errors
+(defn ast-error?
   [expr]
   (when (= :error (:op (value expr)))
     [(value expr)]))
+
+(defn collect-ast-errors
+  [expr]
+  (walk-expr expr ast-error? concat))
