@@ -90,9 +90,7 @@
        
         ;Start by merging outputs and feedback and making
         ;their ports
-        register-ports (->> (merge-with
-                              #(throw+ (error "Duplicate names:" %1 %2))
-                              outputs feedback)
+        register-ports (->> (concat outputs feedback)
                 ;Next, we convert all the outputs and feedback to
                 ;their types.
                 (map (fn [[k v]] [k (typeof v) :register]))
