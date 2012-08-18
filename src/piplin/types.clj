@@ -419,3 +419,6 @@
       (mkast type :cast [expr] (partial cast type)))
     (promote type expr)))
 
+(defn ast-error
+  [t msg]
+  (mkast t :error [] #(throw (IllegalStateException. "fail"))))

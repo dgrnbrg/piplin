@@ -15,3 +15,6 @@
                     (broken-counter 4)
                     piplin.semantics/duplicated-ports?
                     concat)))))
+
+(deftest null-test
+  (is (collect-ast-errors (cast (anontype :null) 3))))

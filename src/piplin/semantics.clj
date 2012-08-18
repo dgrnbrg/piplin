@@ -36,5 +36,5 @@
 
 (defn collect-ast-errors
   [expr]
-  (when (= :error (kindof expr))
+  (when (= :error (:op (value expr)))
     [(value expr)]))
