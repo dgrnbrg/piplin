@@ -39,7 +39,14 @@
     (is (thrown? ExceptionInfo (promote (uintm 3) "lx")))
     (is (thrown? ExceptionInfo (promote (uintm 3) -1)))
     (is (thrown? ExceptionInfo (promote (uintm 3) 100)))
-    (is (= (- 0 (um8 1)) (um8 255)))))
+    (is (= (- 0 (um8 1)) (um8 255)))
+    (is ((make-sim-fn (> (uninst (um8 30)) (um8 20)))))  
+    (is ((make-sim-fn (>= (uninst (um8 20)) (um8 20)))))  
+    (is (>= (um8 20) (um8 20)))  
+    (is ((make-sim-fn (<= (uninst (um8 20)) (um8 30)))))  
+    (is (<= (um8 20) (um8 30)))
+    (is (thrown? ExceptionInfo
+                 (cast (uintm 8) #b00)))))
 
 (deftest binop-error-test
   (let [e (error "hi")]
