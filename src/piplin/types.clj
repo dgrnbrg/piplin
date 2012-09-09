@@ -233,11 +233,13 @@
       (.write ^java.io.Writer *out* "type: ")
       (clojure.pprint/pprint-newline :miser) 
       (.write ^java.io.Writer *out* (print-str (.type node))) 
+      (.write ^java.io.Writer *out* " ")
       (clojure.pprint/pprint-newline :linear)) 
     (clojure.pprint/pprint-logical-block
-      (.write ^java.io.Writer *out* "data:")
+      (.write ^java.io.Writer *out* "data: ")
       (clojure.pprint/pprint-newline :linear)
-      (clojure.pprint/write-out (.map node)))) 
+      (clojure.pprint/write-out (.map node))
+      (.write ^java.io.Writer *out* " "))) 
   )
 
 (defn instance
