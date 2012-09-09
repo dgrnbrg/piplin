@@ -123,3 +123,25 @@
                  (memory-file) 30))  
   (icarus-test (p/modules->verilog+testbench
                  (memory-file) 50))) 
+
+(p/defmodule cycling []
+  [:feedback [pod (p/cast (array (p/uintm 3) 2) [0 2])]]
+  (let [[x y] pod]
+    (p/connect pod [(p/inc x) (p/inc y)])))
+
+(deftest cycling-test
+  (let [m (cycling)
+        a #(p/cast (array (p/uintm 3) 2) %)
+        [state fns] (p/make-sim m)]
+    (is (p/= (a [0 2])
+             (get (p/exec-sim state fns 0) [:pod])))
+    (is (p/= (a [1 3])
+             (get (p/exec-sim state fns 1) [:pod])))
+    (is (p/= (a [2 4])
+             (get (p/exec-sim state fns 2) [:pod])))
+    (is (p/= (a [3 5])
+             (get (p/exec-sim state fns 3) [:pod])))
+    (is (p/= (a [4 6])
+             (get (p/exec-sim state fns 4) [:pod])))  
+    (is (p/= (a [6 0])
+             (get (p/exec-sim state fns 6) [:pod])))))

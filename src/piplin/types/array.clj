@@ -48,7 +48,7 @@
           (if (every? pipinst? (vals casted-obj))
             (instance type casted-obj :constrain)
             (mkast-explicit-keys type :make-array
-                                 (map keyword (range array-len))
+                                 (map (comp keyword str) (range array-len))
                                  casted-obj
                                  (fn [& args]
                                    (promote type args)))))))))
@@ -101,12 +101,12 @@
   ([array i notfound]
    (let [i (cast (uintm (log2 (-> array typeof :array-len))) i)]
      (if (and (pipinst? i)
-            (pipinst? array))
-     (get (value array) (-> i value str keyword) notfound)
-     (mkast (:array-type (typeof array))
-            :array-get 
-            [array i]
-            get)))))
+              (pipinst? array))
+       (get (value array) (-> i value str keyword) notfound)
+       (mkast (:array-type (typeof array))
+              :array-get 
+              [array i]
+              piplin.types/valAt-multi)))))
 
 (defmethod piplin.types/entryAt-multi
   :array
