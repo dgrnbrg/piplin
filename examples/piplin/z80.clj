@@ -74,13 +74,13 @@
                              :data (->> (get registers src-addr)
                                      (get memory))}}))
     (:store {:keys [src-reg dst-addr]}
-            (cast writeback {:mem {:mem (get registers src-reg)
-                                   :data (get registers dst-addr)}}))
+      (cast writeback {:mem {:mem (get registers src-reg)
+                             :data (get registers dst-addr)}}))
     (:imm {:keys [imm dst]}
       (cast writeback {:reg {:reg dst :data imm}}))
     (:alu {:keys [src1 src2 dst op]}
       (let [alu-result (compute-alu src1 src2 op)]
-        (writeback {:reg {:reg dst :data alu-result}})))))
+        (cast writeback {:reg {:reg dst :data alu-result}})))))
 
 (comment (defn decode-opcode
   "Takes an opcode and returns the map containing
