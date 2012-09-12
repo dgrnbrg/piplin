@@ -39,8 +39,8 @@
     (let [tag (key (first obj))
           v (val (first obj))]
       (when-not (= (count obj) 1)
-        (throw+ (error "Union map must have 1 element")))
-      (if-let [val-type (get (:schema type) tag)] 
+        (throw+ (error "Union map must have 1 key/value pair, goal type:" type "from:" obj)))
+    (if-let [val-type (get (:schema type) tag)] 
         (let [v (cast val-type v)]
           (if (pipinst? v)
             (instance type obj :constrain)
@@ -102,9 +102,9 @@
         k (key (first m))
         v (val (first m))]
     (when-not (= (class (typeof inst)) Union)
-      (throw+ (error "Union has wrong class")))
+      (throw+ (error "Union has wrong class:" (class (typeof inst)))))
     (when-not (= 1 (count m))
-      (throw+ (error m "must have 1 key/value pair")))
+      (throw+ (error "Union map must have 1 key/value pair, was type" (typeof inst) "value:" m)))
     (when-not (get schema k)
       (throw+ (error k "not in schema:" schema)))
     (when-not (= (typeof v) (get schema k))
