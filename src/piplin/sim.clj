@@ -130,6 +130,97 @@
        every-cycle-fn)
      fnargs]))
 
+;;; State is 
+
+(defn transition 
+  "State transition"
+  [state transitions]
+  (let [[state delta events] state]
+    [state (merge delta transitions) events]))
+
+(defmacro -x>
+  [state & {:as transitions}]
+  `(transition ~state ~(reduce (fn [m [s v]] (conj m [(-> s name keyword) v]))
+                               {}
+                               transitions)))
+
+(defn delay'
+  "Add event for +n cycles"
+  [state n]
+  (let [[{c :cycle :as state} delta events] state]
+    [state delta (inc c)]))
+
+(defn state-machine*
+  [init-state init-vars transitions]
+  "init-state is a pair: a keyword, the state var, to a value, the initial state
+  
+  init-vars is a seq of pairs from keyword var names to their initial values
+
+  transitions is a map from state names to the functions to invoke if in that state.
+  The functions must take as fnargs (cons (first init-state) (map first init-vars)).
+
+  This returns an initial state and fns map.
+  "
+  (let [fnargs (list* (first init-state) :cycle (map first init-vars))
+        init-state (-> {} (conj init-state) (into init-vars))]
+    [init-state
+     {(fn f [state & args]
+        (let [[_ delta event] (apply (transitions state) args)] 
+          [delta {event {f fnargs}}]
+          ))
+      fnargs}]))
+
+(defmacro state-machine
+  [[state-sym state-val] var-binding & transitions]
+  (let [state-kw (keyword (name state-sym))
+        init-state [state-kw state-val]
+        var-binding (partition 2 var-binding)
+        init-vars (reduce (fn [m [sym v]] (conj m [(keyword sym) v])) [] var-binding)
+        quoted-syms (map (comp #_(partial list 'quote)
+                               first)
+                         var-binding)
+        transitions (reduce (fn [m [state & body]]
+                              (conj m
+                                    [state
+                                     `(fn ~(symbol (str (name state) "-transition-fn"))
+                                        [cycle# ~@quoted-syms]
+                                        (let [~state-sym [(conj ~(zipmap (map (comp keyword first)
+                                                                              var-binding)
+                                                                         quoted-syms)
+                                                                [:cycle cycle#])
+                                                          {}
+                                                          {}]
+                                              ~'next-state (fn [s# s'#] (-x> s# ~state-kw s'#))
+                                              ]
+                                          ~@body))]))
+                            {}
+                            transitions)
+        ]
+    `(state-machine* ~init-state ~init-vars ~transitions)))
+
+(comment
+  (defn clock
+    "Implements a lopsided clock and demonstrates state machine dsl."
+    [period]
+    (state-machine [old-state :high] [b true]
+                   (:high (println "In high state!")
+                          (-> old-state
+                            (-x> b false)
+                            (next-state :low)
+                            (delay' period))) 
+                   (:wait (-> old-state
+                            (next-state :high)
+                            (delay' period))) 
+                   (:low (-> old-state
+                           (-x> b true)
+                           (next-state :wait)
+                           (delay' period)))))
+
+  (let [[state fns] (clock 1)
+        [fns a] (trace-keys fns :old-state :b)]
+    (exec-sim state fns 10)
+    @a))
+
 (defn trace-keys
   "Generate a trace for given tokens.
   Returns the atom that will contain the
