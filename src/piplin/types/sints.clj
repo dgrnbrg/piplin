@@ -22,6 +22,18 @@
     {:min (- base)
      :max (dec base)}))
 
+(defn min-value
+  "Returns the minimum value possible to store in `type`"
+  [type]
+  (let [{:keys [min]} (bounds (:n type))]
+    (type min)))
+
+(defn max-value
+  "Returns the maximum value possible to store in `type`"
+  [type]
+  (let [{:keys [max]} (bounds (:n type))]
+    (type max)))
+
 (defmethod constrain
   :sints
   [sintm init-val]

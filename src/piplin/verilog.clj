@@ -14,6 +14,14 @@
   [s]
   (replace s \- \_))
 
+(defn array-width-decl
+  "Takes a width `x` and returns the string `\"[x:0]\"`,
+  or `\"\"` if x is one"
+  [x]
+  (if (= 1 x)
+    ""
+    (str "[" (dec x) ":0]")))
+
 (defn make-union-verilog
   [tag padding value]
   (str "{" tag
@@ -42,6 +50,15 @@
         i (value x)
         w (bit-width-of t)] 
     (str w "'d" i)))
+
+(defmethod verilog-repr :sints 
+  [x]
+  (let [t (typeof x)
+        i (value x)
+        w (bit-width-of t)] 
+    (str (when (neg? i) "-")
+         w "'d"
+         (if (neg? i) (- i) i))))
 
 (defmethod verilog-repr :boolean
   [x]
@@ -110,11 +127,11 @@
 
 (defmethod verilog-of ::immediate
   [ast name-lookup]
-  (verilog-repr ast))
+  [(verilog-repr ast)])
 
 (defmethod verilog-of :port
   [ast name-lookup]
-  (lookup-expr name-lookup ast))
+  [(lookup-expr name-lookup ast)])
 
 (defn get-args
   [ast]
@@ -138,18 +155,18 @@
         padding (- w
                    (bit-width-of enum)
                    (bit-width-of (tag schema)))]
-    (make-union-verilog
+    [(make-union-verilog
       (lookup-expr name-lookup (enum tag))
       padding
-      (lookup-expr name-lookup val))))
+      (lookup-expr name-lookup val))]))
 
 (defmethod verilog-of :get-value
   [ast name-lookup]
   (let [valtype (typeof ast) 
         union (:u (get-args ast))
         top  (dec (bit-width-of valtype))]
-    (str (lookup-expr name-lookup union)
-         "[" top (when-not (zero? top) ":0") "]"))) 
+    [(str (lookup-expr name-lookup union)
+         "[" top (when-not (zero? top) ":0") "]")])) 
 
 (defmethod verilog-of :get-tag
   [ast name-lookup]
@@ -157,11 +174,11 @@
         union (:u (get-args ast))
         top (dec (bit-width-of (typeof union)))
         bottom (inc (- top (bit-width-of enum)))]
-    (str (lookup-expr name-lookup union)
+    [(str (lookup-expr name-lookup union)
          "[" top 
          (when-not (= top bottom)
            (str ":" bottom))
-         "]"))) 
+         "]")])) 
 
 (defmethod verilog-of :make-bundle
   [ast name-lookup]
@@ -170,7 +187,7 @@
         ordered-vals (map #(lookup-expr name-lookup
                                         (get bundle-inst %))
                           schema-ks)]
-    (str "{" (join ", " ordered-vals) "}")))
+    [(str "{" (join ", " ordered-vals) "}")]))
 
 (defn compute-key-offsets
   "Returns a map from keys to pairs. The pairs
@@ -197,20 +214,20 @@
         [high low] (get offsets k)
         v (lookup-expr name-lookup v)
         bund (lookup-expr name-lookup bund)] 
-    (str "{"
+    [(str "{"
          (when-not (= (dec w) high)
            (str bund "[" (dec w) ":" (inc high) "], "))
          v
          (when-not (= low 0)
            (str ", " bund "[" (dec low) ":0]"))
-         "}")))
+         "}")]))
 
 (defmethod verilog-of :bundle-key
   [ast name-lookup]
   (let [{:keys [bund key]} (get-args ast)
         offsets (compute-key-offsets (typeof bund))
         [high low] (get offsets key)]
-    (str (lookup-expr name-lookup bund) "[" high ":" low "]")))
+    [(str (lookup-expr name-lookup bund) "[" high ":" low "]")]))
 
 (defmethod verilog-of :make-array
   [ast name-lookup]
@@ -222,23 +239,23 @@
         ordered-vals (map #(lookup-expr name-lookup
                                         (get array-inst %))
                           keys)]
-    (str "{" (join ", " ordered-vals) "}")))
+    [(str "{" (join ", " ordered-vals) "}")]))
 
 (defmethod verilog-of :array-get
   [ast name-lookup]
   (let [{:keys [array i]} (get-args ast)
         subtype-width (bit-width-of (:array-type (typeof array)))
         index (lookup-expr name-lookup i)]
-    (str
+    [(str
       (lookup-expr name-lookup array)
       "[" 
       (lookup-expr name-lookup i)
-      "]")))
+      "]")]))
 
 (defmethod verilog-of :array-nth
   [ast name-lookup]
   (let [{:keys [array i]} (get-args ast)]
-    (lookup-expr name-lookup (get array (keyword (str i))))))
+    [(lookup-expr name-lookup (get array (keyword (str i))))]))
 
 #_(defmethod verilog-of :array-assoc
   [ast name-lookup]
@@ -259,95 +276,130 @@
 (defmethod verilog-of :slice
   [ast name-lookup]
   (let [{:keys [expr high low]} (get-args ast)]
-    (str (lookup-expr name-lookup expr) "[" (dec high) ":" low "]")))
+    [(str (lookup-expr name-lookup expr) "[" (dec high) ":" low "]")]))
 
 (defmethod verilog-of :bit-cat
   [ast name-lookup]
   (let-args ast name-lookup [b1 b2]
-    (str "{" b1 ", " b2 "}")))
+    [(str "{" b1 ", " b2 "}")]))
 
 (defmethod verilog-of :mux2
   [ast name-lookup]
   (let [t (typeof ast)
         {:keys [sel v1 v2]} (get-args ast)]
-    (str (lookup-expr name-lookup sel) " ? "
+    [(str (lookup-expr name-lookup sel) " ? "
          (lookup-expr name-lookup v1) " : "
-         (lookup-expr name-lookup v2))))
+         (lookup-expr name-lookup v2))]))
 
 (defmethod verilog-of :+
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            (str lhs " + " rhs)))
+    (condp = (kindof ast)
+      :uintm
+      [(str lhs " + " rhs)]
+      :sintm
+      [(str "$signed(" lhs ") + $signed(" rhs ")")]
+      :sints
+      (let [type (typeof ast)
+            width (bit-width-of type)
+           
+            lhs-tmp-name (name (gensym))
+            lhs-tmp (format "wire [%d:0] %s = %s" (dec width) lhs-tmp-name lhs)
+            rhs-tmp-name (name (gensym))
+            rhs-tmp (format "wire [%d:0] %s = %s" (dec width) rhs-tmp-name rhs)
+
+            extended-sum-name (name (gensym))
+            extended-sum (str "wire " (array-width-decl (inc width)) " "
+                              extended-sum-name
+                              (format " = {%s[%d],%s} + {%s[%d],%s}"
+                                      lhs-tmp-name (dec width) lhs-tmp-name
+                                      rhs-tmp-name (dec width) rhs-tmp-name))
+
+            extended-sum-msb (str extended-sum-name "[" width "]")
+            overflow? (str "(" extended-sum-msb " == "
+                           extended-sum-name "[" (dec width) "])")
+
+            overflow-case (str "(" extended-sum-msb " == 1'b0) ? "
+                               (verilog-repr
+                                 (piplin.types.sints/max-value type))
+                               " : "
+                               (verilog-repr
+                                 (piplin.types.sints/min-value type)))]
+        [(str overflow? " ? "
+              extended-sum-name (array-width-decl width)
+              " : " overflow-case)
+         [lhs-tmp rhs-tmp extended-sum]])
+      (throw+ (error "Cannot add" (kindof ast))))))
 
 (defmethod verilog-of :-
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            (str lhs " - " rhs)))
+            [(str lhs " - " rhs)]))
 
 (defmethod verilog-of :*
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            (str lhs " * " rhs)))
+            [(str lhs " * " rhs)]))
 
 (defmethod verilog-of :>
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            (str lhs " > " rhs)))
+            [(str lhs " > " rhs)]))
 
 (defmethod verilog-of :>=
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            (str lhs " >= " rhs)))
+            [(str lhs " >= " rhs)]))
 
 (defmethod verilog-of :<
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            (str lhs " - " rhs)))
+            [(str lhs " - " rhs)]))
 
 (defmethod verilog-of :<=
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            (str lhs " <= " rhs)))
+            [(str lhs " <= " rhs)]))
 
 (defmethod verilog-of :bit-and
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            (str lhs " & " rhs)))
+            [(str lhs " & " rhs)]))
 
 (defmethod verilog-of :bit-or
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            (str lhs " | " rhs)))
+            [(str lhs " | " rhs)]))
 
 (defmethod verilog-of :bit-xor
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            (str lhs " ^ " rhs)))
+            [(str lhs " ^ " rhs)]))
 
 (defmethod verilog-of :bit-not
   [ast name-lookup]
   (let-args ast name-lookup [x]
-            (str "~" x)))
+            [(str "~" x)]))
 
 (defmethod verilog-of :not
   [ast name-lookup]
   (let-args ast name-lookup [x]
-    (str "~" x)))
+    [(str "~" x)]))
 
 (defmethod verilog-of :and
   [ast name-lookup]
   (let-args ast name-lookup [x y]
-    (str x " & " y)))
+    [(str x " & " y)]))
 
 (defmethod verilog-of :or
   [ast name-lookup]
   (let-args ast name-lookup [x y]
-    (str x " | " y)))
+    [(str x " | " y)]))
 
 (defmethod verilog-of :=
   [ast name-lookup]
-   (let [{:keys [x y]} (get-args ast)]
-     (str (lookup-expr name-lookup x) " == " (lookup-expr name-lookup y))))
+   [(let [{:keys [x y]} (get-args ast)]
+     (str (lookup-expr name-lookup x) " == " (lookup-expr name-lookup y)))])
 
 (defn verilog-noop-passthrough
   ([ast name-lookup]
@@ -375,11 +427,6 @@
   [ast name-lookup]
   (verilog-noop-passthrough ast name-lookup :bits))
 
-(defn array-width-decl [x]
-  (if (zero? x)
-    ""
-    (str "[" (dec x) ":0]")))
-
 (defn render-single-expr
   "Takes an expr and a name table and
   returns an updated name table and a string
@@ -398,10 +445,12 @@
           bit-width (bit-width-of (typeof expr))
           wire-decl (str "wire " (array-width-decl bit-width) " ")
           assign " = "
-          body (verilog-of expr name-table)
+          [body structural] (verilog-of expr name-table)
           terminator ";\n"]
       [name
-       (str indent
+       (str (join (interleave (map (partial str indent) structural)
+                              (repeat terminator)))
+            indent
             wire-decl
             name
             assign
