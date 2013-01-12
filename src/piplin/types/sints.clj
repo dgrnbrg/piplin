@@ -97,3 +97,25 @@
 (defcoercions impl/<= :sints [:j-integral])
 
 (defcoercions piplin.types.binops/= :sints [:j-integral])
+
+(defmethod bit-width-of
+  :sints 
+  [type]
+  (:n type))
+
+(defmethod get-bits
+  :sints 
+  [expr]
+  (let [n (bit-width-of (typeof expr))]
+      (long-to-bitvec (value expr) n)))
+
+(defmethod from-bits
+  :sints
+  [type bits]
+  (let [n (:n type)
+        [sign & body] (value bits)
+        body (bitvec-to-long body)
+        {:keys [min]} (bounds n)]
+    (if (= 0 sign)
+      body
+      (+ min body))))

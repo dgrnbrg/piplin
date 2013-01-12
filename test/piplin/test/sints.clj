@@ -45,3 +45,7 @@
   (is (> ((sints 8) 100) 0))
   (is (> ((sints 8) 100) -120))
   (is (< ((sints 8) -100) 120)))
+
+(deftest sints-bits-roundtrip
+  (doseq [x (map (sints 4) (range -8 8))]
+    (is (= x (deserialize (sints 4) (serialize x))))))
