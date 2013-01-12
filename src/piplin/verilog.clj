@@ -26,7 +26,7 @@
   :hierarchy types)
 (defmethod verilog-repr :default
   [x]
-  (throw+ (error "cannot convert to verilog:" x)))
+  (throw+ (error "cannot convert " (kindof x) " to verilog:" x)))
 
 ;TODO: why must this method be included?
 ;I cannot figure out where it fits in the output
@@ -106,7 +106,7 @@
 
 (defmethod verilog-of :default
   [ast name-lookup]
-  (throw+ (error "cannot convert to verilog:" ast)))
+  (throw+ (error "cannot convert" (:op (value ast)) "to verilog:" ast)))
 
 (defmethod verilog-of ::immediate
   [ast name-lookup]
@@ -328,6 +328,11 @@
   [ast name-lookup]
   (let-args ast name-lookup [x]
             (str "~" x)))
+
+(defmethod verilog-of :not
+  [ast name-lookup]
+  (let-args ast name-lookup [x]
+    (str "~" x)))
 
 (defmethod verilog-of :and
   [ast name-lookup]
