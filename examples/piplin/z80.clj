@@ -1,5 +1,5 @@
 (ns piplin.z80
-  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp])
+  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or])
   (:use piplin.core))
 
 ;http://www.z80.info/decoding.htm

@@ -329,19 +329,33 @@
   (let-args ast name-lookup [x]
             (str "~" x)))
 
+(defmethod verilog-of :and
+  [ast name-lookup]
+  (let-args ast name-lookup [x y]
+    (str x " & " y)))
+
+(defmethod verilog-of :or
+  [ast name-lookup]
+  (let-args ast name-lookup [x y]
+    (str x " | " y)))
+
 (defmethod verilog-of :=
   [ast name-lookup]
    (let [{:keys [x y]} (get-args ast)]
      (str (lookup-expr name-lookup x) " == " (lookup-expr name-lookup y))))
 
 (defn verilog-noop-passthrough
-  [ast name-lookup]
-  (let [args (get-args ast)]
-    (when-not (contains? args :expr)
-      (throw+ (error "must have an :expr" args)))
-    (when (not= 1 (count args))
-      (throw+ (error "must have exactly one expr")))
-    (verilog-of (:expr args) name-lookup)))
+  ([ast name-lookup]
+   (verilog-noop-passthrough ast name-lookup :expr)
+   )
+  ([ast name-lookup passthrough]
+   (let [args (get-args ast)]
+     (when-not (contains? args passthrough)
+       (throw+ (error (str "must have an " passthrough)
+                      args)))
+     (when (not= 1 (count args))
+       (throw+ (error "must have exactly one expr")))
+     (verilog-of (passthrough args) name-lookup))))
 
 (defmethod verilog-of :cast
   [ast name-lookup]
@@ -352,6 +366,9 @@
 (defmethod verilog-of :serialize
   [ast name-lookup]
   (verilog-noop-passthrough ast name-lookup))
+(defmethod verilog-of :deserialize
+  [ast name-lookup]
+  (verilog-noop-passthrough ast name-lookup :bits))
 
 (defn array-width-decl [x]
   (if (zero? x)

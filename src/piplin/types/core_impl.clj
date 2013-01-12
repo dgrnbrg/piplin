@@ -7,7 +7,7 @@
   There are also several macros useful for making unary and binary functions
   that delegate to clojure.core implementations, which is useful for
   adding support for currently unsupported operations."
-  (:refer-clojure :exclude [= not= bit-and bit-or bit-xor bit-not + - * inc dec > >= < <= cast])
+  (:refer-clojure :exclude [= not= bit-and bit-or bit-xor bit-not + - * inc dec > >= < <= cast and or])
   (:require [piplin.types])
   (:require [piplin.types.numbers])
   (:require [clojure.core :as clj])
@@ -20,7 +20,7 @@
   [op key]
   `(defmethod ~op ~key
      [~'x]
-     ('~(ns-resolve 'clojure.core op) ~'x)))
+     (~(symbol "clojure.core" (name op)) ~'x)))
 
 (defn- make-core-binop-fn
   "Makes syntax for a binop using the core
@@ -28,7 +28,7 @@
   [op key]
   `(defmethod ~op [~key ~key]
      [~'x ~'y]
-     ('~(ns-resolve 'clojure.core op) ~'x ~'y)))
+     (~(symbol "clojure.core" (name op)) ~'x ~'y)))
 
 (defmacro def-n-ary-binop
   "Defines a generic function for a binary operation

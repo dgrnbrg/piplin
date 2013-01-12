@@ -1,7 +1,7 @@
 (ns piplin.test.math
   (:use clojure.test)
   (:use [slingshot.slingshot :only [throw+]])
-  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not])
+  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not and or])
   (:use [piplin types math modules sim connect protocols])
   (:use [piplin.types bits boolean enum numbers core-impl binops uintm])
   (:import clojure.lang.ExceptionInfo))
@@ -28,6 +28,38 @@
   (is (not (<= 4 1)))
   (is (not= 1 2))
   (is (not (not= 0 0))))
+
+(deftest boolean-test
+  (is (not false))
+  (is (and))
+  (is (not (or)))
+  (is (and true true))
+  (is (not (and true false)))
+  (is (not (and false true)))
+  (is (not (and false true true true)))
+  (is (not (and true true true false)))
+  (is (and true true true true))
+
+  (is ((make-sim-fn (and (uninst true) true))))
+  (is ((make-sim-fn (and true (uninst true)))))
+  (is ((make-sim-fn (and true true (uninst true)))))
+  (is ((make-sim-fn (and (uninst true) true true))))
+  (is (make-sim-fn (and (uninst false) true true)))
+  (is (not ((make-sim-fn (and (uninst false) true true)))))
+
+  (is (or true false))
+  (is (or false true))
+  (is (or false true true true))
+  (is (or true true true false))
+  (is (not (or false false false false)))
+  
+  (is ((make-sim-fn (or true (uninst false)))))
+  (is ((make-sim-fn (or (uninst true) false))))
+  (is ((make-sim-fn (or (uninst true) (uninst false)))))
+  (is (make-sim-fn (or (uninst false) false false)))
+  (is (make-sim-fn (or false false (uninst false))))
+  (is (not ((make-sim-fn (or (uninst false) false false)))))
+  (is (not ((make-sim-fn (or false false (uninst false)))))))
 
 (deftest uintm-test
   (letfn [(um8 [v] (instance (uintm 8) v))]

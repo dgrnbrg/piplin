@@ -3,7 +3,7 @@
   (:use [clojure.pprint :only [pprint]])
   (:use [slingshot.slingshot :only [throw+]])
   (:use piplin.test.util)
-  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not])
+  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not and or])
   (:use [piplin.types bits boolean bundle enum numbers union core-impl binops uintm])
   (:use [piplin connect types math modules mux sim verilog [seven-segment-decoder :only [seven-seg-tester]]]))
 
@@ -64,3 +64,20 @@
                  (seven-seg-tester 9) 600))
   (icarus-test (modules->verilog+testbench
                  (seven-seg-tester 10) 1025)))
+
+(defmodule and-or []
+  [:feedback [c ((uintm 3) 0)
+              x false
+              y false]]
+  (connect c (inc c))
+  (let [c-bits (serialize c)
+        [a b c] (map #(deserialize
+                        (anontype :boolean)
+                        (bit-slice c-bits % (inc %)))
+                     (range 3))]
+    (connect x (and a b))
+    (connect y (or b c))))
+
+(deftest and-or-test
+  (icarus-test (modules->verilog+testbench
+                 (and-or) 20)))

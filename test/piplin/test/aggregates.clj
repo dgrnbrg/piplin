@@ -1,5 +1,5 @@
 (ns piplin.test.aggregates
-  (:refer-clojure :exclude [cond condp cast not = not= > >= < <= + - * inc dec bit-and bit-or bit-xor bit-not])
+  (:refer-clojure :exclude [cond condp cast not = not= > >= < <= + - * inc dec bit-and bit-or bit-xor bit-not and or])
   (:use [piplin.types bundle uintm enum bits union boolean core-impl binops])
   (:use [piplin types mux modules sim connect protocols])
   (:import clojure.lang.ExceptionInfo) 

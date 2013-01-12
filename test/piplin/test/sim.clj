@@ -2,7 +2,7 @@
   (:use [piplin sim modules math types])
   (:use [piplin types modules sim mux connect])
   (:use [piplin.types numbers core-impl binops uintm])
-  (:refer-clojure :as clj :exclude [not= cond + - * inc dec bit-or bit-xor bit-and bit-not condp < > <= >= = cast])
+  (:refer-clojure :as clj :exclude [not= cond + - * inc dec bit-or bit-xor bit-and bit-not condp < > <= >= = cast or and])
   (:use clojure.test))
 
 (deftest what-changed-test

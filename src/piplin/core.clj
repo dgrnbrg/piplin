@@ -1,5 +1,5 @@
 (ns piplin.core
-  (:refer-clojure :exclude [cast + - * <= < >= > not= = bit-and bit-or bit-xor bit-not inc dec not cond condp])
+  (:refer-clojure :exclude [cast + - * <= < >= > not= = bit-and bit-or bit-xor bit-not inc dec not cond condp and or])
   (:use [slingshot.slingshot])
   (:use [swiss-arrows.core :only [-<>]]))
 
@@ -68,6 +68,8 @@
   piplin.types.bits/bit-cat
   piplin.types.bits/bit-slice
   piplin.types.boolean/not
+  piplin.types.boolean/and
+  piplin.types.boolean/or
   piplin.types.bundle/bundle
   piplin.types.core-impl/+
   piplin.types.core-impl/-
