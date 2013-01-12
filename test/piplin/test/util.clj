@@ -11,11 +11,12 @@
                      (str "-o" n ".vvp")
                      "-tvvp"
                      (str n ".v"))
+        _ (when-not (zero? (:exit iverilog))
+            (throw (ex-info "iverilog failed" iverilog)))
         vvp (sh (str "./" n ".vvp"))
         _ (sh "rm" "-f"
               (str n ".vvp")
               (str n ".v"))]
-    (is (= 0 (:exit iverilog)) iverilog)
     (is (re-find #"test passed" (:out vvp)) "tests didn't pass")
     (is (= 0 (:exit vvp)) "tested failed-return value")))
 
