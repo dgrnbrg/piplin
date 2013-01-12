@@ -82,6 +82,7 @@
   piplin.types.core-impl/<=
   piplin.types.enum/enum
   piplin.types.uintm/uintm
+  piplin.types.sints/sints 
   piplin.types.union/union
   piplin.types.union/union-match
   piplin.types.union/maybe
