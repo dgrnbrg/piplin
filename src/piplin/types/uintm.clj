@@ -56,9 +56,6 @@
     :else (throw+ (error "Don't know how to promote to :uintm from"
                          (typeof obj)))))
 
-
-
-
 (defbinopimpl impl/+ :uintm [:j-integral]
   [x y]
   (+ (value x) (value y)))
