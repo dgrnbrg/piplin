@@ -6,6 +6,7 @@
   (:use [clojure.set :only [map-invert]])
   (:use [clojure.string :only [join replace]]) 
   (:use [piplin modules types])
+  (:require piplin.types.sints)
   (:use [piplin.types [bits :only [bit-width-of bits serialize]]])
   (:use [piplin [types :only [piplin-clojure-dispatch]] protocols]))
 
@@ -291,6 +292,22 @@
          (lookup-expr name-lookup v1) " : "
          (lookup-expr name-lookup v2))]))
 
+(defmethod verilog-of :sign-extend
+  [ast name-lookup]
+  (let [orig-width (-> ast
+                     value
+                     :args
+                     :num
+                     typeof
+                     bit-width-of)
+        new-width (-> ast
+                    typeof
+                    bit-width-of)]
+    (let-args ast name-lookup [num]
+      [(format "{ {%d{%s[%d]}}, %s}"
+               (- new-width orig-width)
+               num (dec orig-width) num)])))
+
 (defmethod verilog-of :+
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
@@ -303,12 +320,12 @@
       (let [type (typeof ast)
             width (bit-width-of type)
            
-            lhs-tmp-name (name (gensym))
+            lhs-tmp-name (name (gensym "lhs"))
             lhs-tmp (format "wire [%d:0] %s = %s" (dec width) lhs-tmp-name lhs)
-            rhs-tmp-name (name (gensym))
+            rhs-tmp-name (name (gensym "rhs"))
             rhs-tmp (format "wire [%d:0] %s = %s" (dec width) rhs-tmp-name rhs)
 
-            extended-sum-name (name (gensym))
+            extended-sum-name (name (gensym "extended_sum"))
             extended-sum (str "wire " (array-width-decl (inc width)) " "
                               extended-sum-name
                               (format " = {%s[%d],%s} + {%s[%d],%s}"
@@ -334,12 +351,138 @@
 (defmethod verilog-of :-
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            [(str lhs " - " rhs)]))
+    (condp = (kindof ast)
+      :uintm
+      [(str lhs " - " rhs)]
+      )))
 
 (defmethod verilog-of :*
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            [(str lhs " * " rhs)]))
+    (condp = (kindof ast)
+      :uintm
+      [(str lhs " * " rhs)]
+      :sints
+      (let [type (typeof ast)
+            width (bit-width-of type)
+
+            lhs-tmp-name (name (gensym "lhs"))
+            lhs-tmp (format "wire [%d:0] %s = %s" (dec width) lhs-tmp-name lhs)
+            rhs-tmp-name (name (gensym "rhs"))
+            rhs-tmp (format "wire [%d:0] %s = %s" (dec width) rhs-tmp-name rhs)
+
+            prod-sym (name (gensym "prod"))
+            prod (format "wire [%d:0] %s = %s * %s"
+                         (dec width) prod-sym lhs-tmp-name rhs-tmp-name)
+
+            lhs-pos?-sym (name (gensym "lhs_pos")) 
+            rhs-pos?-sym (name (gensym "rhs_pos")) 
+            lhs-pos? (format "wire %s = ~%s[%d]" lhs-pos?-sym lhs-tmp-name (dec width))
+            rhs-pos? (format "wire %s = ~%s[%d]" rhs-pos?-sym rhs-tmp-name (dec width))
+
+            lhs-leading-0s-sym (name (gensym "lhs_leading_zeros"))
+            lhs-leading-0s-clauses (->> (range (dec width))
+                                     (map #(format "~|%s[%d:%d] ? %d :"
+                                                   lhs-tmp-name 
+                                                   (dec width) %
+                                                   (- width %)))
+                                     (join " ")
+                                     (format "%s 1"))
+            lhs-leading-0s (format "wire [%d:0] %s = %s"
+                                   (log2 width) lhs-leading-0s-sym
+                                   lhs-leading-0s-clauses)
+            rhs-leading-0s-sym (name (gensym "rhs_leading_zeros"))
+            rhs-leading-0s-clauses (->> (range (dec width))
+                                     (map #(format "~|%s[%d:%d] ? %d :"
+                                                   rhs-tmp-name 
+                                                   (dec width) %
+                                                   (- width %)))
+                                     (join " ")
+                                     (format "%s 1"))
+            rhs-leading-0s (format "wire [%d:0] %s = %s"
+                                   (log2 width) rhs-leading-0s-sym
+                                   rhs-leading-0s-clauses)
+
+            lhs-leading-1s-sym (name (gensym "lhs_leading_ones"))
+            lhs-leading-1s-clauses (->> (range (dec width))
+                                     (map #(format "&%s[%d:%d] ? %d :"
+                                                   lhs-tmp-name 
+                                                   (dec width) %
+                                                   (- width %)))
+                                     (join " ")
+                                     (format "%s 1"))
+            lhs-leading-1s (format "wire [%d:0] %s = %s"
+                                   (log2 width) lhs-leading-1s-sym
+                                   lhs-leading-1s-clauses)
+            rhs-leading-1s-sym (name (gensym "rhs_leading_ones"))
+            rhs-leading-1s-clauses (->> (range (dec width))
+                                     (map #(format "&%s[%d:%d] ? %d :"
+                                                   rhs-tmp-name 
+                                                   (dec width) %
+                                                   (- width %)))
+                                     (join " ")
+                                     (format "%s 1"))
+            rhs-leading-1s (format "wire [%d:0] %s = %s"
+                                   (log2 width) rhs-leading-1s-sym
+                                   rhs-leading-1s-clauses)
+
+            pos-pos-ovf?-sym (name (gensym "pos_pos_ovf"))
+            pos-pos-ovf? (format "wire %s = (%s + %s < %d) | ((%s + %s == %d) & %s[%d])"
+                                 pos-pos-ovf?-sym
+                                 lhs-leading-0s-sym rhs-leading-0s-sym width
+                                 lhs-leading-0s-sym rhs-leading-0s-sym width
+                                 prod-sym (dec width))
+
+            neg-neg-ovf?-sym (name (gensym "neg_neg_ovf"))
+            neg-neg-ovf? (format "wire %s = (%s + %s < %d) | ((%s + %s == %d || %s + %s == %d) & (%s[%d] || %s == %s))"
+                                 neg-neg-ovf?-sym
+                                 lhs-leading-1s-sym rhs-leading-1s-sym width
+                                 lhs-leading-1s-sym rhs-leading-1s-sym width
+                                 lhs-leading-1s-sym rhs-leading-1s-sym (inc width)
+                                 prod-sym (dec width)
+                                 prod-sym (verilog-repr
+                                        ((piplin.types.bits/bits width)
+                                           (vec (repeat width 0)))))
+
+            negative-leading-sym (name (gensym "neg_leading"))
+            negative-leading (format "wire [%d:0] %s = ~%s ? %s : %s"
+                                     (log2 width) negative-leading-sym
+                                     lhs-pos?-sym
+                                     lhs-leading-1s-sym rhs-leading-1s-sym)
+            positive-leading-sym (name (gensym "pos_leading"))
+            positive-leading (format "wire [%d:0] %s = ~%s ? %s : %s"
+                                     (log2 width) positive-leading-sym
+                                     lhs-pos?-sym
+                                     rhs-leading-0s-sym lhs-leading-0s-sym)
+            neg-pos-ovf?-sym (name (gensym "neg_pos_ovf"))
+            neg-pos-ovf? (format "wire %s = (%s + %s < %d) | ~%s[%d]"
+                                 neg-pos-ovf?-sym
+                                 negative-leading-sym positive-leading-sym
+                                 width prod-sym (dec width))
+
+            zero-sym (format "%d'd0" width)
+            has-zero?-sym (name (gensym "zero"))
+            has-zero? (format "wire %s = %s == %s || %s == %s"
+                              has-zero?-sym lhs-tmp-name zero-sym
+                              rhs-tmp-name zero-sym)
+
+            min-val (verilog-repr
+                      (piplin.types.sints/min-value type))
+            max-val (verilog-repr
+                      (piplin.types.sints/max-value type))
+            ]
+        [(format "%s ? %s : ((%s & %s & %s) | (~%s & ~%s & %s)) ? %s : ((%s ^ %s) & %s) ? %s : %s"
+                 has-zero?-sym zero-sym
+                 lhs-pos?-sym rhs-pos?-sym pos-pos-ovf?-sym
+                 lhs-pos?-sym rhs-pos?-sym neg-neg-ovf?-sym
+                 max-val
+                 lhs-pos?-sym rhs-pos?-sym neg-pos-ovf?-sym
+                 min-val
+                 prod-sym
+                 )
+         [lhs-tmp rhs-tmp has-zero? prod lhs-pos? rhs-pos? lhs-leading-0s lhs-leading-1s rhs-leading-0s rhs-leading-1s
+          pos-pos-ovf? neg-neg-ovf? negative-leading positive-leading neg-pos-ovf?]]
+        ))))
 
 (defmethod verilog-of :>
   [ast name-lookup]
@@ -649,11 +792,11 @@
         (mapcat #(get module %) [:outputs]))]) ;TODO: should this include :feedback?
 
 (defn assert-hierarchical
-  [indent dut-name var val]
+  [indent dut-name var val cycle]
   (let [dut-var (str dut-name \. var) 
         assertion-str (str dut-var " !== " val)]
     (str indent "if (" assertion-str ") begin\n"
-         indent "  $display(\"failed assertion: " assertion-str ", instead is %b\", " dut-var ");\n"
+         indent "  $display(\"Cycle " cycle ": failed assertion: " assertion-str ", instead is %b\", " dut-var ");\n"
          indent "  $finish;\n"
          indent "end\n")))
 
@@ -666,7 +809,7 @@
   cycle-map is a map from vectors of keywords representing
   the hierarchical path to a register (excluding the dut's name)
   to the values."
-  [indent dut-name cycle-map]
+  [indent dut-name cycle-map cycle]
   (reduce (fn [text [path val]]
             (when-not (vector? path)
               (throw+ "Path must be a vector"))
@@ -675,13 +818,15 @@
                    (if-not array?
                      (assert-hierarchical indent dut-name
                                           (join \. (map name path))
-                                          (verilog-repr val))
+                                          (verilog-repr val)
+                                          cycle)
                      (->> (map (fn [val index]
                                  (assert-hierarchical
                                    indent dut-name
                                    (str (join \. (map name path))
                                         \[ index \])
-                                   (verilog-repr val)))
+                                   (verilog-repr val)
+                                   cycle))
                                val (range))
                        (join "\n"))))))
           ""
@@ -727,7 +872,8 @@
         
         (map #(assert-hierarchical-cycle "    "
                                          dut-name
-                                         %))
+                                         %2 %1)
+             (range))
         (map #(str % "    #10\n"))
         join)
       "    $display(\"test passed\");\n"

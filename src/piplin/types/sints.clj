@@ -1,4 +1,8 @@
-(ns piplin.types.sints
+(ns
+  ^{:doc
+    "The namespaces defines a signed twos-complement numeric
+    type that saturates on overflow and underflow."}
+  piplin.types.sints
   (:require [piplin.types.core-impl :as impl])
   (:use [piplin.types
          [binops :only [defbinopimpl defcoercions defunopimpl]]
@@ -34,10 +38,21 @@
   (let [{:keys [max]} (bounds (:n type))]
     (type max)))
 
+(defn sign-extend
+  "Takes an sints and a longer width and sign-extends
+  the sints."
+  [width' num]
+  (assert (= :sints (kindof num)))
+  (assert (<= (bit-width-of (typeof num)) width'))
+  (let [wider-sints (sints width')]
+    (if (pipinst? num)
+    (wider-sints (value num))
+    (mkast wider-sints :sign-extend [num] (partial sign-extend width')))))
+
 (defmethod constrain
   :sints
-  [sintm init-val]
-  (let [{:keys [min max]} (bounds (:n sintm))]
+  [sints init-val]
+  (let [{:keys [min max]} (bounds (:n sints))]
     (cond
       (< init-val min) min
       (> init-val max) max
@@ -49,6 +64,8 @@
   (let [n (-> inst typeof :n)
         v (value inst)
         {:keys [min max]} (bounds n)]
+    (when-not (integer? v)
+      (throw+ (error "sints requires an integer, got" v)))
     (when (> v max)
       (throw+ (error "sints" n "is too big:" v)))
     (when (< v min) 
