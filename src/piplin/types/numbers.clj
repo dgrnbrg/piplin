@@ -31,11 +31,11 @@
   (value [this] this)
   (pipinst? [this] true)
   java.lang.Float
-  (typeof [this] (anontype :j-num))
+  (typeof [this] (anontype :j-float))
   (value [this] this)
   (pipinst? [this] true)
   java.lang.Double
-  (typeof [this] (anontype :j-num))
+  (typeof [this] (anontype :j-double))
   (value [this] this)
   (pipinst? [this] true))
 
@@ -61,8 +61,10 @@
 ;JVM numeric type promotion rules
 (derive-type :j-integral :j-num)
 
-(derive-type Double :j-num)
-(derive-type Float :j-num)
+(derive-type Double :j-double)
+(derive-type Float :j-float)
+(derive-type :j-float :j-num)
+(derive-type :j-double :j-num)
 
 (derive-type Byte :j-byte)
 (derive-type Short :j-short)
