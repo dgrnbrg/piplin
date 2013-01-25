@@ -6,14 +6,17 @@
   (:use [clojure.set :only [map-invert]])
   (:use [clojure.string :only [join replace]]) 
   (:use [piplin modules types])
-  (:require piplin.types.sints)
-  (:use [piplin.types [bits :only [bit-width-of bits serialize]]])
+  (:require [piplin.types.core-impl :as impl])
+  (:use [piplin.types.sints :only [sign-extend sints]])
+  (:use [piplin.types [bits :only [bit-width-of bits deserialize serialize]]])
   (:use [piplin [types :only [piplin-clojure-dispatch]] protocols]))
 
 (defn sanitize-str
   "Takes a string and makes it safe for verilog."
   [s]
-  (replace s \- \_))
+  (replace (munge s) "." "_DOT_"))
+
+(declare render-single-expr)
 
 (defn array-width-decl
   "Takes a width `x` and returns the string `\"[x:0]\"`,
@@ -60,6 +63,10 @@
     (str (when (neg? i) "-")
          w "'d"
          (if (neg? i) (- i) i))))
+
+(defmethod verilog-repr :sfxpts
+  [x]
+  (verilog-repr (serialize x)))
 
 (defmethod verilog-repr :boolean
   [x]
@@ -114,8 +121,8 @@
     (if-let [name (get table expr)]
       name
       (do
-        "UNKNOWN_QUANTITY"
-       #_(throw+ (error expr "not found in" table))))))
+        #_"UNKNOWN_QUANTITY"
+       (throw+ (error expr "not found in" table))))))
 
 (defmulti verilog-of
   (fn [ast name-lookup] (if (pipinst? ast)
@@ -316,6 +323,21 @@
       [(str lhs " + " rhs)]
       :sintm
       [(str "$signed(" lhs ") + $signed(" rhs ")")]
+      :sfxpts
+      (let [{:as type
+             :keys [i f]} (typeof ast)
+            width (bit-width-of type)
+            {:keys [lhs rhs]} (get-args ast)
+            lhs-sints (->> (serialize lhs)
+                        (deserialize (sints width)))
+            rhs-sints (->> (serialize rhs)
+                        (deserialize (sints width)))] 
+        (verilog-of (impl/+ lhs-sints
+                            rhs-sints)
+                    (assoc name-lookup
+                           lhs-sints (name-lookup lhs)
+                           rhs-sints (name-lookup rhs)))
+        )
       :sints
       (let [type (typeof ast)
             width (bit-width-of type)
@@ -362,6 +384,33 @@
     (condp = (kindof ast)
       :uintm
       [(str lhs " * " rhs)]
+      :sfxpts
+      (let [{:as type
+             :keys [i f]} (typeof ast)
+            width (bit-width-of type)
+            {:keys [lhs rhs]} (get-args ast)
+            lhs-sints (->> (serialize lhs)
+                        (deserialize (sints width))
+                        (sign-extend (* 2 width)))
+            rhs-sints (->> (serialize rhs)
+                        (deserialize (sints width))
+                        (sign-extend (* 2 width)))
+            sints-* (impl/* lhs-sints rhs-sints) 
+            [name-lookup' body] (walk/compile
+                                  sints-*
+                                  render-single-expr
+                                  name-lookup [])
+
+            sints-tmp-name (name (gensym "full_result"))
+            sints-tmp (format "wire [%d:0] %s = %s"
+                              (dec (* 2 width))
+                              sints-tmp-name
+                              (name-lookup' sints-*))]
+        [(format "%s[%d:%d]"
+                 sints-tmp-name
+                 (+ f (dec width))
+                 f)
+         [(str (join body) "\n" sints-tmp)]])
       :sints
       (let [type (typeof ast)
             width (bit-width-of type)
