@@ -705,7 +705,7 @@
         subports-map (->> (set subports)
                        (mapcat (fn [{:keys [module port] :as subport}]
                                  [subport (str (sanitize-str module)
-                                               \.
+                                               \_
                                                (sanitize-str port))]))
                        (apply hash-map))]
     (merge subports-map module-ports)))
@@ -748,7 +748,40 @@
                                     (range) v)))))
         submodules (->> (:modules module)
                      (map (fn make-module-decls [[k v]]
-                            (module-decl (sanitize-str k) v {}))))
+                            (let [all-input-ports
+                                  (->> v
+                                    :inputs
+                                    (map (fn [[k v]]
+                                           [(sanitize-str k)
+                                            v])))
+                                  all-output-ports
+                                  (->> v
+                                    :outputs
+                                    (map (fn [[k v]]
+                                           [(sanitize-str k)
+                                            (typeof v)])))
+                                  module-name (sanitize-str k)
+                                  all-ports (concat all-input-ports
+                                                    all-output-ports)
+                                  all-ports-wires
+                                  (map (fn [[port type]]
+                                         (str "  wire " (array-width-decl (bit-width-of type)) " " module-name \_ port ";\n")) all-ports)
+                                  port-map
+                                  (into
+                                    {}
+                                    (map (comp
+                                           (juxt
+                                             identity
+                                             (partial str
+                                                      module-name
+                                                      \_))
+                                           first)
+                                         all-ports))]
+                              (str
+                                (join all-ports-wires)
+                                (module-decl
+                                  (sanitize-str k) v
+                                  port-map))))))
         name-table (init-name-table module)
         connections (->> module
                       :body
@@ -768,7 +801,7 @@
                       (filter #(= (:type %) :subport))
                       (map (comp :args value))
                       (map (fn [{:keys [reg expr]}]
-                               [(->> reg value ((juxt :module :port)) (map sanitize-str) (join \.))
+                               [(->> reg value ((juxt :module :port)) (map sanitize-str) (join \_))
                                 expr])))
         [name-table body] (reduce
                             (fn [[name-table text] expr]
