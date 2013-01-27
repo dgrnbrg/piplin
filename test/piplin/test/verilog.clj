@@ -8,8 +8,8 @@
   (:use [piplin connect types math modules mux sim verilog [seven-segment-decoder :only [seven-seg-tester]]]))
 
 (defmodule counter [n]
-  [:outputs [x ((uintm n) 0)]]
-  (connect x (inc x)))
+  [:outputs [x* ((uintm n) 0)]]
+  (connect x* (inc x*)))
 
 (deftest counter-test
   (icarus-test (modules->verilog+testbench
@@ -28,12 +28,14 @@
   [:modules [c (counter x)]
    :feedback [prev ((uintm x) 0)]
    :outputs [n ((uintm x) 0)]]
-  (connect prev (subport c :c :x))
-  (connect n (+ prev (subport c :c :x))))
+  (connect prev (subport c :c :x*))
+  (connect n (+ prev (subport c :c :x*))))
 
 (deftest fib-counter-test
-  (icarus-test (modules->verilog+testbench
-                 (fib-counter 32) 100)))
+  (icarus-test (try (modules->verilog+testbench
+                 (fib-counter 32) 100)
+                 (catch Exception e (.printStackTrace e))
+                 )))
 
 (defmodule delayer []
   [:inputs [in (uintm 8)]
@@ -43,7 +45,7 @@
 (defmodule delayer-holder []
   [:modules [c (counter 8)
              d (delayer)]]
-  (connect (subport d :d :in) (subport c :c :x)))
+  (connect (subport d :d :in) (subport c :c :x*)))
 
 (deftest delayer-test
   (icarus-test (modules->verilog+testbench

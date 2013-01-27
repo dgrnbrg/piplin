@@ -14,7 +14,7 @@
 (defn sanitize-str
   "Takes a string and makes it safe for verilog."
   [s]
-  (replace (munge s) "." "_DOT_"))
+  (replace (munge (name s)) "." "_DOT_"))
 
 (declare render-single-expr)
 
@@ -688,7 +688,7 @@
                        :ports
                        (reduce (fn [accum port]
                                  (let [{port-kw :port} (value port)]
-                                   (assoc accum port (name port-kw))))
+                                   (assoc accum port (sanitize-str port-kw))))
                                {}))
         ;We must find all the submodule port
         ;references to add to the name-table
@@ -704,9 +704,9 @@
                           concat)) module-exprs)
         subports-map (->> (set subports)
                        (mapcat (fn [{:keys [module port] :as subport}]
-                                 [subport (str (name module)
+                                 [subport (str (sanitize-str module)
                                                \.
-                                               (name port))]))
+                                               (sanitize-str port))]))
                        (apply hash-map))]
     (merge subports-map module-ports)))
 
@@ -716,37 +716,39 @@
     (throw+ (error module "must be a module")))
   (let [ports  (mapcat (comp keys #(get module %)) [:inputs :outputs])
         inputs (->> (:inputs module)
-                 (map (fn [[k v]] [(name k) (bit-width-of v)]))
+                 (map (fn [[k v]] [(sanitize-str k) (bit-width-of v)]))
                  (into {})) 
         outputs (->> (:outputs module)
                   (map (fn [[k v]]
                          (if (= :array (kindof v))
-                           [(name k)
+                           [(sanitize-str k)
                             (bit-width-of (:array-type (typeof v)))
                             (:array-len (typeof v))]
-                           [(name k)
+                           [(sanitize-str k)
                             (bit-width-of (typeof v))
                             nil]))))
         feedbacks (->> (:feedback module)
                     (map (fn [[k v]]
                            (if (= :array (kindof v))
-                             [(name k)
+                             [(sanitize-str k)
                               (bit-width-of (:array-type (typeof v)))
                               (:array-len (typeof v))]
-                             [(name k)
+                             [(sanitize-str k)
                               (bit-width-of (typeof v))
                               nil]))))
         initials (->> (merge (:outputs module) (:feedback module))
                    (mapcat (fn [[k v]]
                              (if-not (= :array (kindof v))
-                               [[(name k) (verilog-repr v)]]
+                               [[(sanitize-str k)
+                                 (verilog-repr v)]]
                                (map (fn [index v]
-                                      [(str (name k) \[ index \])
+                                      [(str (sanitize-str k)
+                                            \[ index \])
                                        (verilog-repr v)])
                                     (range) v)))))
         submodules (->> (:modules module)
                      (map (fn make-module-decls [[k v]]
-                            (module-decl (name k) v {}))))
+                            (module-decl (sanitize-str k) v {}))))
         name-table (init-name-table module)
         connections (->> module
                       :body
@@ -758,7 +760,7 @@
                                                   (get-in reg [:args :i])))
                                    reg (if-not index-expr reg
                                          (-> reg value :args :array))]
-                               [(-> reg value :port name)
+                               [(-> reg value :port sanitize-str)
                                 expr
                                 index-expr]))))
         input-connections (->> module
@@ -766,7 +768,7 @@
                       (filter #(= (:type %) :subport))
                       (map (comp :args value))
                       (map (fn [{:keys [reg expr]}]
-                               [(->> reg value ((juxt :module :port)) (map name) (join \.))
+                               [(->> reg value ((juxt :module :port)) (map sanitize-str) (join \.))
                                 expr])))
         [name-table body] (reduce
                             (fn [[name-table text] expr]
@@ -776,10 +778,10 @@
                                               (filter identity
                                                (mapcat next connections))))
         ]
-    (str "module " (sanitize-str (name (:token module))) "(\n"
+    (str "module " (sanitize-str (:token module)) "(\n"
          "  clock,\n"
          "  reset,\n"
-         (join ",\n" (map #(str "  " (name %)) ports)) "\n"
+         (join ",\n" (map #(str "  " (sanitize-str %)) ports)) "\n"
          ");\n"
          "  input wire clock;\n"
          "  input wire reset;\n"
@@ -846,7 +848,7 @@
 (defn wire-for-regs
   [module]
   [[]
-   (map #(str \. (-> % key name) "()")
+   (map #(str \. (-> % key sanitize-str) "()")
         (mapcat #(get module %) [:outputs]))]) ;TODO: should this include :feedback?
 
 (defn assert-hierarchical
@@ -875,13 +877,13 @@
               (str text
                    (if-not array?
                      (assert-hierarchical indent dut-name
-                                          (join \. (map name path))
+                                          (join \. (map sanitize-str path))
                                           (verilog-repr val)
                                           cycle)
                      (->> (map (fn [val index]
                                  (assert-hierarchical
                                    indent dut-name
-                                   (str (join \. (map name path))
+                                   (str (join \. (map sanitize-str path))
                                         \[ index \])
                                    (verilog-repr val)
                                    cycle))
@@ -910,7 +912,7 @@
       "\n"
       (join (map (partial str "  ") input-decls))
       (join (map (partial str "  ") output-decls))
-      "  " (sanitize-str (name (:token module))) " " dut-name "(\n"
+      "  " (sanitize-str (:token module)) " " dut-name "(\n"
       "    .clock(clk), .reset(rst)" (when
                                        (->
                                          (concat
