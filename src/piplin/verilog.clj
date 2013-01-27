@@ -288,8 +288,17 @@
 
 (defmethod verilog-of :bit-cat
   [ast name-lookup]
-  (let-args ast name-lookup [b1 b2]
-    [(str "{" b1 ", " b2 "}")]))
+  (let-args ast name-lookup [b1 b2] 
+    (let [{b1-ast :b1 b2-ast :b2} (get-args ast)
+          b1-zero? (zero? (-> b1-ast typeof bit-width-of))
+          b2-zero? (zero? (-> b2-ast typeof bit-width-of))]
+      (cond
+        (and b1-zero? b2-zero?)
+        (throw+ (error "Cannot concat 2 zero-width signals"))
+        b1-zero? [b2]
+        b2-zero? [b1]
+        :else
+        [(str "{" b1 ", " b2 "}")]))))
 
 (defmethod verilog-of :mux2
   [ast name-lookup]
