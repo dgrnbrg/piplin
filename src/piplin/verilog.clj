@@ -29,9 +29,9 @@
 (defn format-verilog
   "Takes a wire name, its width, and the corresponding
   verilog, and returns the formatted `wire` declaration."
-  [name width verilog]
+  [width name verilog & args]
   (format "  wire %s %s = %s;\n"
-          (array-width-decl width) name verilog))
+          (array-width-decl width) name (apply format verilog args)))
 
 (defn gen-verilog-name
   "Takes a string, symbol, or keyword, and returns a unique
@@ -370,16 +370,17 @@
             width (bit-width-of type)
            
             lhs-tmp-name (gen-verilog-name "lhs")
-            lhs-tmp (format "wire [%d:0] %s = %s" (dec width) lhs-tmp-name lhs)
+            lhs-tmp (format-verilog width lhs-tmp-name lhs)
             rhs-tmp-name (gen-verilog-name "rhs")
-            rhs-tmp (format "wire [%d:0] %s = %s" (dec width) rhs-tmp-name rhs)
+            rhs-tmp (format-verilog width rhs-tmp-name rhs)
 
             extended-sum-name (gen-verilog-name "extended_sum")
-            extended-sum (str "wire " (array-width-decl (inc width)) " "
-                              extended-sum-name
-                              (format " = {%s[%d],%s} + {%s[%d],%s}"
-                                      lhs-tmp-name (dec width) lhs-tmp-name
-                                      rhs-tmp-name (dec width) rhs-tmp-name))
+            extended-sum (format-verilog
+                           (inc width)
+                           extended-sum-name
+                           "{%s[%d],%s} + {%s[%d],%s}"
+                           lhs-tmp-name (dec width) lhs-tmp-name
+                           rhs-tmp-name (dec width) rhs-tmp-name)
 
             extended-sum-msb (str extended-sum-name "[" width "]")
             overflow? (str "(" extended-sum-msb " == "
@@ -429,32 +430,35 @@
                                   name-lookup [])
 
             sints-tmp-name (gen-verilog-name "full_result")
-            sints-tmp (format "wire [%d:0] %s = %s"
-                              (dec (* 2 width))
-                              sints-tmp-name
-                              (name-lookup' sints-*))]
+            sints-tmp (format-verilog
+                        (* 2 width)
+                        sints-tmp-name
+                        (name-lookup' sints-*))]
         [(format "%s[%d:%d]"
                  sints-tmp-name
                  (+ f (dec width))
                  f)
-         [(str (join body) "\n" sints-tmp)]])
+         (conj (vec body) sints-tmp)])
       :sints
       (let [type (typeof ast)
             width (bit-width-of type)
 
             lhs-tmp-name (gen-verilog-name "lhs")
-            lhs-tmp (format "wire [%d:0] %s = %s" (dec width) lhs-tmp-name lhs)
+            lhs-tmp (format-verilog width lhs-tmp-name lhs)
             rhs-tmp-name (gen-verilog-name "rhs")
-            rhs-tmp (format "wire [%d:0] %s = %s" (dec width) rhs-tmp-name rhs)
+            rhs-tmp (format-verilog width rhs-tmp-name rhs)
 
             prod-sym (gen-verilog-name "prod")
-            prod (format "wire [%d:0] %s = %s * %s"
-                         (dec width) prod-sym lhs-tmp-name rhs-tmp-name)
+            prod (format-verilog
+                   width
+                   prod-sym
+                   "%s * %s"
+                   lhs-tmp-name rhs-tmp-name) 
 
             lhs-pos?-sym (gen-verilog-name "lhs_pos") 
             rhs-pos?-sym (gen-verilog-name "rhs_pos") 
-            lhs-pos? (format "wire %s = ~%s[%d]" lhs-pos?-sym lhs-tmp-name (dec width))
-            rhs-pos? (format "wire %s = ~%s[%d]" rhs-pos?-sym rhs-tmp-name (dec width))
+            lhs-pos? (format-verilog 1 lhs-pos?-sym "~%s[%d]" lhs-tmp-name (dec width))
+            rhs-pos? (format-verilog 1 rhs-pos?-sym "~%s[%d]" rhs-tmp-name (dec width))
 
             lhs-leading-0s-sym (gen-verilog-name "lhs_leading_zeros")
             lhs-leading-0s-clauses (->> (range (dec width))
@@ -464,9 +468,9 @@
                                                    (- width %)))
                                      (join " ")
                                      (format "%s 1"))
-            lhs-leading-0s (format "wire [%d:0] %s = %s"
-                                   (log2 width) lhs-leading-0s-sym
-                                   lhs-leading-0s-clauses)
+            lhs-leading-0s (format-verilog
+                             (log2 width) lhs-leading-0s-sym
+                             lhs-leading-0s-clauses)
             rhs-leading-0s-sym (gen-verilog-name "rhs_leading_zeros")
             rhs-leading-0s-clauses (->> (range (dec width))
                                      (map #(format "~|%s[%d:%d] ? %d :"
@@ -475,9 +479,9 @@
                                                    (- width %)))
                                      (join " ")
                                      (format "%s 1"))
-            rhs-leading-0s (format "wire [%d:0] %s = %s"
-                                   (log2 width) rhs-leading-0s-sym
-                                   rhs-leading-0s-clauses)
+            rhs-leading-0s (format-verilog
+                             (log2 width) rhs-leading-0s-sym
+                             rhs-leading-0s-clauses)
 
             lhs-leading-1s-sym (gen-verilog-name "lhs_leading_ones")
             lhs-leading-1s-clauses (->> (range (dec width))
@@ -487,9 +491,9 @@
                                                    (- width %)))
                                      (join " ")
                                      (format "%s 1"))
-            lhs-leading-1s (format "wire [%d:0] %s = %s"
-                                   (log2 width) lhs-leading-1s-sym
-                                   lhs-leading-1s-clauses)
+            lhs-leading-1s (format-verilog
+                             (inc (log2 width)) lhs-leading-1s-sym
+                             lhs-leading-1s-clauses)
             rhs-leading-1s-sym (gen-verilog-name "rhs_leading_ones")
             rhs-leading-1s-clauses (->> (range (dec width))
                                      (map #(format "&%s[%d:%d] ? %d :"
@@ -498,49 +502,57 @@
                                                    (- width %)))
                                      (join " ")
                                      (format "%s 1"))
-            rhs-leading-1s (format "wire [%d:0] %s = %s"
-                                   (log2 width) rhs-leading-1s-sym
-                                   rhs-leading-1s-clauses)
+            rhs-leading-1s (format-verilog 
+                             (inc (log2 width)) rhs-leading-1s-sym
+                             rhs-leading-1s-clauses)
 
             pos-pos-ovf?-sym (gen-verilog-name "pos_pos_ovf")
-            pos-pos-ovf? (format "wire %s = (%s + %s < %d) | ((%s + %s == %d) & %s[%d])"
-                                 pos-pos-ovf?-sym
-                                 lhs-leading-0s-sym rhs-leading-0s-sym width
-                                 lhs-leading-0s-sym rhs-leading-0s-sym width
-                                 prod-sym (dec width))
+            pos-pos-ovf? (format-verilog
+                           1 pos-pos-ovf?-sym
+                           "(%s + %s < %d) | ((%s + %s == %d) & %s[%d])"
+
+                           lhs-leading-0s-sym rhs-leading-0s-sym width
+                           lhs-leading-0s-sym rhs-leading-0s-sym width
+                           prod-sym (dec width))
 
             neg-neg-ovf?-sym (gen-verilog-name "neg_neg_ovf")
-            neg-neg-ovf? (format "wire %s = (%s + %s < %d) | ((%s + %s == %d || %s + %s == %d) & (%s[%d] || %s == %s))"
-                                 neg-neg-ovf?-sym
-                                 lhs-leading-1s-sym rhs-leading-1s-sym width
-                                 lhs-leading-1s-sym rhs-leading-1s-sym width
-                                 lhs-leading-1s-sym rhs-leading-1s-sym (inc width)
-                                 prod-sym (dec width)
-                                 prod-sym (verilog-repr
-                                        ((piplin.types.bits/bits width)
-                                           (vec (repeat width 0)))))
+            neg-neg-ovf? (format-verilog
+                           1 neg-neg-ovf?-sym
+                           "(%s + %s < %d) | ((%s + %s == %d || %s + %s == %d) & (%s[%d] || %s == %s))"
+                           lhs-leading-1s-sym rhs-leading-1s-sym width
+                           lhs-leading-1s-sym rhs-leading-1s-sym width
+                           lhs-leading-1s-sym rhs-leading-1s-sym (inc width)
+                           prod-sym (dec width)
+                           prod-sym (verilog-repr
+                                      ((piplin.types.bits/bits width)
+                                         (vec (repeat width 0)))))
 
             negative-leading-sym (gen-verilog-name "neg_leading")
-            negative-leading (format "wire [%d:0] %s = ~%s ? %s : %s"
-                                     (log2 width) negative-leading-sym
-                                     lhs-pos?-sym
-                                     lhs-leading-1s-sym rhs-leading-1s-sym)
+            negative-leading (format-verilog
+                               (inc (log2 width)) negative-leading-sym
+                               "~%s ? %s : %s"
+                               lhs-pos?-sym
+                               lhs-leading-1s-sym rhs-leading-1s-sym)
             positive-leading-sym (gen-verilog-name "pos_leading")
-            positive-leading (format "wire [%d:0] %s = ~%s ? %s : %s"
-                                     (log2 width) positive-leading-sym
-                                     lhs-pos?-sym
-                                     rhs-leading-0s-sym lhs-leading-0s-sym)
+            positive-leading (format-verilog
+                               (log2 width) positive-leading-sym
+                               "~%s ? %s : %s"
+                               lhs-pos?-sym
+                               rhs-leading-0s-sym lhs-leading-0s-sym)
             neg-pos-ovf?-sym (gen-verilog-name "neg_pos_ovf")
-            neg-pos-ovf? (format "wire %s = (%s + %s < %d) | ~%s[%d]"
-                                 neg-pos-ovf?-sym
-                                 negative-leading-sym positive-leading-sym
-                                 width prod-sym (dec width))
+            neg-pos-ovf? (format-verilog
+                           1 neg-pos-ovf?-sym
+                           "(%s + %s < %d) | ~%s[%d]"
+                           negative-leading-sym positive-leading-sym
+                           width prod-sym (dec width))
 
             zero-sym (format "%d'd0" width)
             has-zero?-sym (gen-verilog-name "zero")
-            has-zero? (format "wire %s = %s == %s || %s == %s"
-                              has-zero?-sym lhs-tmp-name zero-sym
-                              rhs-tmp-name zero-sym)
+            has-zero? (format-verilog
+                        1 has-zero?-sym
+                        "%s == %s || %s == %s"
+                        lhs-tmp-name zero-sym
+                        rhs-tmp-name zero-sym)
 
             min-val (verilog-repr
                       (piplin.types.sints/min-value type))
@@ -663,8 +675,8 @@
           bit-width (bit-width-of (typeof expr))
           [body structural] (verilog-of expr name-table)]
       [name
-       (conj (mapv #(str "  " % ";\n") structural)
-             (format-verilog name bit-width body))])))
+       (conj (vec structural)
+             (format-verilog bit-width name body))])))
 
 ;todo this can take a long time
 (defn verilog
