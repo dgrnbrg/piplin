@@ -15,17 +15,17 @@
   forms in order.
   
   You can provide pre-initialized name-lookup or form list."
-  [expr expr->name+form name-table body]
+  [expr expr->name+body name-table body]
   (letfn [(render-expr [expr name-table body]
             (if (contains? name-table expr)
               [name-table body]
-              (let [[name form]
-                    (expr->name+form expr name-table)]
+              (let [[name body']
+                    (expr->name+body expr name-table)]
                 (if name
                   [(assoc name-table
                           expr
                           name)
-                   (conj body form)]
+                   (concat body body')]
                   [name-table body]))))]
     (if (pipinst? expr)
       (render-expr expr name-table body)
@@ -35,7 +35,7 @@
               (reduce
                 (fn [[name-table body] expr]
                   (compile expr
-                           expr->name+form
+                           expr->name+body
                            name-table
                            body))
                 [name-table body]

@@ -649,14 +649,13 @@
           [body structural] (verilog-of expr name-table)
           terminator ";\n"]
       [name
-       (str (join (interleave (map (partial str indent) structural)
-                              (repeat terminator)))
-            indent
-            wire-decl
-            name
-            assign
-            body
-            terminator)])))
+       (conj (mapv #(str indent % terminator) structural)
+             (str indent
+                  wire-decl 
+                  name 
+                  assign 
+                  body 
+                  terminator))])))
 
 ;todo this can take a long time
 (defn verilog
