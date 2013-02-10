@@ -9,7 +9,7 @@
   (:require [piplin.types.core-impl :as impl])
   (:use [piplin.types.sints :only [sign-extend sints]])
   (:use [piplin.types [bits :only [bit-width-of bits deserialize serialize]]])
-  (:use [piplin [types :only [piplin-clojure-dispatch]] protocols]))
+  (:use [piplin [types :only [piplin-clojure-dispatch]] protocols [util :only [let']]]))
 
 (defn sanitize-str
   "Takes a string and makes it safe for verilog."
@@ -413,27 +413,27 @@
       :uintm
       [(str lhs " * " rhs)]
       :sfxpts
-      (let [{:as type
-             :keys [i f]} (typeof ast)
-            width (bit-width-of type)
-            {:keys [lhs rhs]} (get-args ast)
-            lhs-sints (->> (serialize lhs)
-                        (deserialize (sints width))
-                        (sign-extend (* 2 width)))
-            rhs-sints (->> (serialize rhs)
-                        (deserialize (sints width))
-                        (sign-extend (* 2 width)))
-            sints-* (impl/* lhs-sints rhs-sints) 
-            [name-lookup' body] (walk/compile
-                                  sints-*
-                                  render-single-expr
-                                  name-lookup [])
+      (let' [{:as type
+              :keys [i f]} (typeof ast)
+             width (bit-width-of type)
+             {:keys [lhs rhs]} (get-args ast)
+             lhs-sints (->> (serialize lhs)
+                         (deserialize (sints width))
+                         (sign-extend (* 2 width)))
+             rhs-sints (->> (serialize rhs)
+                         (deserialize (sints width))
+                         (sign-extend (* 2 width)))
+             sints-* (impl/* lhs-sints rhs-sints) 
+             [name-lookup' body] (walk/compile
+                                   sints-*
+                                   render-single-expr
+                                   name-lookup [])
 
-            sints-tmp-name (gen-verilog-name "full_result")
-            sints-tmp (format-verilog
-                        (* 2 width)
-                        sints-tmp-name
-                        (name-lookup' sints-*))]
+             sints-tmp-name (gen-verilog-name "full_result")
+             sints-tmp (format-verilog
+                         (* 2 width)
+                         sints-tmp-name
+                         (name-lookup' sints-*))]
         [(format "%s[%d:%d]"
                  sints-tmp-name
                  (+ f (dec width))
@@ -671,7 +671,9 @@
       (println "WARNING: trying to render clojure type, skipping")
       [nil ""])
     :else
-    (let [name (gen-verilog-name)
+    (let [name (if-let [let-name (-> expr meta :let-name)]
+                 (gen-verilog-name let-name)
+                 (gen-verilog-name))
           bit-width (bit-width-of (typeof expr))
           [body structural] (verilog-of expr name-table)]
       [name
