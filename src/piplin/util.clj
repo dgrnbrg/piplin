@@ -20,10 +20,7 @@
                   meta-form `(if (and
                                    (instance? clojure.lang.IObj ~tmp-name) 
                                    (instance? clojure.lang.IMeta ~tmp-name))
-                               (->> 
-                                 (assoc (meta ~tmp-name)
-                                        :let-name '~name)
-                                 (with-meta ~tmp-name))
+                               (vary-meta ~tmp-name assoc :let-name '~name)
                                ~tmp-name)]
               [tmp-name form name meta-form]))
           (partition 2 bindings))]
