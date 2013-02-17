@@ -42,7 +42,7 @@
                 y (cast t 0.0)]]
     (connect x (inc x))
     (let [x' (deserialize t (serialize x))
-          poly (+ (* coeff1 x' x')
+          poly #_(* x' x') (+ (* coeff1 x' x')
                   (* coeff2 x')
                   coeff3)]
       (connect y poly))))

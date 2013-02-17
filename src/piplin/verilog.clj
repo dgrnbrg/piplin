@@ -533,8 +533,10 @@
                                                    (- width %)))
                                      (join " ")
                                      (format "%s 1"))
+            ;TODO: all instances of log2 in this area should be
+            ;replaced with ceil(log2()), since currently log2 takes the floor
             lhs-leading-0s (format-verilog
-                             (log2 width) lhs-leading-0s-sym
+                             (inc (log2 width)) lhs-leading-0s-sym
                              lhs-leading-0s-clauses)
             rhs-leading-0s-sym (gen-verilog-name "rhs_leading_zeros")
             rhs-leading-0s-clauses (->> (range (dec width))
@@ -545,7 +547,7 @@
                                      (join " ")
                                      (format "%s 1"))
             rhs-leading-0s (format-verilog
-                             (log2 width) rhs-leading-0s-sym
+                             (inc (log2 width)) rhs-leading-0s-sym
                              rhs-leading-0s-clauses)
 
             lhs-leading-1s-sym (gen-verilog-name "lhs_leading_ones")
