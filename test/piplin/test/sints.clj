@@ -70,6 +70,24 @@
   (icarus-test (modules->verilog+testbench
                  (sints-adder 4) (* 16 16 2))))
 
+(defmodule sints-subtractor
+  [n]
+  [:feedback [difference ((sints n) 0)
+              x (piplin.types.sints/min-value (sints n))
+              y (piplin.types.sints/min-value (sints n))]]
+  (connect difference (- x y))
+  (let [x-max? (= x (piplin.types.sints/max-value (sints n)))]
+    (connect x (mux2 x-max?
+                     (piplin.types.sints/min-value (sints n)) 
+                     (inc x)))
+    (connect y (mux2 x-max?
+                     (inc y)
+                     y))))
+
+(deftest sints-subtractor-verilog
+  (icarus-test (modules->verilog+testbench
+                 (sints-subtractor 4) (* 16 16 2))))
+
 (defmodule sints-multiplier
   [n]
   [:feedback [prod ((sints n) 0)

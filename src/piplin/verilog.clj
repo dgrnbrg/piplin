@@ -6,9 +6,13 @@
   (:use [clojure.set :only [map-invert]])
   (:use [clojure.string :only [join replace]]) 
   (:use [piplin modules types])
+  (:use [swiss-arrows.core :only [-<>>]])
   (:require [piplin.types.core-impl :as impl])
   (:use [piplin.types.sints :only [sign-extend sints]])
-  (:use [piplin.types [bits :only [bit-width-of bits deserialize serialize]]])
+  (:use [piplin.types.uintm :only [uintm]])
+  (:use [piplin.types [bits :only [bit-width-of bits deserialize serialize bit-cat bit-slice]]])
+  (:require [piplin.mux :as mux]
+            [piplin.types.binops :as binops])
   (:use [piplin [types :only [piplin-clojure-dispatch]] protocols [util :only [let']]]))
 
 (defn sanitize-str
@@ -404,6 +408,67 @@
     (condp = (kindof ast)
       :uintm
       [(str lhs " - " rhs)]
+      :sints
+      (let' [{rhs-ast :rhs lhs-ast :lhs} (get-args ast)
+             rhs-type (typeof rhs-ast)
+             rhs-width (bit-width-of rhs-type)
+             rhs-extended-type (sints (inc rhs-width))
+             raw-diff (->> rhs-ast
+                        (sign-extend (inc rhs-width))
+                        serialize
+                        impl/bit-not
+                        (deserialize (-> rhs-width
+                                       inc
+                                       uintm))
+                        impl/inc
+                        serialize
+                        (deserialize rhs-extended-type)
+                        (impl/+ (sign-extend
+                                  (inc rhs-width)
+                                  lhs-ast))) 
+             difference (-<>> raw-diff
+                              serialize 
+                              (bit-slice <> 0 rhs-width) 
+                              (deserialize rhs-type)) 
+             msb0 (-> raw-diff
+                    serialize
+                    (bit-slice rhs-width (inc rhs-width)))
+             msb1 (-> raw-diff
+                    serialize
+                    (bit-slice (dec rhs-width) rhs-width))
+             overflow? (->> (impl/bit-xor msb0 msb1)
+                         serialize
+                         (deserialize
+                           (anontype :boolean)))
+             min-val (piplin.types.sints/min-value
+                       rhs-type)
+             max-val (piplin.types.sints/max-value
+                       rhs-type)
+             result (mux/mux2 overflow?
+                      (mux/mux2 (binops/= #b0 msb0)
+                        max-val
+                        min-val)
+                      difference)
+             [name-lookup' body] (walk/compile
+                                   result 
+                                   render-single-expr
+                                   name-lookup [])]
+        [(name-lookup' result) 
+         (vec body)])
+      :sfxpts
+      (let [{:as type
+             :keys [i f]} (typeof ast)
+            width (bit-width-of type)
+            {:keys [lhs rhs]} (get-args ast)
+            lhs-sints (->> (serialize lhs)
+                        (deserialize (sints width)))
+            rhs-sints (->> (serialize rhs)
+                        (deserialize (sints width)))] 
+        (verilog-of (impl/- lhs-sints
+                            rhs-sints)
+                    (assoc name-lookup
+                           lhs-sints (name-lookup lhs)
+                           rhs-sints (name-lookup rhs)))) 
       )))
 
 (defmethod verilog-of :*
