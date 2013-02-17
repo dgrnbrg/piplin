@@ -21,6 +21,20 @@
                serialize
                (deserialize (typeof x)))))))
 
+(let [t (sfxpts 4 4)]
+  (defmodule sfxpts-mul []
+    [:feedback [x ((uintm 8) 0)
+                y (cast t 0.0)]]
+    (let [x-sfxpts (->> x
+                     serialize
+                     (deserialize t))]
+      (connect y (* x-sfxpts x-sfxpts)))
+    (connect x (inc x))))
+
+(deftest sfxpts-mul-verilog
+  (icarus-test (modules->verilog+testbench
+                 (sfxpts-mul) 500)))
+
 (let [t (sfxpts 12 16)]
   (defmodule sfxpts-quadratic
     [coeff1 coeff2 coeff3]
@@ -28,7 +42,7 @@
                 y (cast t 0.0)]]
     (connect x (inc x))
     (let [x' (deserialize t (serialize x))
-          poly #_(* x' x') (+ (* coeff1 x' x')
+          poly (+ (* coeff1 x' x')
                   (* coeff2 x')
                   coeff3)]
       (connect y poly))))

@@ -1,6 +1,6 @@
 (ns piplin.test.sints 
   (:refer-clojure :exclude [cond condp cast not = not= > >= < <= + - * inc dec bit-and bit-or bit-xor bit-not and or])
-  (:use [piplin.types bundle sints bits boolean core-impl binops])
+  (:use [piplin.types bundle sints bits boolean core-impl binops uintm])
   (:use [piplin types mux modules sim connect protocols [verilog :only [modules->verilog+testbench]]])
   (:import clojure.lang.ExceptionInfo) 
   (:use clojure.test
@@ -91,20 +91,23 @@
 (defmodule sints-multiplier
   [n]
   [:feedback [prod ((sints n) 0)
-              x (min-value (sints n))
-              y (min-value (sints n))]]
-  (connect prod (* x y))
-  (let [x-max? (= x (max-value (sints n)))]
-    (connect x (mux2 x-max?
-                     (min-value (sints n)) 
-                     (inc x)))
-    (connect y (mux2 x-max?
+              x ((uintm n) 0)
+              y ((uintm n) 0)]] 
+  (let [x' (->> x
+             serialize
+             (deserialize (sints n)))
+        y' (->> y
+             serialize
+             (deserialize (sints n)))]
+    (connect prod (* x' y')))
+    (connect x (inc x))
+    (connect y (mux2 (= 0 x)
                      (inc y)
-                     y))))
+                     y)))
 
 (deftest sints-multiplier-verilog
   (icarus-test (modules->verilog+testbench
-                 (sints-multiplier 4) (* 16 16 2))))
+                 (sints-multiplier 6) (* 64 64 2))))
 
 (defmodule sints-extender
   [n m]

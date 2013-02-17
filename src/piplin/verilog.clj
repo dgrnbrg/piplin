@@ -484,10 +484,10 @@
              {:keys [lhs rhs]} (get-args ast)
              lhs-sints (->> (serialize lhs)
                          (deserialize (sints width))
-                         (sign-extend (* 2 width)))
+                         (sign-extend (+ f width)))
              rhs-sints (->> (serialize rhs)
                          (deserialize (sints width))
-                         (sign-extend (* 2 width)))
+                         (sign-extend (+ f width)))
              sints-* (impl/* lhs-sints rhs-sints) 
              [name-lookup' body] (walk/compile
                                    sints-*
@@ -496,7 +496,7 @@
 
              sints-tmp-name (gen-verilog-name "full_result")
              sints-tmp (format-verilog
-                         (* 2 width)
+                         (+ f width)
                          sints-tmp-name
                          (name-lookup' sints-*))]
         [(format "%s[%d:%d]"
