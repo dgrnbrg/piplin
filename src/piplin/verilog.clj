@@ -10,6 +10,7 @@
   (:require [piplin.types.core-impl :as impl])
   (:use [piplin.types.sints :only [sign-extend sints]])
   (:use [piplin.types.uintm :only [uintm]])
+  (:use [piplin.types.complex :only [real-part imag-part]])
   (:use [piplin.types [bits :only [bit-width-of bits deserialize serialize bit-cat bit-slice]]])
   (:require [piplin.mux :as mux]
             [piplin.types.binops :as binops])
@@ -87,6 +88,10 @@
          (if (neg? i) (- i) i))))
 
 (defmethod verilog-repr :sfxpts
+  [x]
+  (verilog-repr (serialize x)))
+
+(defmethod verilog-repr :complex
   [x]
   (verilog-repr (serialize x)))
 
@@ -346,6 +351,28 @@
                (- new-width orig-width)
                num (dec orig-width) num)])))
 
+(defmethod verilog-of :real-part
+  [ast name-lookup]
+  (let [{:as complex-type
+         :keys [imag]} (-> (get-args ast)
+                         :complex
+                         typeof)]
+    (let-args ast name-lookup [complex]
+      [(format "%s[%d:%d]"
+               complex
+               (dec (bit-width-of complex-type))
+               (bit-width-of imag))])))
+
+(defmethod verilog-of :imag-part
+  [ast name-lookup]
+  (let [{:keys [imag]} (-> (get-args ast)
+                         :complex
+                         typeof)]
+    (let-args ast name-lookup [complex]
+      [(format "%s[%d:0]"
+               complex
+               (dec (bit-width-of imag)))])))
+
 (defmethod verilog-of :+
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
@@ -354,6 +381,23 @@
       [(str lhs " + " rhs)]
       :sintm
       [(str "$signed(" lhs ") + $signed(" rhs ")")]
+      :complex
+      (let' [{:keys [lhs rhs]} (get-args ast)
+             r1 (real-part lhs)
+             i1 (imag-part lhs)
+             r2 (real-part rhs)
+             i2 (imag-part rhs)
+             r' (impl/+ r1 r2)
+             i' (impl/+ i1 i2) 
+             r'-bits (serialize r')
+             i'-bits (serialize i')
+             result (bit-cat r'-bits i'-bits)
+             [name-lookup' body] (walk/compile
+                                   result
+                                   render-single-expr
+                                   name-lookup [])]
+        [(name-lookup' result)
+         (vec body)])
       :sfxpts
       (let [{:as type
              :keys [i f]} (typeof ast)
@@ -504,6 +548,23 @@
                  (+ f (dec width))
                  f)
          (conj (vec body) sints-tmp)])
+      :complex
+      (let' [{:keys [lhs rhs]} (get-args ast)
+             r1 (real-part lhs)
+             i1 (imag-part lhs)
+             r2 (real-part rhs)
+             i2 (imag-part rhs)
+             r' (impl/- (impl/* r1 r2) (impl/* i1 i2))
+             i' (impl/+ (impl/* i1 r2) (impl/* r1 i2))
+             r'-bits (serialize r')
+             i'-bits (serialize i')
+             result (bit-cat r'-bits i'-bits)
+             [name-lookup' body] (walk/compile
+                                   result
+                                   render-single-expr
+                                   name-lookup [])]
+        [(name-lookup' result)
+         (vec body)])
       :sints
       (let [type (typeof ast)
             width (bit-width-of type)

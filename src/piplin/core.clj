@@ -84,6 +84,9 @@
   piplin.types.uintm/uintm
   piplin.types.sints/sints 
   piplin.types.sfxpts/sfxpts
+  piplin.types.complex/complex
+  piplin.types.complex/real-part 
+  piplin.types.complex/imag-part 
   piplin.types.union/union
   piplin.types.union/union-match
   piplin.types.union/maybe
