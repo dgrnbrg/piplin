@@ -1,5 +1,4 @@
-(ns
-  piplin.types.sfxpts
+(ns piplin.types.sfxpts
   (:require [piplin.types.core-impl :as impl])
   (:use [piplin.types
          [binops :only [defbinopimpl defcoercions defunopimpl]]

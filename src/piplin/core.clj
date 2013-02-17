@@ -83,6 +83,7 @@
   piplin.types.enum/enum
   piplin.types.uintm/uintm
   piplin.types.sints/sints 
+  piplin.types.sfxpts/sfxpts
   piplin.types.union/union
   piplin.types.union/union-match
   piplin.types.union/maybe
