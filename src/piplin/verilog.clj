@@ -905,11 +905,11 @@
                              (if-not (= :array (kindof v))
                                [[(sanitize-str k)
                                  (verilog-repr v)]]
-                               (comment (map (fn [index v]
+                               (map (fn [index v]
                                       [(str (sanitize-str k)
                                             \[ index \])
                                        (verilog-repr v)])
-                                    (range) v))))))
+                                    (range) v)))))
         submodules (->> (:modules module)
                      (map (fn make-module-decls [[k v]]
                             (let [all-input-ports
