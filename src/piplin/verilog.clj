@@ -61,7 +61,7 @@
   :hierarchy types)
 (defmethod verilog-repr :default
   [x]
-  (throw+ (error "cannot convert " (kindof x) " to verilog:" x)))
+  (throw+ (error "cannot convert" (kindof x) "to verilog:" x)))
 
 ;TODO: why must this method be included?
 ;I cannot figure out where it fits in the output
@@ -259,10 +259,10 @@
 
 (defmethod verilog-of :bundle-key
   [ast name-lookup]
-  (let [{:keys [bund key]} (get-args ast)
-        offsets (compute-key-offsets (typeof bund))
+  (let [{:keys [bundle key]} (get-args ast)
+        offsets (compute-key-offsets (typeof bundle))
         [high low] (get offsets key)]
-    [(str (lookup-expr name-lookup bund) "[" high ":" low "]")]))
+    [(str (lookup-expr name-lookup bundle) "[" high ":" low "]")]))
 
 (defmethod verilog-of :make-array
   [ast name-lookup]
@@ -845,13 +845,29 @@
         module-exprs (walk-connects module-inst
                                     #(get-in % [:args :expr])
                                     concat)
+        module-array-exprs (walk-connects module-inst
+                                    (fn [connection]
+                                      (if (= (-> connection
+                                               :args
+                                               :reg
+                                               value
+                                               :op) 
+                                             :array-get)
+                                        (-> connection
+                                           :args
+                                           :reg
+                                           value
+                                           :args
+                                           :i)
+                                        nil))
+                                    concat)
         subports (mapcat (fn [expr]
                         (walk-expr expr
                           (fn [expr]
                               (if (= (:port-type (value expr))
                                     :subport)
                                [expr] nil))
-                          concat)) module-exprs)
+                          concat)) (concat module-exprs module-array-exprs))
         subports-map (->> (set subports)
                        (mapcat (fn [{:keys [module port] :as subport}]
                                  [subport (str (sanitize-str module)
@@ -891,11 +907,11 @@
                              (if-not (= :array (kindof v))
                                [[(sanitize-str k)
                                  (verilog-repr v)]]
-                               (map (fn [index v]
+                               (comment (map (fn [index v]
                                       [(str (sanitize-str k)
                                             \[ index \])
                                        (verilog-repr v)])
-                                    (range) v)))))
+                                    (range) v))))))
         submodules (->> (:modules module)
                      (map (fn make-module-decls [[k v]]
                             (let [all-input-ports
