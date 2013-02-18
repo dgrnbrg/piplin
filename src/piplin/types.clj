@@ -387,7 +387,7 @@
   (let [log2v (-> (value v)
                 Math/log
                 (/ (Math/log 2))
-                (+ 0.5)
+                Math/ceil
                 int)]
     (promote (typeof v) log2v)))
 

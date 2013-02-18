@@ -594,10 +594,8 @@
                                                    (- width %)))
                                      (join " ")
                                      (format "%s 1"))
-            ;TODO: all instances of log2 in this area should be
-            ;replaced with ceil(log2()), since currently log2 takes the floor
             lhs-leading-0s (format-verilog
-                             (inc (log2 width)) lhs-leading-0s-sym
+                             (log2 width) lhs-leading-0s-sym
                              lhs-leading-0s-clauses)
             rhs-leading-0s-sym (gen-verilog-name "rhs_leading_zeros")
             rhs-leading-0s-clauses (->> (range (dec width))
@@ -608,7 +606,7 @@
                                      (join " ")
                                      (format "%s 1"))
             rhs-leading-0s (format-verilog
-                             (inc (log2 width)) rhs-leading-0s-sym
+                             (log2 width) rhs-leading-0s-sym
                              rhs-leading-0s-clauses)
 
             lhs-leading-1s-sym (gen-verilog-name "lhs_leading_ones")
@@ -620,7 +618,7 @@
                                      (join " ")
                                      (format "%s 1"))
             lhs-leading-1s (format-verilog
-                             (inc (log2 width)) lhs-leading-1s-sym
+                             (log2 width) lhs-leading-1s-sym
                              lhs-leading-1s-clauses)
             rhs-leading-1s-sym (gen-verilog-name "rhs_leading_ones")
             rhs-leading-1s-clauses (->> (range (dec width))
@@ -631,7 +629,7 @@
                                      (join " ")
                                      (format "%s 1"))
             rhs-leading-1s (format-verilog 
-                             (inc (log2 width)) rhs-leading-1s-sym
+                             (log2 width) rhs-leading-1s-sym
                              rhs-leading-1s-clauses)
 
             pos-pos-ovf?-sym (gen-verilog-name "pos_pos_ovf")
@@ -657,7 +655,7 @@
 
             negative-leading-sym (gen-verilog-name "neg_leading")
             negative-leading (format-verilog
-                               (inc (log2 width)) negative-leading-sym
+                               (log2 width) negative-leading-sym
                                "~%s ? %s : %s"
                                lhs-pos?-sym
                                lhs-leading-1s-sym rhs-leading-1s-sym)
