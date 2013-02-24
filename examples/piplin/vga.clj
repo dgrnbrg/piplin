@@ -1,6 +1,7 @@
 (ns piplin.vga
   (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp or and])
-  (:use piplin.core))
+  (:use piplin.core
+        [piplin.util :only [let']]))
 
 ;This generates xvga display signals (1024 x 768 @ 60 Hz)
 ;Requires a 65MHz clock
@@ -13,7 +14,7 @@
              blank false]
    :feedback [hblank false
               vblank false]]
-  (let [
+  (let' [
         ;Horizontal: 1344 pixels total
         ;display 1024 pixels per line
         hblankon (= hcount 1023)
