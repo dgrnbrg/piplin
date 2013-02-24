@@ -55,60 +55,60 @@
                          (typeof obj)))))
 
 (defbinopimpl impl/+ :uintm [:j-integral]
-  [x y]
-  (+ (value x) (value y)))
+  [lhs rhs]
+  (+ (value lhs) (value rhs)))
 
 (defbinopimpl impl/- :uintm [:j-integral]
-  [x y]
-  (- (value x) (value y)))
+  [lhs rhs]
+  (- (value lhs) (value rhs)))
 
 (defbinopimpl impl/* :uintm [:j-integral]
-  [x y]
-  (* (value x) (value y)))
+  [lhs rhs]
+  (* (value lhs) (value rhs)))
 
 (defmethod impl/> [:uintm :uintm]
-  [x y]
-  (if (and (pipinst? x) (pipinst? y))
-    (> (value x) (value y))
-    (mkast (anontype :boolean) :> [x y] impl/>)))
+  [lhs rhs]
+  (if (and (pipinst? lhs) (pipinst? rhs))
+    (> (value lhs) (value rhs))
+    (mkast (anontype :boolean) :> [lhs rhs] impl/>)))
 (defcoercions impl/> :uintm [:j-integral])
 
 (defmethod impl/>= [:uintm :uintm]
-  [x y]
-  (if (and (pipinst? x) (pipinst? y))
-    (>= (value x) (value y))
-    (mkast (anontype :boolean) :>= [x y] impl/>=)))
+  [lhs rhs]
+  (if (and (pipinst? lhs) (pipinst? rhs))
+    (>= (value lhs) (value rhs))
+    (mkast (anontype :boolean) :>= [lhs rhs] impl/>=)))
 (defcoercions impl/>= :uintm [:j-integral])
 
 (defmethod impl/< [:uintm :uintm]
-  [x y]
-  (if (and (pipinst? x) (pipinst? y))
-    (< (value x) (value y))
-    (mkast (anontype :boolean) :< [x y] impl/<)))
+  [lhs rhs]
+  (if (and (pipinst? lhs) (pipinst? rhs))
+    (< (value lhs) (value rhs))
+    (mkast (anontype :boolean) :< [lhs rhs] impl/<)))
 (defcoercions impl/< :uintm [:j-integral])
 
 (defmethod impl/<= [:uintm :uintm]
-  [x y]
-  (if (and (pipinst? x) (pipinst? y))
-    (<= (value x) (value y))
-    (mkast (anontype :boolean) :<= [x y] impl/<=)))
+  [lhs rhs]
+  (if (and (pipinst? lhs) (pipinst? rhs))
+    (<= (value lhs) (value rhs))
+    (mkast (anontype :boolean) :<= [lhs rhs] impl/<=)))
 (defcoercions impl/<= :uintm [:j-integral])
 
 (defcoercions piplin.types.binops/= :uintm [:j-integral])
 
 
 (defbinopimpl impl/bit-and :uintm [:j-integral]
-  [x y]
-  (impl/bit-and (value x) (value y)))
+  [lhs rhs]
+  (impl/bit-and (value lhs) (value rhs)))
 
-;TODO: (bit-or #b00 #b110010) should throw an exception
+;TODO: (bit-or #b00 #b110010) should throw an elhsception
 (defbinopimpl impl/bit-or :uintm [:j-integral]
-  [x y]
-  (impl/bit-or (value x) (value y)))
+  [lhs rhs]
+  (impl/bit-or (value lhs) (value rhs)))
 
 (defbinopimpl impl/bit-xor :uintm [:j-integral]
-  [x y]
-  (impl/bit-xor (value x) (value y)))
+  [lhs rhs]
+  (impl/bit-xor (value lhs) (value rhs)))
 
 (defunopimpl impl/bit-not :uintm
   [x]

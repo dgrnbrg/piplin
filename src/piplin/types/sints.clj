@@ -86,43 +86,43 @@
 
 
 (defbinopimpl impl/+ :sints [:j-integral]
-  [x y]
-  (+ (value x) (value y)))
+  [lhs rhs]
+  (+ (value lhs) (value rhs)))
 
 (defbinopimpl impl/- :sints [:j-integral]
-  [x y]
-  (- (value x) (value y)))
+  [lhs rhs]
+  (- (value lhs) (value rhs)))
 
 (defbinopimpl impl/* :sints [:j-integral]
-  [x y]
-  (* (value x) (value y)))
+  [lhs rhs]
+  (* (value lhs) (value rhs)))
 
 (defmethod impl/> [:sints :sints]
-  [x y]
-  (if (and (pipinst? x) (pipinst? y))
-    (> (value x) (value y))
-    (mkast (anontype :boolean) :> [x y] impl/>)))
+  [lhs rhs]
+  (if (and (pipinst? lhs) (pipinst? rhs))
+    (> (value lhs) (value rhs))
+    (mkast (anontype :boolean) :> [lhs rhs] impl/>)))
 (defcoercions impl/> :sints [:j-integral])
 
 (defmethod impl/>= [:sints :sints]
-  [x y]
-  (if (and (pipinst? x) (pipinst? y))
-    (>= (value x) (value y))
-    (mkast (anontype :boolean) :>= [x y] impl/>=)))
+  [lhs rhs]
+  (if (and (pipinst? lhs) (pipinst? rhs))
+    (>= (value lhs) (value rhs))
+    (mkast (anontype :boolean) :>= [lhs rhs] impl/>=)))
 (defcoercions impl/>= :sints [:j-integral])
 
 (defmethod impl/< [:sints :sints]
-  [x y]
-  (if (and (pipinst? x) (pipinst? y))
-    (< (value x) (value y))
-    (mkast (anontype :boolean) :< [x y] impl/<)))
+  [lhs rhs]
+  (if (and (pipinst? lhs) (pipinst? rhs))
+    (< (value lhs) (value rhs))
+    (mkast (anontype :boolean) :< [lhs rhs] impl/<)))
 (defcoercions impl/< :sints [:j-integral])
 
 (defmethod impl/<= [:sints :sints]
-  [x y]
-  (if (and (pipinst? x) (pipinst? y))
-    (<= (value x) (value y))
-    (mkast (anontype :boolean) :<= [x y] impl/<=)))
+  [lhs rhs]
+  (if (and (pipinst? lhs) (pipinst? rhs))
+    (<= (value lhs) (value rhs))
+    (mkast (anontype :boolean) :<= [lhs rhs] impl/<=)))
 (defcoercions impl/<= :sints [:j-integral])
 
 (defcoercions piplin.types.binops/= :sints [:j-integral])
