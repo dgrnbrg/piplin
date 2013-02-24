@@ -1,6 +1,8 @@
 (ns piplin.mtprng
   (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp or and])
-  (:use [piplin core [protocols :only [typeof value]]] [swiss-arrows.core :only [-<>]]))
+  (:use [piplin core [protocols :only [typeof value]]] [swiss-arrows.core :only [-<>]]
+        [piplin.util :only [let']]
+        ))
 
 (def N 624)
 (def M 397)
@@ -50,7 +52,7 @@
 (defn mt_gen_single
   "Generate next Mersenne Twister number."
   [mt mt-index]
-  (let [y (bit-or (bit-and (get mt mt-index) UPPER_MASK)
+  (let' [y (bit-or (bit-and (get mt mt-index) UPPER_MASK)
                   (bit-and (get mt (mux2 (= (dec N) mt-index)
                                          (cast (typeof mt-index) 0)
                                          (inc mt-index)))
@@ -80,7 +82,7 @@
   (map
     (fn [[_ _ r]]
       (value r)))
-  (take 10))] (printf "%08x\n" x))
+  (take 10))] (printf "%d\n" x))
 
 (defmodule mersenne-twister
   [seed]
@@ -89,11 +91,11 @@
    :feedback [mt (cast (array (uintm 32) N) (mt_init seed))
               mt-index ((uintm 10) 0)]]
   (let [[mt-update mt-index-update rand'] (mt_gen_single mt mt-index)]
-    (println "mt-update:" mt-update "\n\nblah " mt-index-update "\n\nrand " rand')
     (connect mt-index mt-index-update)
     (connect rand rand')
     (connect (get mt mt-index) mt-update)))
 
-;(spit "mod.v" (modules->all-in-one (mersenne-twister 0x12341233)))
-(with-out-str (pprint (modules->all-in-one (mersenne-twister 0x12341233))))
-(spit "blah" (with-out-str (pprint (mersenne-twister 0x12341233))))
+(spit "mod.v" (modules->all-in-one (mersenne-twister 0x12341233)))
+(spit "mod.v" (modules->verilog+testbench (mersenne-twister 0x12341233) 100))
+;(with-out-str (pprint (modules->all-in-one (mersenne-twister 0x12341233))))
+;(spit "blah" (with-out-str (pprint (mersenne-twister 0x12341233))))

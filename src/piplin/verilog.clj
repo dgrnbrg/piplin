@@ -711,7 +711,7 @@
 (defmethod verilog-of :<
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
-            [(str lhs " - " rhs)]))
+            [(str lhs " < " rhs)]))
 
 (defmethod verilog-of :<=
   [ast name-lookup]
