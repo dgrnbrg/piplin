@@ -46,9 +46,7 @@
     (= (typeof obj) this) obj ;Already correct
     (= (kindof obj)
        (:kind this)) 
-    (ast-error
-      this
-      (str "Cannot convert " obj " to " this))
+    (throw+ (error (str "Cannot convert " obj " to " this)))
     (isa-type? :j-integral (kindof obj)) (instance
                                            this
                                            (promote (anontype :j-long)

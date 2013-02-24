@@ -34,7 +34,7 @@
     (cond
       (= (typeof obj) this) obj
       (= (kindof obj) (:kind this))
-      (ast-error this (str "Cannot convert " obj " to " this))
+      (throw+ (error (str "Cannot convert " obj " to " this)))
       ;(isa-type? :j-integral (kindof obj))
       ;(instance this (bit-shift-left (promote (anontype :j-long) obj) f))
       (isa-type? :j-double (kindof obj))

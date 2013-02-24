@@ -65,7 +65,7 @@
         (instance this [(promote real r)
                         (promote imag i)]))
       (= (kindof obj) (:kind this))
-      (ast-error this (str "Cannot convert " obj " to " this))
+      (throw+ (error (str "Cannot convert " obj " to " this)))
       :else (throw+ (error "Don't know how to promote to" this "from"
                            (typeof obj))))))
 

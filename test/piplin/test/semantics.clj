@@ -21,16 +21,3 @@
                    (broken-counter 4)
                    piplin.semantics/duplicated-ports?
                    concat)))))
-
-(deftest null-test
-  (count-errors! (cast (anontype :null) 3)))
-
-(deftest integer-cast-error
-   (count-errors! (cast (uintm 4) ((uintm 5) 2))) 
-  (count-errors! (get (cast (array (uintm 4) 4) [0 0 0 0]) ((uintm 4) 2))))
-
-(deftest array-test
-  (count-errors! (cast (array (anontype :boolean) 4)
-                       (cast
-                         (array (anontype :boolean) 2)
-                         [false false]))))

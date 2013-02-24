@@ -25,9 +25,9 @@
     (let [{atype :array-type alen :array-len} (typeof obj)
           s (value obj)]
       (if-not (= alen (:array-len type))
-        (ast-error type (str "Array is not of length"
-                             (:array-len type) 
-                             "=>" obj))
+        (throw+ (error (str "Array is not of length"
+                            (:array-len type) 
+                            "=>" obj)))
         (instance type (into {}
                              (map (fn [[k v]]
                                     [k (promote (:array-type type) v)])
