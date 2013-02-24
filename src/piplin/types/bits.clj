@@ -139,8 +139,11 @@
   ([]
    (instance (bits 0) []))
   ([bs]
+   (assert (kindof bs) :bits)
    bs)
   ([b1 b2]
+   (assert (kindof b1) :bits)
+   (assert (kindof b2) :bits)
    (let [type (bits (+ (-> b1 typeof :n)
                        (-> b2 typeof :n)))]
      (if (and (pipinst? b1) (pipinst? b2))
