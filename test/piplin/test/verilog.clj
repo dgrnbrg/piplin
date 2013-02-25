@@ -3,7 +3,7 @@
   (:use [clojure.pprint :only [pprint]])
   (:use [slingshot.slingshot :only [throw+]])
   (:use piplin.test.util)
-  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not and or])
+  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not and or bit-shift-left bit-shift-right])
   (:use [piplin.types bits boolean bundle enum numbers union core-impl binops uintm])
   (:use [piplin connect types math modules mux sim verilog [seven-segment-decoder :only [seven-seg-tester]]]))
 

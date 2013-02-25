@@ -65,6 +65,8 @@
   piplin.types.core-impl/bit-or
   piplin.types.core-impl/bit-xor
   piplin.types.core-impl/bit-not
+  piplin.types.core-impl/bit-shift-left
+  piplin.types.core-impl/bit-shift-right
   piplin.types.bits/bit-cat
   piplin.types.bits/bit-slice
   piplin.types.boolean/not

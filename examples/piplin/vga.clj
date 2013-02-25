@@ -1,5 +1,5 @@
 (ns piplin.vga
-  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp or and])
+  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp or and bit-shift-right bit-shift-left])
   (:use piplin.core
         [piplin.util :only [let']]))
 

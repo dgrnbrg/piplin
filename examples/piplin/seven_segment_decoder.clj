@@ -1,7 +1,7 @@
 (ns piplin.seven-segment-decoder
   (:use clojure.test)
   (:use [slingshot.slingshot :only [throw+]])
-  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not and or])
+  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not and or bit-shift-left bit-shift-right])
   (:use [piplin.types bits boolean bundle enum numbers union core-impl binops uintm])
   (:use [piplin types math modules sim connect mux protocols]))
 

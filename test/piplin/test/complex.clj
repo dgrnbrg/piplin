@@ -1,5 +1,5 @@
 (ns piplin.test.complex 
-  (:refer-clojure :exclude [cond condp cast not = not= > >= < <= + - * inc dec bit-and bit-or bit-xor bit-not and or])
+  (:refer-clojure :exclude [cond condp cast not = not= > >= < <= + - * inc dec bit-and bit-or bit-xor bit-not and or bit-shift-left bit-shift-right])
   (:use [piplin.types bundle sfxpts bits boolean core-impl binops uintm complex])
   (:use [piplin types mux modules sim connect protocols [verilog :only [modules->verilog+testbench]]])
   (:import clojure.lang.ExceptionInfo) 
