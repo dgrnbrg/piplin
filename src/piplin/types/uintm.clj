@@ -110,6 +110,14 @@
   [lhs rhs]
   (impl/bit-xor (value lhs) (value rhs)))
 
+(defbinopimpl impl/bit-shift-left :uintm [:j-integral]
+  [lhs rhs]
+  (impl/bit-shift-left (value lhs) (value rhs)))
+
+(defbinopimpl impl/bit-shift-right :uintm [:j-integral]
+  [lhs rhs]
+  (impl/bit-shift-right (value lhs) (value rhs)))
+
 (defunopimpl impl/bit-not :uintm
   [x]
   (bit-not (value x)))

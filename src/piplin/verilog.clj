@@ -718,6 +718,16 @@
   (let-args ast name-lookup [lhs rhs]
             [(str lhs " <= " rhs)]))
 
+(defmethod verilog-of :bit-shift-left
+  [ast name-lookup]
+  (let-args ast name-lookup [lhs rhs]
+            [(str lhs " << " rhs)]))
+
+(defmethod verilog-of :bit-shift-right
+  [ast name-lookup]
+  (let-args ast name-lookup [lhs rhs]
+            [(str lhs " >> " rhs)]))
+
 (defmethod verilog-of :bit-and
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]

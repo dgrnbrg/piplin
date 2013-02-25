@@ -200,6 +200,18 @@
   (vec (map #(bit-xor %1 %2)
             (value x) (value y))))
 
+(defbinopimpl impl/bit-shift-left :bits [:j-integral]
+  [x y]
+  (let [n (bitvec-to-long (value y))
+        remainder (drop n (value x))]
+    (vec (concat remainder (repeat n 0)))))
+
+(defbinopimpl impl/bit-shift-right :bits [:j-integral]
+  [x y]
+  (let [n (bitvec-to-long (value y))
+        remainder (drop-last n (value x))]
+    (vec (concat (repeat n 0) remainder))))
+
 (defunopimpl impl/bit-not :bits 
   [x]
   (vec (map (partial - 1) (value x))))
