@@ -19,7 +19,6 @@ First, you'll define a module with these inputs and outputs, like so:
 ```clojure
 (defmodule my-first-project []
   [:outputs [led #b0000_0000 ;8 bit quantity for controlling the 8 LEDs
-             ;7 segment display is 
              seven_seg_cathode #b0000_000_0
              seven_seg_anode #b0000
              vgaRed #b000
@@ -65,7 +64,6 @@ Since we have several peripherials we're going to control, we're going to need t
 ```clojure
 (defmodule my-first-project []
   [:outputs [led #b0000_0000 ;8 bit quantity for controlling the 8 LEDs
-             ;7 segment display is 
              seven_seg_cathode #b0000_000_0
              seven_seg_anode #b0000
              vgaRed #b000
@@ -95,7 +93,6 @@ Now that we have something simple, let's try controlling the LEDs with the switc
 ```clojure
 (defmodule my-first-project []
   [:outputs [led #b0000_0000 ;8 bit quantity for controlling the 8 LEDs
-             ;7 segment display is 
              seven_seg_cathode #b0000_000_0
              seven_seg_anode #b0000
              vgaRed #b000
@@ -134,7 +131,6 @@ This time, we're going to invert every other switch, so that the even switches t
 
 (defmodule my-first-project []
   [:outputs [led #b0000_0000 ;8 bit quantity for controlling the 8 LEDs
-             ;7 segment display is 
              seven_seg_cathode #b0000_000_0
              seven_seg_anode #b0000
              vgaRed #b000
