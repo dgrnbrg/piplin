@@ -220,3 +220,78 @@ We cannot `bit-slice` the `counter` since it's a `uintm`, which is a number, not
 The seven segment displays on the Nexys 6 are active low, so we `bit-not` the output of the decoder before putting it on the cathode. Also, we must include the extra `#b1` to turn off the decimal point, since the display requires 8 bits to drive--7 for the digit, and one for the decimal.
 
 At this point, you should see all 4 digits displaying the same value and counting up together!
+
+## Displaying different digits
+
+You may have noticed from the last section that there's only one digit of output on the Nexys 6 board. How do we control the other digits!?
+
+The seven segment display is controlled through a technique called **timeslicing**, **time multiplexing**, or **scanning**. This means that you light up one character at a time, and switch which character you're displaying every couple milliseconds. Since the human eye can't perceive changes that fast, the display appears to have a different digit on each character display. We'll use the clock divided by 2^12 to switch which charater we're displaying around 16k times per second. You can try adjusting the period faster and slower to see what happens.
+
+```clojure
+(defn invert-every-other
+  [binary]
+  (let [the-bits (map #(bit-slice binary % (inc %)) (reverse (range 8)))
+        inverting (map (fn [bit invert?]
+                         (if invert?
+                           (bit-not bit)
+                           bit))
+                       the-bits
+                       (cycle [true false]))]
+    (apply bit-cat inverting)))
+
+;; Pin mapping for Nexys 6 Seven Segment Displays
+(def seven-seg-map
+  {:top 0
+   :upper-left 5
+   :lower-left 4
+   :bottom 3
+   :lower-right 2
+   :upper-right 1
+   :middle 6})
+
+(defmodule my-first-project []
+  [:outputs [led #b0000_0000 ;8 bit quantity for controlling the 8 LEDs
+             seven_seg_cathode #b0000_000_0
+             seven_seg_anode #b0000
+             vgaRed #b000
+             vgaGreen #b000
+             vgaBlue #b00
+             Hsync false
+             Vsync false]
+   :inputs [sw (bits 8)]
+   :feedback [counter ((uintm 41) 0)]
+   :modules [deco (piplin.seven-segment-decoder/decoder 16 seven-seg-map)]]
+
+  (connect counter (inc counter)) ;uintm is modulo
+  (connect deco$in (bit-slice (serialize counter) 25 41)) ;Full 16 bits in now
+  (let [;Must multiplex in the millisecond regime 
+        current-state (bit-slice
+                        (serialize counter) 12 14)
+        anode (condp = current-state
+                #b00 #b1110
+                #b01 #b1101
+                #b10 #b1011
+                ;#b11
+                #b0111)
+        cathode (condp = current-state
+                  #b00 (bit-slice
+                         deco$out 0 7)
+                  #b01 (bit-slice
+                         deco$out 7 14)
+                  #b10 (bit-slice
+                         deco$out 14 21)
+                 ; #b11
+                  (bit-slice
+                         deco$out 21 28))]
+    (connect seven_seg_anode anode)
+    (connect seven_seg_cathode (bit-cat #b1 (bit-not cathode))))
+
+  (connect led (invert-every-other sw))
+  (connect vgaRed #b000)
+  (connect vgaGreen #b000)
+  (connect vgaBlue #b00)
+  (connect Hsync false)
+  (connect Vsync false))
+```
+
+For more information on why the 2 connections to the display are called *anode* and *cathode*, see [this Wikipedia article on diodes](http://en.wikipedia.org/wiki/Diode). The short version is that the anode and cathode are the 2 wires that come out of the LED, and their must be a positive voltage difference between the anode and the cathode for the LED to light up.
