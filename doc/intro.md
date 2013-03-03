@@ -14,7 +14,16 @@ Once you've got that, you can clone [this sample project](https://github.com/dgr
 
 ## Piplin code
 
-First, you'll define a module with these inputs and outputs, like so:
+First, we'll set up the `ns` form for this piplin project. You can copy the sample below, changing the namespace to yours:
+
+```clojure
+(ns piplin.my-first-project
+  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-left bit-shift-right])
+  (:use piplin.core)
+  (:require piplin.seven-segment-decoder))
+```
+
+Next, you'll define a module with these inputs and outputs, like so:
 
 ```clojure
 (defmodule my-first-project []
