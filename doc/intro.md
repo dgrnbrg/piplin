@@ -154,3 +154,69 @@ You can test `invert-every-other` on the REPL. Note that we've hardcoded it to t
 Why do we need to `reverse` the `(range 8)`? The least significant bit (index 0) should go on the right side of `the-bits`, so that we can apply `bit-cat` to it; however, if we don't reverse the range, we'll end up with the least significant bit in the most significant bit position, which would be wrong.
 
 Try running that on the FPGA now!
+
+## Seven segment display and submodules
+
+At this point, we've succeeded in playing around with the LEDs a bit. Now, we'd like to actually try to use the seven segment display. For this, we'll use a submodule. Piplin modules can be instantiated and used as components of other modules. We'll use the module `piplin.seven-segment-decoder/decoder` to display a simple counter.
+
+Since our FPGA is running at 65MHz (in the provided sample project), we need to have a counter that is running slower--slow enough that we can actually see it counting. To do this, we'll create a counter that runs at 65MHz, but we'll divide it by 2^25 (33 million) so that it counts up about twice per second.
+
+We can create local registers that aren't exposed as ports by using the `:feedback` section, and submodules using the `:modules` section.
+
+```clojure
+(defn invert-every-other
+  [binary]
+  (let [the-bits (map #(bit-slice binary % (inc %)) (reverse (range 8)))
+        inverting (map (fn [bit invert?]
+                         (if invert?
+                           (bit-not bit)
+                           bit))
+                       the-bits
+                       (cycle [true false]))]
+    (apply bit-cat inverting)))
+
+;; Pin mapping for Nexys 6 Seven Segment Displays
+(def seven-seg-map
+  {:top 0
+   :upper-left 5
+   :lower-left 4
+   :bottom 3
+   :lower-right 2
+   :upper-right 1
+   :middle 6})
+
+(defmodule my-first-project []
+  [:outputs [led #b0000_0000 ;8 bit quantity for controlling the 8 LEDs
+             seven_seg_cathode #b0000_000_0
+             seven_seg_anode #b0000
+             vgaRed #b000
+             vgaGreen #b000
+             vgaBlue #b00
+             Hsync false
+             Vsync false]
+   :inputs [sw (bits 8)]
+   :feedback [counter ((uintm 29) 0)]
+   :modules [deco (piplin.seven-segment-decoder/decoder 4 seven-seg-map)]]
+
+  (connect counter (inc counter)) ;uintm is modulo
+  (connect deco$in (bit-slice (serialize counter) 25 29))
+  (connect seven_seg_cathode (bit-cat #b1 (bit-not deco$out)))
+  (connect seven_seg_anode #b0000)
+
+  (connect led (invert-every-other sw))
+  (connect vgaRed #b000)
+  (connect vgaGreen #b000)
+  (connect vgaBlue #b00)
+  (connect Hsync false)
+  (connect Vsync false))
+```
+
+Creating a decoder module takes 2 arguments: the number of bits to decode, and the mapping from digits to wire indices.
+
+Submodules' ports are specified with `$`, so that the ports `in` and `out` of the module named `deco` are referred to as `deco$in` and `deco$out`.
+
+We cannot `bit-slice` the `counter` since it's a `uintm`, which is a number, not a `bits`. So, we use the function `serialize` to convert it to its bit representation, and then we can slice and concatenate with other bits to our heart's content. There is a corresponding function `deserialize` that we can use to convert bits to more meaningful types, as long as we know what type we want to deserialize the bits into.
+
+The seven segment displays on the Nexys 6 are active low, so we `bit-not` the output of the decoder before putting it on the cathode. Also, we must include the extra `#b1` to turn off the decimal point, since the display requires 8 bits to drive--7 for the digit, and one for the decimal.
+
+At this point, you should see all 4 digits displaying the same value and counting up together!
