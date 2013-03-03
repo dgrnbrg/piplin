@@ -4,6 +4,10 @@
 
 Piplin is an hardware description language (HDL) written in Clojure.
 
+# Documentation
+
+Please visit http://dgrnbrg.github.com/piplin/intro.html for an introductory tutorial on Piplin.
+
 ## License
 
 Copyright (C) 2012 David Greenberg
