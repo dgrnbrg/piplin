@@ -1,5 +1,5 @@
 (ns piplin.core
-  (:refer-clojure :exclude [cast + - * <= < >= > not= = bit-and bit-or bit-xor bit-not inc dec not cond condp and or])
+  (:refer-clojure :exclude [cast + - * <= < >= > not= = bit-and bit-or bit-xor bit-not inc dec not cond condp and or bit-shift-left bit-shift-right])
   (:use [slingshot.slingshot])
   (:use [swiss-arrows.core :only [-<>]]))
 
