@@ -1,6 +1,26 @@
+# What is Piplin?
+
+Piplin is a way to use Clojure to create hardware. Using Piplin, you can describe and simulate logic using the full power of Clojure. These descriptions can then be compiled to put them onto an FPGA. Currently, Piplin is in beta and as such APIs may be subject to change.
+
+## For Software Developers
+
+Piplin is a great way for you to use your knowledge of programming, algorithms, and JVM libraries to describe the structure of hardware. It is useful to have some knowledge of computer architecture or digital logic circuits with registers. [Here is a short introduction on digital logic](http://www.swarthmore.edu/NatSci/echeeve1/Ref/Digital/DigitalIntro.html). I recommend skipping over the parts explaining Karnaugh maps, as Piplin does that automatically.
+
+Piplin doesn't do everything yet, though. You'll need to provide the file layer of integration with the FPGA, although this document links to a sample one. Also, Piplin will allow you to generate hardware that runs too slowly, so you may need to [manually pipeline your designs](http://www.cs.iastate.edu/~prabhu/Tutorial/PIPELINE/pipe_title.html).
+
+## For Hardware Developers
+
+Piplin is a pleasant improvement on Verilog and VHDL, with future potential to gain features of BlueSpec, OpenCL, and other HLS tools. It uses structural logic semantics to describe circuits using only flip-flops, memories, and combinational logic. It's primary benefits are:
+
+1. Piplin's powerful and extensible type system makes it impossible to write many common errors, such as connecting busses of different widths or busses of the same width carrying mismatched data formats.
+2. Clojure offers many powerful tools for organizing logic and generating complex structures. These let you use one language for design, high level composition, and testing, and offer a far richer syntax for describing hardware than existing HDLs.
+3. Piplin's representation of logic is simple and manipulable. This allows powerful optimizations, such as phase-shifted time-slicing of circular pipelines and processor stage bypassing, to be automatically generated in designs.
+
+If you don't know Clojure, I recommend going to the [Clojure Doc Site](http://clojure-doc.org) to learn about the language, its library, installation, and the associated tools. An excellent quick reference of the core APIs with examples and source code can be found at [Clojuredocs](http://clojuredocs.org/quickref/Clojure%20Core).
+
 # Getting Started
 
-I have chosen the [Digilent Nexys 3](http://www.digilentinc.com/Products/Detail.cfm?NavPath=2,400,897&Prod=NEXYS3&CFID=277304&CFTOKEN=75901224) as the initial standard platform for experimenting with Piplin. It has a big FPGA with lots of capacity, plenty of RAM and nonvolatile memory, video output, buttons and LEDs, USB, Ethernet, and expansion ports with a host of add-ons.
+I have chosen the [Digilent Nexys 3](http://www.digilentinc.com/Products/Detail.cfm?NavPath=2,400,897&Prod=NEXYS3&CFID=277304&CFTOKEN=75901224) as the initial standard platform for experimenting with Piplin. It has a big FPGA with lots of capacity, plenty of RAM and non-volatile memory, video output, buttons and LEDs, USB, Ethernet, and expansion ports with a host of add-ons.
 
 The Nexys 3 uses a Xilinx FPGA that can be programmed using the free [Xilinx ISE WebPACK](http://www.xilinx.com/products/design-tools/ise-design-suite/ise-webpack.htm). This software works for Windows and Linux. To install it on Ubuntu, you'll need to Google for directions--there are many blog posts that explain the extra packages required and scripts. [Here is one example post](http://blog.2gn.com/electronics/xilinx-ise-14-2-on-ubuntu-12-04/).
 
