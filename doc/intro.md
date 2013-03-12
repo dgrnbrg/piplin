@@ -140,7 +140,7 @@ Now that we have something simple, let's try controlling the LEDs with the switc
   (connect Vsync false))
 ```
 
-Try simulating this module. Noice that it cannot be simulated as-is! Instead, we get a NullPointerException in the function `piplin.modules/make-connection`. This is because we haven't connected anything to the input `sw`, so our simulation will be missing data! We can write a "testbench", a program that stimulates the outputs so that we can observe the outputs. Here's a simple one that turns the switches on one at a time:
+Try simulating this module. Notice that it cannot be simulated as-is! Instead, we get a NullPointerException in the function `piplin.modules/make-connection`. This is because we haven't connected anything to the input `sw`, so our simulation will be missing data! We can write a "testbench", a program that stimulates the outputs so that we can observe the outputs. Here's a simple one that turns the switches on one at a time:
 
 ```clojure
 (defmodule testbench []
