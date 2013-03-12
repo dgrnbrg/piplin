@@ -10,7 +10,7 @@ Piplin doesn't do everything yet, though. You'll need to provide the file layer 
 
 ## For Hardware Developers
 
-Piplin is a pleasant improvement on Verilog and VHDL, with future potential to gain features of BlueSpec, OpenCL, and other HLS tools. It uses structural logic semantics to describe circuits using only flip-flops, memories, and combinational logic. It's primary benefits are:
+Piplin is a pleasant improvement on Verilog and VHDL, with future potential to gain features of BlueSpec, OpenCL, and other HLS tools. It uses structural logic semantics to describe circuits using only flip-flops, memories, and combinational logic. Its primary benefits are:
 
 1. Piplin's powerful and extensible type system makes it impossible to write many common errors, such as connecting busses of different widths or busses of the same width carrying mismatched data formats.
 2. Clojure offers many powerful tools for organizing logic and generating complex structures. These let you use one language for design, high level composition, and testing, and offer a far richer syntax for describing hardware than existing HDLs.
