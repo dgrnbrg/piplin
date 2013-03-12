@@ -140,6 +140,22 @@ Now that we have something simple, let's try controlling the LEDs with the switc
   (connect Vsync false))
 ```
 
+Try simulating this module. Noice that it cannot be simulated as-is! Instead, we get a NullPointerException in the function `piplin.modules/make-connection`. This is because we haven't connected anything to the input `sw`, so our simulation will be missing data! We can write a "testbench", a program that stimulates the outputs so that we can observe the outputs. Here's a simple one that turns the switches on one at a time:
+
+```clojure
+(defmodule testbench []
+  [:modules [proj (my-first-project)]
+   :feedback [switch #b0000_0001]]
+  (connect switch (bit-cat
+                    (bit-slice switch 0 1)
+                    (bit-slice switch 1 8)))
+  (connect proj$sw switch))
+```
+
+This module introduces the other 2 bindings forms in modules. We've already seen `:outputs`, which are registers that store state, and `:inputs`, which defines the inputs to the module. `:feedback` is the same as `:outputs`, except they're registers private to the module. `:modules` allows you to instantiate submodules, whose input and output ports can be accessed using the `module$subport` syntax (this will change in the future).
+
+Now you can continue to simulate the examples by running `(trace-module (testbench) 100)`. When you look at GTKWave, you'll see that now, the signal names of the `my-first-project` module are listed as `proj_led` or `proj_Hsync`, since they are now signals underneath a named submodule.
+
 Try running that on the FPGA, and see how flipping the switches turns on and off the LEDs.
 
 ## Turning on some LEDs, round II
