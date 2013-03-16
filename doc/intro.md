@@ -156,7 +156,7 @@ This module introduces the other 2 bindings forms in modules. We've already seen
 
 Now you can continue to simulate the examples by running `(trace-module (testbench) 100)`. When you look at GTKWave, you'll see that now, the signal names of the `my-first-project` module are listed as `proj_led` or `proj_Hsync`, since they are now signals underneath a named submodule.
 
-Try running that on the FPGA, and see how flipping the switches turns on and off the LEDs.
+Try running that on the FPGA, and see how flipping the switches turns on and off the LEDs. Once you've used `modules->verilog` and written its output to a file, you can combine that with the sample project so that you can use ISE Webpack to synthesize it to a binary file, and then use the Adept tool to write that to the FPGA.
 
 ## Turning on some LEDs, round II
 
