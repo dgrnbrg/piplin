@@ -1,7 +1,10 @@
 (ns piplin.nexys6.sw-led
-  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or])
-  (:use piplin.core)
+  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-left bit-shift-right])
+  (:use piplin.core
+        [piplin.modules :only [modulize compile-root sim]])
   (:use [piplin.types.union :only [get-tag get-value]])
+  (:use plumbing.core)
+  (:require [plumbing.graph :as graph])
   (:use [piplin.vga :only [xvga]])
   (:use [piplin.seven-segment-decoder :only [decoder]]))
 
@@ -286,3 +289,196 @@
 
 #_(spit "tmp" (with-out-str (led->switch)))
 (spit "nexys-leds.v" (modules->all-in-one (led->switch)))
+
+(def adder
+  {:sum (fnk adder [x y] (+ x y))
+   :difference (fnk addr [x y] (- x y))})
+
+#_(pprint ((graph/eager-compile (assoc adder
+                            :x (fnk [] (piplin.types/uninst ((uintm 8) 2)))
+                            :y (fnk [] (piplin.types/uninst ((uintm 8) 3))))) {}))
+
+
+
+(declare fetch store)
+(def fetch get)
+(def store assoc)
+
+(def adder
+  {:sum (fnk [x y] (+ x y))})
+
+(compile-root (modulize adder nil) :x ((uintm 8) 3) :y 4)
+(-> (compile-root (modulize :root adder nil) :x ((uintm 8) 3) :y 4)
+  (piplin.modules/verilog {[:root :sum] "sum"})
+  println
+  )
+
+(def counter
+  {:value (fnk [value] (inc value))})
+
+(-> (compile-root (modulize :root counter {:value ((uintm 8) 0)}))
+  (piplin.modules/verilog {[:root :value] "val"})
+  print)
+(-> (compile-root (modulize counter {:value ((uintm 8) 0)}))
+  (sim 10)
+  pprint)
+
+(def quadratic-counter
+  {:value (fnk [value]
+               (let [counter ((modulize counter
+                                        {:value
+                                         ((uintm 8) 0)}))]
+                 (+ value (:value counter))))})
+
+(-> (compile-root (modulize :root quadratic-counter {:value ((uintm 8) 0)}))
+  (piplin.modules/verilog {[:root :value] "val"})
+  println)
+
+(-> (compile-root
+      (modulize quadratic-counter {:value ((uintm 8) 0)}))
+  (sim 10) 
+  pprint )
+
+(def adder {:+1 (fnk [input] (inc input))})
+(def double-adder
+  {:input (fnk [input]
+            (let [adder1 ((modulize adder nil)
+                            :input input)
+                  adder2 ((modulize adder nil)
+                            :input (:+1 adder1))]
+              (:+1 adder2)))})
+(-> (compile-root (modulize :root double-adder {:input ((uintm 8) 3)}))
+  (piplin.modules/verilog {[:root :input] "double_count"})
+  (println)
+;  (sim 10)
+;  (pprint)
+  )
+
+(def alu
+  {:alu-adder (fnk [x y]
+                   (let [{:keys [sum]} ((modulize [adder] nil)
+                                          :x x
+                                          :y y)]
+                     sum))
+   :result (fnk [dest x y op memory regfile imm]
+                (let [x (fetch regfile x)
+                      y (fetch regfile y)]
+                  (assoc
+                    (condp = op
+                      :add {:val (+ x y) :valid? true}
+                      :sub {:val (- x y) :valid? true}
+                      :mul {:val (* x y) :valid? true}
+                      :load {:val (fetch memory x) :valid? true}
+                      :imm {:val imm :value? true}
+                      :else {:val x :valid? false})
+                    :dest dest)))
+   :branch (fnk [jump-addr op x pc regfile]
+                (cond (and (= op :jz) (zero? (fetch regfile x)))
+                      jump-addr
+                      (= op :jump)
+                      jump-addr
+                      :else
+                      (inc pc)))
+   :memory-wb (fnk [x addr op memory regfile]
+                   (store memory (= op :store) (fetch regfile addr) (fetch regfile x)))})
+
+(def inst
+  (union
+    {:jump (uintm 8)
+     :jz (bundle {:reg (uintm 4) :addr (uintm 8)})
+     :store (bundle {:addr (uintm 3) :reg (uintm 4)})
+     :load (bundle {:addr (uintm 3) :reg (uintm 4) :dest (uintm 4)})
+     :add (bundle {:x (uintm 4) :y (uintm 4) :dest (uintm 4)})
+     :sub (bundle {:x (uintm 4) :y (uintm 4) :dest (uintm 4)})
+     :mul (bundle {:x (uintm 4) :y (uintm 4) :dest (uintm 4)})
+     :imm (bundle {:dest (uintm 4) :imm (uintm 8)})}))
+
+(def fetch-decode
+  {:inst (fnk [pc program]
+              (fetch program pc))
+   :x (fnk [inst]
+           (union-match inst
+             (:jz {:keys [reg]} reg)
+             (:jump _ 0)
+             (:store {:keys [reg]} reg)
+             (:load {:keys [reg]} reg)
+             (:add {:keys [x]} x)
+             (:sub {:keys [x]} x)
+             (:mul {:keys [x]} x)
+             (:imm _ 0)))
+   :y (fnk [inst]
+           (union-match inst
+             (:jz _ 0)
+             (:jump _ 0)
+             (:store _ 0)
+             (:load _ 0)
+             (:add {:keys [y]} y)
+             (:sub {:keys [y]} y)
+             (:mul {:keys [y]} y)
+             (:imm _ 0)))
+   :jump-addr (fnk [inst op]
+                   (mux2 (= op :jump)
+                     (get-value :jump inst)
+                     (:addr (get-value :jz inst))))
+   :op (fnk [inst]
+            (get-tag inst))
+   :dest (fnk [inst]
+           (union-match inst
+             (:jz _ 0)
+             (:jump _ 0)
+             (:store _ 0)
+             (:load {:keys [dest]} dest)
+             (:add {:keys [dest]} dest)
+             (:sub {:keys [dest]} dest)
+             (:mul {:keys [dest]} dest)
+             (:imm {:keys [dest]} dest)))
+   :imm (fnk [inst]
+             (:imm (get-value :imm inst)))
+   :pc (fnk [branch]
+            branch)
+   :addr (fnk [branch]
+              (:addr (get-value :store inst)))})
+
+(def writeback
+  {:regfile-wb (fnk [result regfile]
+                    (let [{:keys [dest val valid?]} result]
+                      (store regfile valid? dest val)))})
+
+(defn make-processor
+  []
+  ((modulize
+     ;seq of included parts
+     (merge fetch-decode alu writeback)
+     ;Elements which are actually registers
+     {:pc (uintm 8)
+      :regfile (array (uintm 8) 8)
+      :memory (array (uintm 8) 256)})
+     :program
+     {0 (cast inst {:jump 0})}
+     ))
+
+;;  With this info, modulize does the following:
+;;  1. makes a set of registers out of the given parts
+;;  2. computes the dependency graph of everything with the
+;;     explicitly called out elements as the roots
+;;  3. Look over every graph node. Each register should be named
+;;     once, which makes the assignment to that register. This is
+;;     enforced across all given maps. Look over the other nodes:
+;;     some of them will return `store` invocations, which generate
+;;     write ports on the array memories. `store` can also return the
+;;     updated array, and it's up to the user to know what their code
+;;     will generate.
+;;  4. Now, the graphs can be merged and evaluated, with the inputs
+;;     being the old values of the registers, and the outputs being
+;;     the way to update registers and memories.
+;;
+;;  Thoughts:
+;;  - get-tag and get-value are useful even though they're unsafe--that's
+;;  inherent in dynamism, due to the wasted circuit
+;;  - modulize returns a function that takes keyword args and returns a map
+;;  of outputs. Whenever you call moduleize, you can check the global *current-module*
+;;  to know whether you're being created under which module. When created as a
+;;  non-root module, the modulize call will have to generate stubs for its input
+;;  and output and add a copy of itself to the module's chain, or it will have
+;;  to add its nested storage elements to the overall storage pool, munge all
+;;  its internal signal names, and "lift" its structure into its parent.

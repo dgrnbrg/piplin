@@ -5,7 +5,7 @@
   (:use [clojure.walk :only [postwalk]]) 
   (:use [clojure.set :only [map-invert]])
   (:use [clojure.string :only [join replace]]) 
-  (:use [piplin modules types])
+  (:use [piplin [modules :exclude [verilog]] types])
   (:use [swiss-arrows.core :only [-<>>]])
   (:require [piplin.types.core-impl :as impl])
   (:use [piplin.types.sints :only [sign-extend sints]])
@@ -801,7 +801,7 @@
   [expr name-table]
   (cond
     (pipinst? expr)
-    [nil ""]
+    [(verilog-repr expr) ""]
     (= :use-core-impl (piplin-clojure-dispatch expr))
     (do
       (println "WARNING: trying to render clojure type, skipping")

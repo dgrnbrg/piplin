@@ -4,6 +4,9 @@
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :exclude [replace cast])
   (:use [clojure.string :only [join replace split]])
+  (:use [swiss-arrows.core :only [-<> -<>>]])
+  (:require [plumbing.graph :as graph]
+            [plumbing.core :as plumb])
   (:require [piplin.connect :as conn]))
 
 (defn connect-impl
@@ -346,7 +349,9 @@
           :register
           (let [path (conj *module-path* (:port (value expr)))]
             (fn []
-              (get *sim-state* path)))
+              ;(println "Getting" (:port (value expr)))
+              ;(println "state is" *sim-state*)
+              (get *sim-state* (:port (value expr)))))
           :input 
           (let [f (get *input-fns* (:port (value expr)))]
             f)
@@ -493,3 +498,156 @@
   At this point we can either try for toVerilog or
   implement structs or vectors, including pattern
   matching aka destructuring. )
+
+;;This stores the path of the current module--used for outputing hierarchical data
+(def ^:dynamic *current-module* [])
+;;This is an atom containing a map of state element paths to a map
+;;of their sim fns (:fn) and initial values (:init)
+(def ^:dynamic *state-elements*)
+
+(defn modulize
+  ([computation state]
+   (modulize 
+     (-<> (RuntimeException.)
+          .getStackTrace
+          ^java.lang.StackTraceElement (aget 2)
+          .getLineNumber
+
+          (str "module_" <>)
+          keyword
+          )
+     computation state))
+  ([module-name computation state]
+   (doseq [[k] state]
+     (assert (computation k)
+             (str "Missing register definition for " k)))
+   (fn [& inputs]
+     (assert (every? keyword? (take-nth 2 inputs)))
+     (binding [*current-module* (conj *current-module*
+                                      module-name)]
+       (let [state-renames (plumb/for-map [k (keys state)]
+                             k (keyword (name (gensym))))
+             reverse-renames (plumb/for-map
+                               [[k v] state-renames]
+                               v k)
+             renamed-computation
+             (plumb/map-keys #(or (state-renames %) %)
+                             computation)
+             init-map (plumb/map-vals
+                        (fn [v] {:init v}) state)
+             register-ports (plumb/for-map [[k v] state]
+                              k (make-port*
+                                  (conj *current-module* k)
+                                  (typeof v)
+                                  :register))
+             port-map (plumb/map-vals
+                        (fn [v] {:port v}) register-ports)
+             result (-<>> (graph/run
+                            renamed-computation
+                            (if (seq inputs)
+                              (apply assoc register-ports inputs)
+                              register-ports))
+                          (plumb/map-keys
+                            #(or (reverse-renames %) %)))
+             fn-map (plumb/map-vals
+                      (fn [v] {:fn v})
+                      result)
+             state-elements (->> (merge-with
+                                   merge
+                                   init-map
+                                   fn-map
+                                   port-map)
+                              (plumb/map-keys
+                                #(conj *current-module* %)))]
+         (swap! *state-elements* merge state-elements)
+         result)))))
+
+(defn compile-root
+  [module & inputs]
+  (binding [*state-elements* (atom {})]
+    (apply module inputs)
+    @*state-elements*))
+
+(defn sim
+  [compiled-module cycles]
+  (assert (empty? (remove (comp :fn second)
+                          compiled-module))
+          "Cannot have any input ports during simulation")
+  (let [inits (plumb/map-vals :init compiled-module)
+        fns (plumb/map-vals (comp make-sim-fn :fn) compiled-module)]
+    (loop [state inits
+           cycles cycles
+           history [inits]]
+      (if (zero? cycles)
+        history
+        (let [state' (binding [*sim-state* state]
+                       (plumb/map-vals #(%) fns))]
+          (recur
+            state'
+            (dec cycles)
+            (conj history state')))))))
+
+(defn verilog
+  [compiled-module outputs]
+  (let [verilog-names (plumb/for-map
+                        [[name v] compiled-module]
+                        (:port v) (piplin.verilog/gen-verilog-name (last name)))
+        module-regs (filter (comp :port second)
+                        compiled-module)
+        regs-inits
+        (join (map
+                (comp #(let [{:keys [init port]} %]
+                         (format
+                           "  reg %s %s = %s;\n"
+                           (-> init
+                             typeof
+                             piplin.types.bits/bit-width-of
+                             piplin.verilog/array-width-decl)
+                           (verilog-names port)
+                           (piplin.verilog/verilog-repr init)
+                           ))
+                      second)
+                module-regs))
+        [name-table code]
+        (->> compiled-module
+               (map (comp :fn second))
+               (reduce (fn [[name-table text] expr]
+                         (piplin.verilog/verilog expr name-table text)) 
+                       [verilog-names ""]))
+        reg-assigns 
+        (join (map
+                (comp (fn [[n v]]
+                        (format "    %s <= %s;\n" n v))
+                      (juxt (comp verilog-names :port)
+                            (comp name-table :fn))
+                      second) 
+          module-regs))
+        output-names (->> outputs
+                       vals
+                       (map #(str "  " % ",\n"))
+                       join)
+        output-assigns (->> outputs
+                         (map (fn [[path verilog-name]]
+                                (let [{p :port
+                                       f :fn} (compiled-module path)
+                                      lookup-name (name-table (or p f))]
+                                  (format
+                                    "  assign %s = %s;\n"
+                                    verilog-name
+                                    lookup-name))))
+                         join)
+        ]
+    (str "module piplin_module(\n"
+         "  clock,\n"
+         output-names
+         ");\n"
+         regs-inits
+         code
+         output-assigns
+         "  always @(posedge clock) begin\n"
+         reg-assigns
+         "  end\n"
+         "endmodule\n"
+         )
+    )
+  )

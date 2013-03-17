@@ -2,6 +2,7 @@
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/core.logic "0.6.7"]
                  [slingshot "0.10.1"]
+                 [prismatic/plumbing "0.0.1"]
                  [swiss-arrows "0.5.1"]
                  [org.clojure/core.incubator "0.1.1"]
                  [org.clojure/tools.macro "0.1.1"]
