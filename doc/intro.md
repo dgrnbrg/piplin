@@ -22,13 +22,13 @@ If you don't know Clojure, I recommend going to the [Clojure Doc Site](http://cl
 
 I have chosen the [Digilent Nexys 3](http://www.digilentinc.com/Products/Detail.cfm?NavPath=2,400,897&Prod=NEXYS3&CFID=277304&CFTOKEN=75901224) as the initial standard platform for experimenting with Piplin. It has a big FPGA with lots of capacity, plenty of RAM and non-volatile memory, video output, buttons and LEDs, USB, Ethernet, and expansion ports with a host of add-ons.
 
-The Nexys 3 uses a Xilinx FPGA that can be programmed using the free [Xilinx ISE WebPACK](http://www.xilinx.com/products/design-tools/ise-design-suite/ise-webpack.htm). This software works for Windows and Linux. To install it on Ubuntu, you'll need to Google for directions--there are many blog posts that explain the extra packages required and scripts. [Here is one example post](http://blog.2gn.com/electronics/xilinx-ise-14-2-on-ubuntu-12-04/).
+The Nexys 3 uses a Xilinx FPGA that can be programmed using the free [Xilinx ISE WebPACK](http://www.xilinx.com/products/design-tools/ise-design-suite/ise-webpack.htm). This software works for Windows and Linux. To install it on Ubuntu, you'll need to Google for directions - there are many blog posts that explain the extra packages required and scripts. [Here is one example post](http://blog.2gn.com/electronics/xilinx-ise-14-2-on-ubuntu-12-04/).
 
 Piplin generates Verilog code, which is then fed into the ISE WebPACK to produce the actual bitstream that can be programmed onto the FPGA. I recommend the open source Verilog simulator IVerilog for checking that your generated hardware matches your simulation. You can install this with `brew install icarus-verilog` on Mac, or `apt-get install iverilog` on Ubuntu.
 
 In order to copy the bitstream onto the Nexys 3, you'll need to install [Digilent Adept](http://www.digilentinc.com/Products/Detail.cfm?NavPath=2,66,828&Prod=ADEPT2), which is the tool that lets you interact with the Digilent board over USB from Windows and Linux.
 
-Once you've got that, you can clone [this sample project](https://github.com/dgrnbrg/nexys6-sample) I've created for the Nexys 3. This sample project provides access to the VGA port at XVGA resolution, and provides access to the buttons, switches, LEDs, and 7 segment display. These are the easiest components to control--once you've figured them out, you'll be able to work on using the memories and Ethernet port (or I'll release a followup project).
+Once you've got that, you can clone [this sample project](https://github.com/dgrnbrg/nexys6-sample) I've created for the Nexys 3. This sample project provides access to the VGA port at XVGA resolution, and provides access to the buttons, switches, LEDs, and 7 segment display. These are the easiest components to control - once you've figured them out, you'll be able to work on using the memories and Ethernet port (or I'll release a followup project).
 
 # High level workflow
 
@@ -194,7 +194,7 @@ This time, we're going to invert every other switch, so that the even switches t
   (connect Vsync false))
 ```
 
-You can test `invert-every-other` on the REPL. Note that we've hardcoded it to take an 8 bit value--if you want to use some other bit width, you'll need to change the `8` to the appropriate value.
+You can test `invert-every-other` on the REPL. Note that we've hardcoded it to take an 8 bit value - if you want to use some other bit width, you'll need to change the `8` to the appropriate value.
 
 Why do we need to `reverse` the `(range 8)`? The least significant bit (index 0) should go on the right side of `the-bits`, so that we can apply `bit-cat` to it; however, if we don't reverse the range, we'll end up with the least significant bit in the most significant bit position, which would be wrong.
 
@@ -262,7 +262,7 @@ Submodules' ports are specified with `$`, so that the ports `in` and `out` of th
 
 We cannot `bit-slice` the `counter` since it's a `uintm`, which is a number, not a `bits`. So, we use the function `serialize` to convert it to its bit representation, and then we can slice and concatenate with other bits to our heart's content. There is a corresponding function `deserialize` that we can use to convert bits to more meaningful types, as long as we know what type we want to deserialize the bits into.
 
-The seven segment displays on the Nexys 6 are active low, so we `bit-not` the output of the decoder before putting it on the cathode. Also, we must include the extra `#b1` to turn off the decimal point, since the display requires 8 bits to drive--7 for the digit, and one for the decimal.
+The seven segment displays on the Nexys 6 are active low, so we `bit-not` the output of the decoder before putting it on the cathode. Also, we must include the extra `#b1` to turn off the decimal point, since the display requires 8 bits to drive - 7 for the digit, and one for the decimal.
 
 At this point, you should see all 4 digits displaying the same value and counting up together!
 
