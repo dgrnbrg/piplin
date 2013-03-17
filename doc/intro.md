@@ -204,7 +204,7 @@ Try running that on the FPGA now!
 
 At this point, we've succeeded in playing around with the LEDs a bit. Now, we'd like to actually try to use the seven segment display. For this, we'll use a submodule. Piplin modules can be instantiated and used as components of other modules. We'll use the module `piplin.seven-segment-decoder/decoder` to display a simple counter.
 
-Since our FPGA is running at 65MHz (in the provided sample project), we need to have a counter that is running slower--slow enough that we can actually see it counting. To do this, we'll create a counter that runs at 65MHz, but we'll divide it by 2^25 (33 million) so that it counts up about twice per second.
+Since our FPGA is running at 65MHz (in the provided sample project), we need to have a counter that is running slower - slow enough that we can actually see it counting. To do this, we'll create a counter that runs at 65MHz, but we'll divide it by 2^25 (33 million) so that it counts up about twice per second.
 
 We can create local registers that aren't exposed as ports by using the `:feedback` section, and submodules using the `:modules` section.
 
@@ -268,7 +268,7 @@ At this point, you should see all 4 digits displaying the same value and countin
 
 ## Displaying different digits
 
-You may have noticed from the last section that there's only one digit of output on the Nexys 6 board. How do we control the other digits!?
+You may have noticed from the last section that there's only one digit of output on the Nexys 6 board. How do we control the other digits?!
 
 The seven segment display is controlled through a technique called **timeslicing**, **time multiplexing**, or **scanning**. This means that you light up one character at a time, and switch which character you're displaying every couple milliseconds. Since the human eye can't perceive changes that fast, the display appears to have a different digit on each character display. We'll use the clock divided by 2^12 to switch which charater we're displaying around 16k times per second. You can try adjusting the period faster and slower to see what happens.
 
@@ -339,4 +339,4 @@ The seven segment display is controlled through a technique called **timeslicing
   (connect Vsync false))
 ```
 
-For more information on why the 2 connections to the display are called *anode* and *cathode*, see [this Wikipedia article on diodes](http://en.wikipedia.org/wiki/Diode). The short version is that the anode and cathode are the 2 wires that come out of the LED, and their must be a positive voltage difference between the anode and the cathode for the LED to light up.
+For more information on why the 2 connections to the display are called *anode* and *cathode*, see [this Wikipedia article on diodes](http://en.wikipedia.org/wiki/Diode). The short version is that the anode and cathode are the 2 wires that come out of the LED, and there must be a positive voltage difference between the anode and the cathode for the LED to light up.
