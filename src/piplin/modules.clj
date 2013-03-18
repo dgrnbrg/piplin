@@ -521,6 +521,7 @@
    (doseq [[k] state]
      (assert (computation k)
              (str "Missing register definition for " k)))
+   ^::module
    (fn [& inputs]
      (assert (every? keyword? (take-nth 2 inputs)))
      (binding [*current-module* (conj *current-module*
@@ -564,14 +565,30 @@
 
 (defn compile-root
   [module & inputs]
+  (assert (::module (meta module)) "Must pass a module as first argument")
   (binding [*state-elements* (atom {})]
     (apply module inputs)
     @*state-elements*))
 
+(defn find-inputs
+  [compiled-module]
+  (apply concat
+         (map #(-> % second
+                 :fn
+                 (walk-expr (fn [expr]
+                              (if (= :input (-> expr
+                                              value
+                                              :port-type))
+                                [expr]))
+                            concat))
+              compiled-module)))
+
+(def ^{:arglists (list '[name type])}
+  input #(make-port* %1 %2 :input))
+
 (defn sim
   [compiled-module cycles]
-  (assert (empty? (remove (comp :fn second)
-                          compiled-module))
+  (assert (empty? (find-inputs compiled-module))
           "Cannot have any input ports during simulation")
   (let [inits (plumb/map-vals :init compiled-module)
         fns (plumb/map-vals (comp make-sim-fn :fn) compiled-module)]
@@ -586,68 +603,3 @@
             state'
             (dec cycles)
             (conj history state')))))))
-
-(defn verilog
-  [compiled-module outputs]
-  (let [verilog-names (plumb/for-map
-                        [[name v] compiled-module]
-                        (:port v) (piplin.verilog/gen-verilog-name (last name)))
-        module-regs (filter (comp :port second)
-                        compiled-module)
-        regs-inits
-        (join (map
-                (comp #(let [{:keys [init port]} %]
-                         (format
-                           "  reg %s %s = %s;\n"
-                           (-> init
-                             typeof
-                             piplin.types.bits/bit-width-of
-                             piplin.verilog/array-width-decl)
-                           (verilog-names port)
-                           (piplin.verilog/verilog-repr init)
-                           ))
-                      second)
-                module-regs))
-        [name-table code]
-        (->> compiled-module
-               (map (comp :fn second))
-               (reduce (fn [[name-table text] expr]
-                         (piplin.verilog/verilog expr name-table text)) 
-                       [verilog-names ""]))
-        reg-assigns 
-        (join (map
-                (comp (fn [[n v]]
-                        (format "    %s <= %s;\n" n v))
-                      (juxt (comp verilog-names :port)
-                            (comp name-table :fn))
-                      second) 
-          module-regs))
-        output-names (->> outputs
-                       vals
-                       (map #(str "  " % ",\n"))
-                       join)
-        output-assigns (->> outputs
-                         (map (fn [[path verilog-name]]
-                                (let [{p :port
-                                       f :fn} (compiled-module path)
-                                      lookup-name (name-table (or p f))]
-                                  (format
-                                    "  assign %s = %s;\n"
-                                    verilog-name
-                                    lookup-name))))
-                         join)
-        ]
-    (str "module piplin_module(\n"
-         "  clock,\n"
-         output-names
-         ");\n"
-         regs-inits
-         code
-         output-assigns
-         "  always @(posedge clock) begin\n"
-         reg-assigns
-         "  end\n"
-         "endmodule\n"
-         )
-    )
-  )

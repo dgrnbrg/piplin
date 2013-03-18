@@ -1,8 +1,7 @@
 (ns piplin.nexys6.sw-led
   (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-left bit-shift-right])
-  (:use piplin.core
-        [piplin.modules :only [modulize compile-root sim]])
-  (:use [piplin.types.union :only [get-tag get-value]])
+  (:use [piplin.types.union :only [get-tag get-value]]
+        piplin.core)
   (:use plumbing.core)
   (:require [plumbing.graph :as graph])
   (:use [piplin.vga :only [xvga]])
@@ -288,7 +287,7 @@
              (bit-cat #b1 (bit-not cathode)))))
 
 #_(spit "tmp" (with-out-str (led->switch)))
-(spit "nexys-leds.v" (modules->all-in-one (led->switch)))
+#_(spit "nexys-leds.v" (modules->all-in-one (led->switch)))
 
 (def adder
   {:sum (fnk adder [x y] (+ x y))
@@ -309,7 +308,7 @@
 
 (compile-root (modulize adder nil) :x ((uintm 8) 3) :y 4)
 (-> (compile-root (modulize :root adder nil) :x ((uintm 8) 3) :y 4)
-  (piplin.modules/verilog {[:root :sum] "sum"})
+  (->verilog {[:root :sum] "sum"})
   println
   )
 
@@ -317,7 +316,7 @@
   {:value (fnk [value] (inc value))})
 
 (-> (compile-root (modulize :root counter {:value ((uintm 8) 0)}))
-  (piplin.modules/verilog {[:root :value] "val"})
+  (->verilog {[:root :value] "val"})
   print)
 (-> (compile-root (modulize counter {:value ((uintm 8) 0)}))
   (sim 10)
@@ -331,7 +330,7 @@
                  (+ value (:value counter))))})
 
 (-> (compile-root (modulize :root quadratic-counter {:value ((uintm 8) 0)}))
-  (piplin.modules/verilog {[:root :value] "val"})
+  (->verilog {[:root :value] "val"})
   println)
 
 (-> (compile-root
@@ -340,6 +339,9 @@
   pprint )
 
 (def adder {:+1 (fnk [input] (inc input))})
+
+(println (verilog (compile-root (modulize adder nil) :input (input "in" (uintm 8))) {}))
+
 (def double-adder
   {:input (fnk [input]
             (let [adder1 ((modulize adder nil)
@@ -348,7 +350,7 @@
                             :input (:+1 adder1))]
               (:+1 adder2)))})
 (-> (compile-root (modulize :root double-adder {:input ((uintm 8) 3)}))
-  (piplin.modules/verilog {[:root :input] "double_count"})
+  (verilog {[:root :input] "double_count"})
   (println)
 ;  (sim 10)
 ;  (pprint)

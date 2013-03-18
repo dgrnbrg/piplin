@@ -42,10 +42,14 @@
   piplin.modules/make-sim 
   piplin.modules/get-all-registers 
   piplin.modules/trace-module
+  piplin.modules/input
+  piplin.modules/modulize
+  piplin.modules/compile-root
 
   ;Sim stuff -- this might be too low level
   piplin.sim/exec-sim 
   piplin.sim/trace-keys 
+  piplin.modules/sim
 
   ;functions
   piplin.mux/mux2 
@@ -99,6 +103,7 @@
   piplin.vcd/trace->gtkwave 
 
   ;verilog
+  piplin.verilog/->verilog
   piplin.verilog/modules->all-in-one 
   piplin.verilog/make-testbench 
   piplin.verilog/modules->verilog+testbench) 

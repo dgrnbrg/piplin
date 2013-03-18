@@ -1,6 +1,7 @@
 (ns piplin.verilog
   (:refer-clojure :exclude [replace cast])
-  (:require [piplin.walk :as walk])
+  (:require [piplin.walk :as walk]
+            [plumbing.core :as plumb])
   (:use [slingshot.slingshot])
   (:use [clojure.walk :only [postwalk]]) 
   (:use [clojure.set :only [map-invert]])
@@ -1189,3 +1190,101 @@
   (str (modules->all-in-one mod)
        "\n"
        (make-testbench mod (trace-module mod cycles))))
+
+(defn ->verilog
+  [compiled-module outputs]
+  (let [module-inputs (find-inputs compiled-module)
+        port-names (plumb/for-map
+                        [[name v] compiled-module]
+                        (:port v) (gen-verilog-name (last name)))
+        input-names (plumb/for-map [port module-inputs
+                                    :let [name (-> port value :port)]]
+                                   port name)
+        module-regs (filter (comp :port value second)
+                        compiled-module)
+        regs-inits
+        (join (map
+                (comp #(let [{:keys [init port]} %]
+                         (format
+                           "  reg %s %s = %s;\n"
+                           (-> init
+                             typeof
+                             bit-width-of
+                             array-width-decl)
+                           (port-names port)
+                           (verilog-repr init)
+                           ))
+                      second)
+                module-regs))
+        [name-table code]
+        (->> compiled-module
+               (map (comp :fn second))
+               (reduce (fn [[name-table text] expr]
+                         (verilog expr name-table text)) 
+                       [(merge port-names
+                               input-names) ""]))
+        reg-assigns 
+        (join (map
+                (comp (fn [[n v]]
+                        (format "    %s <= %s;\n" n v))
+                      (juxt (comp port-names :port)
+                            (comp name-table :fn))
+                      second) 
+          module-regs))
+        input-decls (join
+                      (for [[port name] input-names
+                            :let [width (-> port
+                                          typeof
+                                          piplin.types.bits/bit-width-of)]]
+                        (format "  input wire %s %s;\n"
+                                (array-width-decl width) name)))
+        output-decls
+        (join (map
+                (comp #(let [{:keys [init port]} %]
+                         (format
+                           "  output wire %s %s;\n"
+                           (-> init
+                             typeof
+                             bit-width-of
+                             array-width-decl)
+                           (port-names port)))
+                      second)
+                module-regs))
+        output-assigns (->> outputs
+                         (map (fn [[path verilog-name]]
+                                (let [{p :port
+                                       f :fn} (compiled-module path)
+                                      ;Output gets the value of the
+                                      ;register this cycle, not what it will
+                                      ;be next cycle
+                                      lookup-name (name-table (or p f))]
+                                  (format
+                                    "  assign %s = %s;\n"
+                                    verilog-name
+                                    lookup-name))))
+                         join)
+        port-names (->> (merge input-names outputs)
+                       vals
+                       (map #(str "  " % ",\n"))
+                       join)]
+    (str "module piplin_module(\n"
+         "  clock,\n"
+         port-names
+         ");\n"
+         "  //Input and output declarations\n"
+         input-decls
+         output-decls
+         "\n  //Registers\n"
+         regs-inits
+         "\n  //Main code\n"
+         code
+         "\n  //Assignments to outputs\n"
+         output-assigns
+         "\n"
+         "  always @(posedge clock) begin\n"
+         reg-assigns
+         "  end\n"
+         "endmodule\n"
+         )
+    )
+  )
