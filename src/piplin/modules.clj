@@ -507,6 +507,8 @@
 
 (defn modulize
   ([computation state]
+   (assert (map? computation)
+           "You forgot to include the register map")
    (modulize 
      (-<> (RuntimeException.)
           .getStackTrace
@@ -561,7 +563,9 @@
                               (plumb/map-keys
                                 #(conj *current-module* %)))]
          (swap! *state-elements* merge state-elements)
-         result)))))
+         ;We actually want to refer to registers, not their inputs,
+         ;in this map
+         (merge result register-ports))))))
 
 (defn compile-root
   [module & inputs]
@@ -590,16 +594,31 @@
   [compiled-module cycles]
   (assert (empty? (find-inputs compiled-module))
           "Cannot have any input ports during simulation")
-  (let [inits (plumb/map-vals :init compiled-module)
-        fns (plumb/map-vals (comp make-sim-fn :fn) compiled-module)]
+  (let [reg-keys (->> compiled-module
+                   (filter (comp :init second))
+                   (map first))
+        wire-keys (->> compiled-module
+                    (remove (comp :init second))
+                    (map first))
+        wire-fns (plumb/map-vals (comp make-sim-fn :fn)
+                                 (select-keys compiled-module wire-keys)) 
+        reg-fns (plumb/map-vals (comp make-sim-fn :fn)
+                                (select-keys compiled-module reg-keys))
+        reg-inits (plumb/map-vals :init compiled-module)
+        inits (binding [*sim-state* reg-inits]
+                       (merge reg-inits
+                              (plumb/map-vals #(%) wire-fns)))]
     (loop [state inits
            cycles cycles
            history [inits]]
       (if (zero? cycles)
         history
         (let [state' (binding [*sim-state* state]
-                       (plumb/map-vals #(%) fns))]
+                       (plumb/map-vals #(%) reg-fns))
+              state'' (binding [*sim-state* state']
+                        (plumb/map-vals #(%) wire-fns))
+              state'' (merge state' state'')]
           (recur
-            state'
+            state''
             (dec cycles)
-            (conj history state')))))))
+            (conj history state'')))))))
