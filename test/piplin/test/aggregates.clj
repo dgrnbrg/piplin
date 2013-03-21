@@ -3,7 +3,8 @@
   (:use [piplin.types bundle uintm enum bits union boolean core-impl binops])
   (:use [piplin types mux modules sim connect protocols])
   (:import clojure.lang.ExceptionInfo) 
-  (:use clojure.test))
+  (:use clojure.test
+        plumbing.core))
 
 (deftest bundle-test
   (let [b1 (bundle {:a (uintm 3)
@@ -21,40 +22,31 @@
     (let [{:keys [a b]} (cast b1 {:a 2 :b :bar})]
       (is (= a ((uintm 3) 2)))
       (is (= b ((enum #{:foo :bar}) :bar))))
-    (let [mod (module [:outputs [o (cast b1 {:a 0 :b :foo})]]
-                      (let [{:keys [a b]} o
-                            a' (inc a)
-                            b' (mux2 (= b :foo)
-                                     :bar :foo)]
-                        (connect o (cast b1 {:a a' :b b'}))))
-          [state fns] (make-sim mod)] 
-      (is (= (get (exec-sim state fns 0)
-                  [:o])
-             (cast b1 {:a 0 :b :foo})))
-      (is (= (get (exec-sim state fns 1)
-                  [:o])
-             (cast b1 {:a 1 :b :bar})))
-      (is (= (get (exec-sim state fns 2)
-                  [:o])
-             (cast b1 {:a 2 :b :foo}))))
-    (let [mod (module [:outputs [o (cast b1 {:a 0 :b :foo})]]
-                      (let [a' (inc (get o :a))
-                            b' (mux2 (= (get o :b)
-                                        (cast (enum #{:foo :bar})
-                                              :foo))
-                                     :bar :foo)]
-                        (connect o (cast b1 {:a a' :b b'}))))
-          [state fns] (make-sim mod)] 
-      (is (= (get (exec-sim state fns 0)
-                  [:o])
-             (cast b1 {:a 0 :b :foo})))
-      (is (= (get (exec-sim state fns 1)
-                  [:o])
-             (cast b1 {:a 1 :b :bar})))
-      (is (= (get (exec-sim state fns 2)
-                  [:o])
-             (cast b1 {:a 2 :b :foo})))
-      )))
+    (let [mod (modulize :root
+                {:o (fnk [o]
+                         (let [{:keys [a b]} o
+                               a' (inc a)
+                               b' (mux2 (= b :foo)
+                                        :bar :foo)]
+                           (cast b1 {:a a' :b b'})))}
+                {:o (cast b1 {:a 0 :b :foo})})]
+      (are [x y] (= (get (last (sim (compile-root mod) x)) [:root :o]) y)
+           0 (cast b1 {:a 0 :b :foo})
+           1 (cast b1 {:a 1 :b :bar})
+           2 (cast b1 {:a 2 :b :foo})))
+    (let [mod (modulize :root
+                {:o (fnk [o]
+                         (let [a' (inc (get o :a))
+                               b' (mux2 (= (get o :b)
+                                           (cast (enum #{:foo :bar})
+                                                 :foo))
+                                        :bar :foo)]
+                           (cast b1 {:a a' :b b'})))}
+                {:o (cast b1 {:a 0 :b :foo})})]
+      (are [x y] (= (get (last (sim (compile-root mod) x)) [:root :o]) y)
+           0 (cast b1 {:a 0 :b :foo})
+           1 (cast b1 {:a 1 :b :bar})
+           2 (cast b1 {:a 2 :b :foo})))))
 
 (deftest assoc-test
   (let [b (bundle {:x (uintm 4) :y (anontype :boolean)})

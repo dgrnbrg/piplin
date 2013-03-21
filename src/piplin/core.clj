@@ -89,6 +89,7 @@
   piplin.types.enum/enum
   piplin.types.uintm/uintm
   piplin.types.sints/sints 
+  piplin.types.sints/sign-extend
   piplin.types.sfxpts/sfxpts
   piplin.types.complex/complex
   piplin.types.complex/real-part 
@@ -104,7 +105,5 @@
 
   ;verilog
   piplin.verilog/->verilog
-  piplin.verilog/modules->all-in-one 
-  piplin.verilog/make-testbench 
-  piplin.verilog/modules->verilog+testbench) 
+  piplin.verilog/verify)
 

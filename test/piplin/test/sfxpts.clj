@@ -1,9 +1,10 @@
 (ns piplin.test.sfxpts
   (:refer-clojure :exclude [cond condp cast not = not= > >= < <= + - * inc dec bit-and bit-or bit-xor bit-not and or bit-shift-left bit-shift-right])
   (:use [piplin.types bundle sfxpts bits boolean core-impl binops uintm])
-  (:use [piplin types mux modules sim connect protocols [verilog :only [modules->verilog+testbench]]])
+  (:use [piplin types mux modules sim connect protocols verilog])
   (:import clojure.lang.ExceptionInfo) 
   (:use clojure.test
+        plumbing.core
         piplin.test.util))
 
 (deftest sfxpts-basics
@@ -22,48 +23,33 @@
                (deserialize (typeof x)))))))
 
 (let [t (sfxpts 4 4)]
-  (defmodule sfxpts-mul []
-    [:feedback [x ((uintm 8) 0)
-                y (cast t 0.0)]]
-    (let [x-sfxpts (->> x
-                     serialize
-                     (deserialize t))]
-      (connect y (* x-sfxpts x-sfxpts)))
-    (connect x (inc x))))
+  (def sfxpts-mul
+    (modulize
+      {:x (fnk [x] (inc x))
+       :y (fnk [x]
+               (let [x-sfxpts (->> x
+                                serialize
+                                (deserialize t))]
+                 (* x-sfxpts x-sfxpts)))}
+      {:x ((uintm 8) 0)
+       :y (cast t 0.0)})))
 
 (deftest sfxpts-mul-verilog
-  (icarus-test (modules->verilog+testbench
-                 (sfxpts-mul) 500)))
+  (icarus-test (verify sfxpts-mul 500)))
 
 (let [t (sfxpts 12 16)]
-  (defmodule sfxpts-quadratic
+  (defn sfxpts-quadratic
     [coeff1 coeff2 coeff3]
-    [:feedback [x ((uintm (bit-width-of t)) 0)
-                y (cast t 0.0)]]
-    (connect x (inc x))
-    (let [x' (deserialize t (serialize x))
-          poly #_(* x' x') (+ (* coeff1 x' x')
-                  (* coeff2 x')
-                  coeff3)]
-      (connect y poly))))
+    (modulize
+      {:x (fnk [x] (inc x))
+       :y (fnk [x]
+               (let [x' (deserialize t (serialize x))
+                     poly #_(* x' x') (+ (* coeff1 x' x')
+                                         (* coeff2 x')
+                                         coeff3)]
+                 poly))}
+      {:x ((uintm (bit-width-of t)) 0)
+       :y (cast t 0.0)})))
 
 (deftest sfxpts-synthesis
-  (icarus-test (modules->verilog+testbench
-                 (sfxpts-quadratic 2.2 0.1 -0.8)
-                 10000)))
-
-;NOTE: i don't think this is necessarily possible...
-;(x*( 2 - a x* ))
-#_(deftest invsq-test
-  (letfn [(newton-method
-            [x0 x]
-             (let [x* (* x (- 2 (* x0 x)))]
-               (println x* x (= x* x))
-               (if (= x* x)
-                     x*
-                     #_(cast (typeof x0) 0)
-                     (newton-method x0 x*))))]
-    (println (newton-method (cast (sfxpts 8 8) 2) (cast (sfxpts 8 8) 2)))
-(println (float (/ -32768 (Math/pow 2 8))))
-    )
-  )
+  (icarus-test (verify (sfxpts-quadratic 2.2 0.1 -0.8) 10000)))

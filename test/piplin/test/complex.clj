@@ -1,7 +1,8 @@
 (ns piplin.test.complex 
   (:refer-clojure :exclude [cond condp cast not = not= > >= < <= + - * inc dec bit-and bit-or bit-xor bit-not and or bit-shift-left bit-shift-right])
   (:use [piplin.types bundle sfxpts bits boolean core-impl binops uintm complex])
-  (:use [piplin types mux modules sim connect protocols [verilog :only [modules->verilog+testbench]]])
+  (:use [piplin types mux modules sim connect protocols verilog]
+        plumbing.core)
   (:import clojure.lang.ExceptionInfo) 
   (:use clojure.test
         piplin.test.util))
@@ -45,25 +46,17 @@
 (let [sfxpts-type (sfxpts 8 8)
       complex-type (complex sfxpts-type sfxpts-type)
       const (cast complex-type [1.2 -0.73])]
-  (defmodule complex-add
-    []
-    [:feedback [x (cast complex-type [0.1 1.7])]]
-    (connect x (+ x x)))
-
-  (defmodule complex-mul
-    []
-    [:feedback [x (cast complex-type [0.1 1.7])]]
-    (connect x (* x x)))
-
-  (defmodule complex-fractal
-    []
-    [:feedback [x (cast complex-type [0.1 1.7])]]
-    (connect x (+ (* x x) const))))
+  (def complex-add (modulize
+                     {:x (fnk [x] (+ x x))}
+                     {:x (cast complex-type [0.1 1.7])}))
+  (def complex-mul (modulize
+                     {:x (fnk [x] (* x x))}
+                     {:x (cast complex-type [0.1 1.7])}))
+  (def complex-fractal (modulize
+                         {:x (fnk [x] (+ (* x x) const))}
+                         {:x (cast complex-type [0.1 1.7])})))
 
 (deftest complex-math-verilog
-  (icarus-test (modules->verilog+testbench
-                 (complex-add) 500)) 
-  (icarus-test (modules->verilog+testbench
-                 (complex-mul) 500)) 
-  (icarus-test (modules->verilog+testbench
-                 (complex-fractal) 500)))
+  (icarus-test (verify complex-add 500)) 
+  (icarus-test (verify complex-mul 500))
+  (icarus-test (verify complex-fractal 500)))

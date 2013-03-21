@@ -1,9 +1,10 @@
 (ns piplin.test.sints 
   (:refer-clojure :exclude [cond condp cast not = not= > >= < <= + - * inc dec bit-and bit-or bit-xor bit-not and or bit-shift-left bit-shift-right])
-  (:use [piplin.types bundle sints bits boolean core-impl binops uintm])
-  (:use [piplin types mux modules sim connect protocols [verilog :only [modules->verilog+testbench]]])
   (:import clojure.lang.ExceptionInfo) 
   (:use clojure.test
+        piplin.core
+        plumbing.core
+        [piplin.types :only [instance]]
         piplin.test.util))
 
 (deftest sints-basics
@@ -52,74 +53,79 @@
   (doseq [x (map (sints 4) (range -8 8))]
     (is (= x (deserialize (sints 4) (serialize x))))))
 
-(defmodule sints-adder
+(defn sints-adder
   [n]
-  [:feedback [sum ((sints n) 0)
-              x (piplin.types.sints/min-value (sints n))
-              y (piplin.types.sints/min-value (sints n))]]
-  (connect sum (+ x y))
-  (let [x-max? (= x (piplin.types.sints/max-value (sints n)))]
-    (connect x (mux2 x-max?
-                     (piplin.types.sints/min-value (sints n)) 
-                     (inc x)))
-    (connect y (mux2 x-max?
-                     (inc y)
-                     y))))
+  (modulize
+    {:sum (fnk [x y] (+ x y))
+     :x-max? (fnk [x] (= x (piplin.types.sints/max-value (sints n))))
+     :x (fnk [x-max? x]
+             (mux2 x-max?
+                   (piplin.types.sints/min-value (sints n)) 
+                   (inc x))) 
+     :y (fnk [x-max? y]
+             (mux2 x-max?
+                   (inc y)
+                   y))}
+    {:sum ((sints n) 0)
+     :x (piplin.types.sints/min-value (sints n))
+     :y (piplin.types.sints/min-value (sints n))}))
 
 (deftest sints-adder-verilog
-  (icarus-test (modules->verilog+testbench
+  (icarus-test (verify 
                  (sints-adder 4) (* 16 16 2))))
 
-(defmodule sints-subtractor
+(defn sints-subtractor
   [n]
-  [:feedback [difference ((sints n) 0)
-              x (piplin.types.sints/min-value (sints n))
-              y (piplin.types.sints/min-value (sints n))]]
-  (connect difference (- x y))
-  (let [x-max? (= x (piplin.types.sints/max-value (sints n)))]
-    (connect x (mux2 x-max?
-                     (piplin.types.sints/min-value (sints n)) 
-                     (inc x)))
-    (connect y (mux2 x-max?
-                     (inc y)
-                     y))))
+  (modulize {:difference (fnk [x y] (- x y))
+             :x-max? (fnk [x] (= x (piplin.types.sints/max-value (sints n))))
+             :x (fnk [x-max? x]
+                     (mux2 x-max?
+                           (piplin.types.sints/min-value (sints n)) 
+                           (inc x))) 
+             :y (fnk [x-max? y]
+                     (mux2 x-max?
+                           (inc y)
+                           y))}
+            {:difference ((sints n) 0)
+             :x (piplin.types.sints/min-value (sints n))
+             :y (piplin.types.sints/min-value (sints n))})) 
 
 (deftest sints-subtractor-verilog
-  (icarus-test (modules->verilog+testbench
+  (icarus-test (verify 
                  (sints-subtractor 4) (* 16 16 2))))
 
-(defmodule sints-multiplier
+(defn sints-multiplier
   [n]
-  [:feedback [prod ((sints n) 0)
-              x ((uintm n) 0)
-              y ((uintm n) 0)]] 
-  (let [x' (->> x
-             serialize
-             (deserialize (sints n)))
-        y' (->> y
-             serialize
-             (deserialize (sints n)))]
-    (connect prod (* x' y')))
-    (connect x (inc x))
-    (connect y (mux2 (= 0 x)
-                     (inc y)
-                     y)))
+  (modulize {:prod (fnk [x y] (* x y))
+             :x-max? (fnk [x] (= x (piplin.types.sints/max-value (sints n))))
+             :x (fnk [x-max? x]
+                     (mux2 x-max?
+                           (piplin.types.sints/min-value (sints n)) 
+                           (inc x))) 
+             :y (fnk [x-max? y]
+                     (mux2 x-max?
+                           (inc y)
+                           y))}
+            {:prod ((sints n) 0)
+             :x (piplin.types.sints/min-value (sints n))
+             :y (piplin.types.sints/min-value (sints n))}))
 
 (deftest sints-multiplier-verilog
-  (icarus-test (modules->verilog+testbench
+  (icarus-test (verify
                  (sints-multiplier 6) (* 64 64 2))))
 
-(defmodule sints-extender
+(defn sints-extender
   [n m]
-  [:feedback [x (min-value (sints n))
-              y (min-value (sints m))]]
-  (connect x (inc x))
-  (connect y (sign-extend m x)))
+  (modulize 
+    {:x (fnk [x] (inc x))
+     :y (fnk [x] (sign-extend m x))}
+    {:x (piplin.types.sints/min-value (sints n))
+     :y (piplin.types.sints/min-value (sints m))} ))
 
 (deftest sints-extender-verilog
-  (icarus-test (modules->verilog+testbench
+  (icarus-test (verify
                  (sints-extender 4 8) 100)) 
-  (icarus-test (modules->verilog+testbench
+  (icarus-test (verify
                  (sints-extender 4 5) 100)) 
-  (icarus-test (modules->verilog+testbench
+  (icarus-test (verify
                  (sints-extender 4 4) 100)))

@@ -27,7 +27,7 @@
     (is (not= inst (p/cast a (repeat 7 false))))  
     (is (= ((piplin.modules/make-sim-fn inst)) (p/cast a (repeat 7 false))))))
 
-(p/defmodule filler []
+(comment (p/defmodule filler []
   [:outputs [a (p/cast (array (p/anontype :boolean) 8)
                      (repeat 8 false))]
    :feedback [x ((p/uintm 3) 0)]]
@@ -51,18 +51,18 @@
     (is (p/= ((p/exec-sim state fns 5) [:a])
              [true true true true true false false false]))
     (is (p/= ((p/exec-sim state fns 10) [:a])
-             [true true true true true true true false]))))
+             [true true true true true true true false])))) 
 
-(def states (p/enum #{:foo :bar :baz :quux}))
+(def states (p/enum #{:foo :bar :baz :quux})) 
 
-(def replay-data (p/cast (array states 30) (take 30 (cycle [:foo :bar :foo :baz :foo :quux]))))
+(def replay-data (p/cast (array states 30) (take 30 (cycle [:foo :bar :foo :baz :foo :quux])))) 
 
 (p/defmodule replayer [data]
   [:feedback [tape data
               index ((p/uintm (p/log2 (count data))) 0)]
    :outputs [o (p/cast (p/maybe (piplin.protocols/typeof (nth data 0))) {:nothing nil})]]
   (p/connect index (p/inc index))
-  (p/connect o {:just (get data index)}))
+  (p/connect o {:just (get data index)})) 
 
 (deftest replay-test
   (let [m (replayer replay-data)
@@ -71,7 +71,7 @@
     (is (p/= (get (p/exec-sim state fns 1) [:o]) (->type :foo)))  
     (is (p/= (get (p/exec-sim state fns 2) [:o]) (->type :bar)))  
     (is (p/= (get (p/exec-sim state fns 4) [:o]) (->type :baz)))  
-    (is (p/= (get (p/exec-sim state fns 17) [:o]) (->type :foo)))))
+    (is (p/= (get (p/exec-sim state fns 17) [:o]) (->type :foo))))) 
 
 (p/defmodule sequencer [data]
   [:feedback [tape data
@@ -83,7 +83,7 @@
                :bar (update-in rfile [0] p/inc)
                :baz (update-in rfile [1] p/inc)
                :quux (update-in rfile [2] p/inc)
-               rfile)))
+               rfile))) 
 
 (deftest sequencer-test
   (let [m (sequencer replay-data)
@@ -92,13 +92,13 @@
     (is (p/= (get (p/exec-sim state fns 2) [:rfile]) [1 0 0]))
     (is (p/= (get (p/exec-sim state fns 4) [:rfile]) [1 1 0]))
     (is (p/= (get (p/exec-sim state fns 6) [:rfile]) [1 1 1]))  
-    (is (p/= (get (p/exec-sim state fns 36) [:rfile]) [6 6 6]))))
+    (is (p/= (get (p/exec-sim state fns 36) [:rfile]) [6 6 6])))) 
 
 (p/defmodule memory-file []
   [:feedback [mem (p/cast (array (p/uintm 4) 4) [0 0 0 0])
               i ((p/uintm 2) 0)]]
   (p/connect i (p/inc i))
-  (p/connect (get mem i) (p/inc (get mem i))))
+  (p/connect (get mem i) (p/inc (get mem i)))) 
 
 (deftest memory-test
   (let [m (memory-file)
@@ -106,7 +106,7 @@
     (is (p/= (get (p/exec-sim state fns 1) [:mem]) [1 0 0 0]))  
     (is (p/= (get (p/exec-sim state fns 3) [:mem]) [1 1 1 0]))  
     (is (p/= (get (p/exec-sim state fns 8) [:mem]) [2 2 2 2]))  
-    (is (p/= (get (p/exec-sim state fns 34) [:mem]) [9 9 8 8]))))
+    (is (p/= (get (p/exec-sim state fns 34) [:mem]) [9 9 8 8])))) 
 
 (deftest memory-verilog-test
   (icarus-test (p/modules->verilog+testbench
@@ -127,7 +127,7 @@
 (p/defmodule cycling []
   [:feedback [pod (p/cast (array (p/uintm 3) 2) [0 2])]]
   (let [[x y] pod]
-    (p/connect pod [(p/inc x) (p/inc y)])))
+    (p/connect pod [(p/inc x) (p/inc y)]))) 
 
 (deftest cycling-test
   (let [m (cycling)
@@ -144,4 +144,4 @@
     (is (p/= (a [4 6])
              (get (p/exec-sim state fns 4) [:pod])))  
     (is (p/= (a [6 0])
-             (get (p/exec-sim state fns 6) [:pod])))))
+             (get (p/exec-sim state fns 6) [:pod])))))) 

@@ -885,162 +885,6 @@
                        (apply hash-map))]
     (merge subports-map module-ports)))
 
-(defn module->verilog
-  [module]
-  (when-not (= (:type module) :module)
-    (throw+ (error module "must be a module")))
-  (let [ports  (mapcat (comp keys #(get module %)) [:inputs :outputs])
-        inputs (->> (:inputs module)
-                 (map (fn [[k v]] [(sanitize-str k) (bit-width-of v)]))
-                 (into {})) 
-        outputs (->> (:outputs module)
-                  (map (fn [[k v]]
-                         (if (= :array (kindof v))
-                           [(sanitize-str k)
-                            (bit-width-of (:array-type (typeof v)))
-                            (:array-len (typeof v))]
-                           [(sanitize-str k)
-                            (bit-width-of (typeof v))
-                            nil]))))
-        feedbacks (->> (:feedback module)
-                    (map (fn [[k v]]
-                           (if (= :array (kindof v))
-                             [(sanitize-str k)
-                              (bit-width-of (:array-type (typeof v)))
-                              (:array-len (typeof v))]
-                             [(sanitize-str k)
-                              (bit-width-of (typeof v))
-                              nil]))))
-        initials (->> (merge (:outputs module) (:feedback module))
-                   (mapcat (fn [[k v]]
-                             (if-not (= :array (kindof v))
-                               [[(sanitize-str k)
-                                 (verilog-repr v)]]
-                               (map (fn [index v]
-                                      [(str (sanitize-str k)
-                                            \[ index \])
-                                       (verilog-repr v)])
-                                    (range) v)))))
-        submodules (->> (:modules module)
-                     (map (fn make-module-decls [[k v]]
-                            (let [all-input-ports
-                                  (->> v
-                                    :inputs
-                                    (map (fn [[k v]]
-                                           [(sanitize-str k)
-                                            v])))
-                                  all-output-ports
-                                  (->> v
-                                    :outputs
-                                    (map (fn [[k v]]
-                                           [(sanitize-str k)
-                                            (typeof v)])))
-                                  module-name (sanitize-str k)
-                                  all-ports (concat all-input-ports
-                                                    all-output-ports)
-                                  all-ports-wires
-                                  (map (fn [[port type]]
-                                         (str "  wire " (array-width-decl (bit-width-of type)) " " module-name \_ port ";\n")) all-ports)
-                                  port-map
-                                  (into
-                                    {}
-                                    (map (comp
-                                           (juxt
-                                             identity
-                                             (partial str
-                                                      module-name
-                                                      \_))
-                                           first)
-                                         all-ports))]
-                              (str
-                                (join all-ports-wires)
-                                (module-decl
-                                  (sanitize-str k) v
-                                  port-map))))))
-        name-table (init-name-table module)
-        connections (->> module
-                      :body
-                      (filter #(= :register (:type %)))
-                      (map (comp :args value))
-                      (map (fn [{:keys [reg expr] :as r}]
-                             (let [index-expr (let [reg (value reg)]
-                                                (when (= (:op reg) :array-get)
-                                                  (get-in reg [:args :i])))
-                                   reg (if-not index-expr reg
-                                         (-> reg value :args :array))]
-                               [(-> reg value :port sanitize-str)
-                                expr
-                                index-expr]))))
-        input-connections (->> module
-                      :body
-                      (filter #(= (:type %) :subport))
-                      (map (comp :args value))
-                      (map (fn [{:keys [reg expr]}]
-                               [(->> reg value ((juxt :module :port)) (map sanitize-str) (join \_))
-                                expr])))
-        [name-table body] (reduce
-                            (fn [[name-table text] expr]
-                              (verilog expr name-table text))
-                            [name-table ""] (concat
-                                              (map second input-connections)
-                                              (filter identity
-                                               (mapcat next connections))))
-        ]
-    (str "module " (sanitize-str (:token module)) "(\n"
-         "  clock,\n"
-         "  reset,\n"
-         (join ",\n" (map #(str "  " (sanitize-str %)) ports)) "\n"
-         ");\n"
-         "  input wire clock;\n"
-         "  input wire reset;\n"
-         (join "\n" submodules)
-         (when (seq inputs)
-           (str "\n"
-                "  //inputs\n"
-                (join (map (fn [[input width]]
-                             (str "  input wire " (array-width-decl width) " " input ";\n"))
-                           inputs))))
-         (when (seq outputs)
-           (str "\n"
-                "  //outputs\n"
-                (join (map (fn [[output width len]]
-                             (if-not len
-                               (str "  output reg " (array-width-decl width) " " output ";\n")
-                               (str "  output reg " (array-width-decl width) " " output " " (array-width-decl len) ";\n")) 
-                             )
-                           outputs))))
-         (when (seq feedbacks)
-           (str "\n"
-                "  //feedback\n"
-                (join (map (fn [[feedback width len]]
-                             (if-not len
-                               (str "  reg " (array-width-decl width) " " feedback ";\n")
-                               (str "  reg " (array-width-decl width) " " feedback " " (array-width-decl len) ";\n")))
-                           feedbacks))))
-         "\n"
-         "\n"
-         body
-         "\n"
-         "\n"
-         "  always @(posedge clock)\n"
-         "    if (reset) begin\n"
-         (join (map (fn [[name val]]
-                      (str "      " name " <= " val ";\n"))
-                    initials))
-         "    end else begin\n"
-         (join (map (fn [[name expr index-expr]]
-                      (str "      " name
-                           (when index-expr
-                             (str \[ (lookup-expr name-table index-expr) \]))
-                           " <= " (lookup-expr name-table expr) ";\n"))
-                    connections))
-         "    end\n"
-         "\n"
-         (join (map (fn [[name expr]]
-                      (str "  assign " name " = " (lookup-expr name-table expr) ";\n"))
-                    input-connections))
-         "endmodule\n")))
-
 (defn regs-for-inputs
   [module]
   [(map #(let [w (-> % val bit-width-of)]
@@ -1061,7 +905,7 @@
 
 (defn assert-hierarchical
   [indent dut-name var val cycle]
-  (let [dut-var (str dut-name \. var) 
+  (let [dut-var var
         assertion-str (str dut-var " !== " val)]
     (str indent "if (" assertion-str ") begin\n"
          indent "  $display(\"Cycle " cycle ": failed assertion: " assertion-str ", instead is %b\", " dut-var ");\n"
@@ -1085,7 +929,7 @@
               (str text
                    (if-not array?
                      (assert-hierarchical indent dut-name
-                                          (join \. (map sanitize-str path))
+                                          (join \_ (map sanitize-str path))
                                           (verilog-repr val)
                                           cycle)
                      (->> (map (fn [val index]
@@ -1099,97 +943,6 @@
                        (join "\n"))))))
           ""
           cycle-map))
-
-(defn make-testbench
-  "Produces verilog that will run a test
-  against a given module. samples is a seqable
-  of maps, where the keys are all the inputs
-  and registers of the module, and the simulation
-  is run with those inputs and asserting those
-  states. The generated verilog will do this check,
-  and generate the appropriate clock and reset signanls."
-  [module samples]
-  (let [[input-decls input-connects] (regs-for-inputs module)
-        [output-decls output-connects] (wire-for-regs module)
-        dut-name "dut"]
-    (str
-      "module test;\n"
-      "  reg clk = 0;\n"
-      "  always #5 clk = !clk;\n"
-      "  reg rst = 1;\n"
-      "\n"
-      (join (map (partial str "  ") input-decls))
-      (join (map (partial str "  ") output-decls))
-      "  " (sanitize-str (:token module)) " " dut-name "(\n"
-      "    .clock(clk), .reset(rst)" (when
-                                       (->
-                                         (concat
-                                           input-connects
-                                           output-connects)
-                                         seq) \,)
-      "\n"
-      (join (map (partial str "    ")
-                 (concat input-connects output-connects))) "\n"
-      "  );\n"
-      "\n"
-      "  initial begin\n"
-      ;"    $dumpfile(\"dump.vcd\");\n"
-      ;"    $dumpvars(0);\n"
-      "    #10 rst = 0;\n"
-      (->> samples
-        
-        (map #(assert-hierarchical-cycle "    "
-                                         dut-name
-                                         %2 %1)
-             (range))
-        (map #(str % "    #10\n"))
-        join)
-      "    $display(\"test passed\");\n"
-      "    $finish;\n"
-      "  end\n"
-      "endmodule")))
-
-(defn modules->verilog
-  "This takes a module (the root module),
-  and returns a list of pairs where the first
-  element is a module, the second element is
-  that module's verilog."
-  [root]
-  (walk-modules root
-    (fn visit [module]
-      [[module (module->verilog module)]])
-    (fn combine [x y]
-      (let [left-modules (set (map first x))]
-        (if (left-modules (ffirst y))
-          x
-          (concat x y))))))
-
-(defn modules->all-in-one
-  "Takes a root module and returns a string
-  which is a single verilog file with the
-  entire module hierarchy included."
-  [root]
-  (->> (modules->verilog root)
-    (map second)
-    (join "\n")))
-
-;ex: (verilog (+ ((uintm 3) 0) (uninst ((uintm 3) 1))) {})
-
-;way more awesome that this works:
-(comment
-  (def e (enum #{:a :b :c} ))
-  (def b (bundle {:car e :cdr (uintm 4)})) 
-  (def u (union {:x (uintm 5) :y b})) 
-
-  (-> (verilog (union-match (uninst (u {:x ((uintm 5) 0)}))
-  (:x x (bit-slice (serialize x) 1 4))
-  (:y {:keys [car cdr]} #b00_1)) {}) second print))
-
-(defn modules->verilog+testbench
-  [mod cycles]
-  (str (modules->all-in-one mod)
-       "\n"
-       (make-testbench mod (trace-module mod cycles))))
 
 (defn ->verilog
   [compiled-module outputs]
@@ -1240,16 +993,16 @@
                                 (array-width-decl width) name)))
         output-decls
         (join (map
-                (comp #(let [{:keys [init port]} %]
+                (fn [[path verilog-name]]
+                  (let [{function :fn port :port} (value (compiled-module path))]
                          (format
                            "  output wire %s %s;\n"
-                           (-> init
+                           (-> function
                              typeof
                              bit-width-of
                              array-width-decl)
-                           (port-names port)))
-                      second)
-                module-regs))
+                           verilog-name)))
+                outputs))
         output-assigns (->> outputs
                          (map (fn [[path verilog-name]]
                                 (let [{p :port
@@ -1271,6 +1024,7 @@
          "  clock,\n"
          port-names
          ");\n"
+         "  input wire clock;\n"
          "  //Input and output declarations\n"
          input-decls
          output-decls
@@ -1288,3 +1042,61 @@
          )
     )
   )
+
+(defn verify 
+  [module cycles]
+  (let [compiled (compile-root module)
+        flattened-string-keys (map (comp
+                                     sanitize-str
+                                     #(join "_" (map name %)))
+                                   (keys compiled))
+        plain-path->gensym-path (plumb/for-map [path flattened-string-keys]
+                                               path (gen-verilog-name path))
+        gensym-path->plain-path (plumb/for-map [[k v] plain-path->gensym-path]
+                                               v k)
+        output-renames (zipmap (keys compiled)
+                               (map plain-path->gensym-path
+                                    flattened-string-keys))
+        samples (sim compiled cycles) 
+        dut-name "dut"]
+    (str
+      (->verilog compiled output-renames)
+      "\n"
+      "module test;\n"
+      "  reg clk = 0;\n"
+      "  always #5 clk = !clk;\n"
+      "\n"
+      (join "\n"
+            (map #(str "  wire " (-> (key %)
+                                   compiled
+                                   :fn
+                                   typeof
+                                   bit-width-of
+                                   array-width-decl)
+                       \space
+                       (gensym-path->plain-path (val %))
+                       \;)
+                 output-renames))
+      "\n"
+      "  piplin_module " dut-name "(\n"
+      "    .clock(clk),\n"
+      (join ",\n" 
+              (map #(str "    ." % \( (gensym-path->plain-path %) \))
+                   (vals output-renames)))
+      "\n  );\n"
+      "\n"
+      "  initial begin\n"
+      ;"    $dumpfile(\"dump.vcd\");\n"
+      ;"    $dumpvars(0);\n"
+      (->> samples
+        
+        (map #(assert-hierarchical-cycle "    "
+                                         dut-name
+                                         %2 %1)
+             (range))
+        (map #(str % "    #10\n"))
+        join)
+      "    $display(\"test passed\");\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule")))

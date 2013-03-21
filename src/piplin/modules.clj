@@ -552,6 +552,9 @@
                               register-ports))
                           (plumb/map-keys
                             #(or (reverse-renames %) %)))
+             result (plumb/for-map [[k v] result
+                                    :when (typeof v)]
+                                   k v)
              fn-map (plumb/map-vals
                       (fn [v] {:fn v})
                       result)
