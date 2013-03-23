@@ -340,7 +340,7 @@
 
 (def adder {:+1 (fnk [input] (inc input))})
 
-(println (verilog (compile-root (modulize adder nil) :input (input "in" (uintm 8))) {}))
+(println (->verilog (compile-root (modulize adder nil) :input (input "in" (uintm 8))) {}))
 
 (def double-adder
   {:input (fnk [input]
@@ -350,7 +350,7 @@
                             :input (:+1 adder1))]
               (:+1 adder2)))})
 (-> (compile-root (modulize :root double-adder {:input ((uintm 8) 3)}))
-  (verilog {[:root :input] "double_count"})
+  (->verilog {[:root :input] "double_count"})
   (println)
 ;  (sim 10)
 ;  (pprint)
