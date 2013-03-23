@@ -1,7 +1,8 @@
 (ns piplin.test.mux
   (:use clojure.test)
   (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-right bit-shift-left])
-  (:use [piplin types math modules sim mux connect])
+  (:use [piplin types math modules sim mux connect]
+        plumbing.core)
   (:use [piplin.types bits boolean enum numbers core-impl binops uintm])
   (:import clojure.lang.ExceptionInfo)) 
 
@@ -52,143 +53,151 @@
                          :else ((uintm 3) 0))))) "evaluted sim"))
 
 (deftest sim-mux2-test
-  (let [mod (module [:outputs [flip false]]
-                    (connect flip (mux2 flip
-                                        false
-                                        true)))
+  (let [mod (modulize
+              :root
+              {:flip (fnk [flip]
+                          (mux2 flip
+                                false
+                                true))}
+              {:flip false})
         [state fns] (make-sim mod)]
-    (is (= (get (exec-sim state fns 0)
-                [:flip])
+    (is (= (get (last (sim (compile-root mod) 0))
+                [:root :flip])
            false))
-    (is (= (get (exec-sim state fns 1)
-                [:flip])
+    (is (= (get (last (sim (compile-root mod) 1))
+                [:root :flip])
            true))
-    (is (= (get (exec-sim state fns 2)
-                [:flip])
+    (is (= (get (last (sim (compile-root mod) 2))
+                [:root :flip])
            false))
-    (is (= (get (exec-sim state fns 10)
-                [:flip])
+    (is (= (get (last (sim (compile-root mod) 10))
+                [:root :flip])
            false))
-    (is (= (get (exec-sim state fns 11)
-                [:flip])
+    (is (= (get (last (sim (compile-root mod) 11))
+                [:root :flip])
            true))))
 
 (deftest mux2-connect-test
-  (let [m (module [:outputs [o false
-                             i ((uintm 8) 3)]]
-                  (mux2 o
-                        (do
-                          (connect o false)
-                          (connect i (+ i i))) 
-                        (do
-                          (connect o true)
-                          (connect i (dec i)))))
-        [state fns] (make-sim m)]
-    (is (= (get (exec-sim state fns 0)
-                [:o])
+  (let [mod (modulize
+              :root
+              {:o (fnk [o]
+                       (mux2 o false true))
+               :i (fnk [i o]
+                       (mux2 o
+                             (+ i i)
+                             (dec i)))}
+              {:o false
+               :i ((uintm 8) 3)})]
+    (is (= (get (last (sim (compile-root mod) 0))
+                [:root :o])
            false))  
-    (is (= (get (exec-sim state fns 0)
-                [:i])
+    (is (= (get (last (sim (compile-root mod) 0))
+                [:root :i])
            ((uintm 8) 3)))  
-    (is (= (get (exec-sim state fns 1)
-                [:o])
+    (is (= (get (last (sim (compile-root mod) 1))
+                [:root :o])
            true))
-    (is (= (get (exec-sim state fns 1)
-                [:i])
+    (is (= (get (last (sim (compile-root mod) 1))
+                [:root :i])
            ((uintm 8) 2)))  
-    (is (= (get (exec-sim state fns 2)
-                [:o])
+    (is (= (get (last (sim (compile-root mod) 2))
+                [:root :o])
            false))  
-    (is (= (get (exec-sim state fns 2)
-                [:i])
+    (is (= (get (last (sim (compile-root mod) 2))
+                [:root :i])
            ((uintm 8) 4)))  
-    (is (= (get (exec-sim state fns 3)
-                [:o])
+    (is (= (get (last (sim (compile-root mod) 3))
+                [:root :o])
            true))  
-    (is (= (get (exec-sim state fns 3)
-                [:i])
+    (is (= (get (last (sim (compile-root mod) 3))
+                [:root :i])
            ((uintm 8) 3)))  
     ))
 
 (deftest mux2-connect-test-nested
   (let [e (enum #{:a :b :c}) 
-        m (module [:outputs [o false
-                             i ((uintm 8) 3)
-                             x (e :a)]]
-                  (let [lowbit (bit-slice (serialize i) 0 1)]
-                    (mux2 o
-                          (do
-                            (connect o false)
-                            (connect i (+ i i))
-                            (mux2 (= lowbit ((bits 1) [1]))
-                                  (connect x :a)
-                                  (connect x :b)))
-                          (do
-                            (connect o true)
-                            (connect x :c)
-                            (connect i (dec i))))))
-        [state fns] (make-sim m)]
-    (is (= (get (exec-sim state fns 0)
-                [:o])
+        mod (modulize
+              :root
+              {:o (fnk [o]
+                       (mux2 o false true))
+               :i (fnk [i o]
+                       (mux2 o
+                             (+ i i)
+                             (dec i)))
+               :lowbit (fnk [i] (bit-slice (serialize i) 0 1))
+               :x (fnk [lowbit o]
+                       (mux2 o
+                             (mux2 (= lowbit ((bits 1) [1]))
+                                   :a
+                                   :b)
+                             :c))}
+              {:i ((uintm 8) 3)
+               :x (e :a)
+               :o false})]
+    (is (= (get (last (sim (compile-root mod) 0))
+                [:root :o])
            false))  
-    (is (= (get (exec-sim state fns 0)
-                [:i])
+    (is (= (get (last (sim (compile-root mod) 0))
+                [:root :i])
            ((uintm 8) 3)))  
-    (is (= (get (exec-sim state fns 0)
-                [:x])
+    (is (= (get (last (sim (compile-root mod) 0))
+                [:root :x])
            (e :a)))  
-    (is (= (get (exec-sim state fns 1)
-                [:o])
+    (is (= (get (last (sim (compile-root mod) 1))
+                [:root :o])
            true))
-    (is (= (get (exec-sim state fns 1)
-                [:i])
+    (is (= (get (last (sim (compile-root mod) 1))
+                [:root :i])
            ((uintm 8) 2)))  
-    (is (= (get (exec-sim state fns 1)
-                [:x])
+    (is (= (get (last (sim (compile-root mod) 1))
+                [:root :x])
            (e :c)))  
-    (is (= (get (exec-sim state fns 2)
-                [:o])
+    (is (= (get (last (sim (compile-root mod) 2))
+                [:root :o])
            false))  
-    (is (= (get (exec-sim state fns 2)
-                [:i])
+    (is (= (get (last (sim (compile-root mod) 2))
+                [:root :i])
            ((uintm 8) 4)))  
-    (is (= (get (exec-sim state fns 2)
-                [:x])
+    (is (= (get (last (sim (compile-root mod) 2))
+                [:root :x])
            (e :b)))  
-    (is (= (get (exec-sim state fns 3)
-                [:o])
+    (is (= (get (last (sim (compile-root mod) 3))
+                [:root :o])
            true))  
-    (is (= (get (exec-sim state fns 3)
-                [:i])
+    (is (= (get (last (sim (compile-root mod) 3))
+                [:root :i])
            ((uintm 8) 3)))  
-    (is (= (get (exec-sim state fns 3)
-                [:x])
+    (is (= (get (last (sim (compile-root mod) 3))
+                [:root :x])
            (e :c)))))
 
 (deftest cond-connect-test
   (let [e (enum #{:small :medium :big})
-        m (module [:outputs [size (e :small)]
-                   :feedback [i ((uintm 8) 0)]]
-                  (connect i (inc i))
-                  (cond
-                    (< i 100) (connect size (e :small))
-                    (< i 200) (connect size (e :medium))
-                    :else (connect size (e :big))))
-        [state fns] (make-sim m)]
-    (is (= (get (exec-sim state fns 10)
-                [:size])
+        mod (modulize 
+              :root
+              {:i (fnk [i]
+                       (inc i))
+               :size (fnk [i]
+                          (cond
+                            (< i 100) (e :small)
+                            (< i 200) (e :medium)
+                            :else (e :big)))}
+              {:size (e :small)
+               :i ((uintm 8) 0)})]
+    (is (= (get (last (sim (compile-root mod) 10))
+                [:root :size])
            (e :small)))  
-    (is (= (get (exec-sim state fns 70)
-                [:size])
+    (is (= (get (last (sim (compile-root mod) 70))
+                [:root :size])
            (e :small)))  
-    (is (= (get (exec-sim state fns 110)
-                [:size])
+    (is (= (get (last (sim (compile-root mod) 110))
+                [:root :size])
            (e :medium)))
-    (is (= (get (exec-sim state fns 150)
-                [:size])
+    (is (= (get (last (sim (compile-root mod) 150))
+                [:root :size])
            (e :medium)))
-    (is (= (get (exec-sim state fns 220)
-                [:size])
+    (is (= (get (last (sim (compile-root mod) 220))
+                [:root :size])
            (e :big)))))
 
 (deftest condp-test

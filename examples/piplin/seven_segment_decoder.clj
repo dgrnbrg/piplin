@@ -1,9 +1,10 @@
 (ns piplin.seven-segment-decoder
   (:use clojure.test)
   (:use [slingshot.slingshot :only [throw+]])
-  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not and or bit-shift-left bit-shift-right])
-  (:use [piplin.types bits boolean bundle enum numbers union core-impl binops uintm])
-  (:use [piplin types math modules sim connect mux protocols]))
+  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast not and or bit-shift-left bit-shift-right])
+  (:use plumbing.core
+        [piplin core 
+         [protocols :only [typeof]]]))
 
 (defn log16
   "log base 16"
@@ -34,7 +35,7 @@
     |-------|
 
   the mapping would be
-  
+
   {:top 0
   :upper-left 1
   :lower-left 2
@@ -45,16 +46,18 @@
   (let [max-value (Math/pow 2 bit-width)
         required-digits (int (Math/ceil (log16 max-value)))
         padding-needed (mod (- 4 bit-width) 4)]
-    (module [:inputs [in (bits bit-width)]
-             :outputs [out (cast (bits (* 7 required-digits)) 0)]]
-            (let [in-padded (bit-cat
-                              (cast (bits padding-needed) 0)
-                              in)
-                  slices (for [low (range 0 bit-width 4)]
-                           (bit-slice in-padded low (+ low 4)))
-                  digits (map #(decode-digit % mapping) slices)]
-              (connect out (apply bit-cat
-                                  (reverse digits)))))))
+    (modulize :decoder
+      {:out (fnk [in]
+                 (assert (= (-> in typeof bit-width-of) bit-width))
+                 (let [in-padded (bit-cat
+                                   (cast (bits padding-needed) 0)
+                                   in)
+                       slices (for [low (range 0 bit-width 4)]
+                                (bit-slice in-padded low (+ low 4)))
+                       digits (map #(decode-digit % mapping) slices)]
+                   (apply bit-cat
+                          (reverse digits))))}
+      {:out (cast (bits (* 7 required-digits)) 0)})))
 
 (def sample-mapping
   {:top 0
@@ -185,12 +188,15 @@
 
 (defn seven-seg-tester
   [bit-width]
-  (let [deco (decoder bit-width sample-mapping)]
-    (module tb [:feedback [x ((uintm bit-width) 0)]
-                :outputs [x_out (cast (typeof (subport deco :deco :out)) 0)]
-                :modules [deco deco]]
-            (connect x (inc x))
-          (connect x_out deco$out)
-          (connect
-            deco$in
-            (serialize x)))))
+  (let [deco (decoder bit-width sample-mapping)
+        x-value ((uintm bit-width) 0)
+        deco-out (-> (compile-root deco :in (serialize x-value))
+                   (get [:decoder :out])
+                   :piplin.modules/fn)]
+    (modulize
+      {:x (fnk [x] (inc x))
+       :x_out (fnk [x]
+                   (let [{:keys [out]} (deco :in (serialize x))]
+                     out))}
+     {:x x-value
+      :x_out (cast (typeof deco-out) 0)})))

@@ -1,6 +1,7 @@
 (ns piplin.modules
   (:use [piplin sim types protocols])
-  (:use [clojure.string :only [join]])
+  (:use [clojure.string :only [join]]
+        [clojure.set :only [map-invert]])
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :exclude [replace cast])
   (:use [clojure.string :only [join replace split]])
@@ -499,6 +500,13 @@
   implement structs or vectors, including pattern
   matching aka destructuring. )
 
+(defn push-down-map
+  "Takes a map and a keyword maps all values maps with the
+  key as the keyword and the value as the old value."
+  [m kw]
+  (plumb/for-map [[k v] m]
+                 k {kw v}))
+
 ;;This stores the path of the current module--used for outputing hierarchical data
 (def ^:dynamic *current-module* [])
 ;;This is an atom containing a map of state element paths to a map
@@ -530,21 +538,17 @@
                                       module-name)]
        (let [state-renames (plumb/for-map [k (keys state)]
                              k (keyword (name (gensym))))
-             reverse-renames (plumb/for-map
-                               [[k v] state-renames]
-                               v k)
+             reverse-renames (map-invert state-renames)
              renamed-computation
              (plumb/map-keys #(or (state-renames %) %)
                              computation)
-             init-map (plumb/map-vals
-                        (fn [v] {:init v}) state)
+             init-map (push-down-map state ::init)
              register-ports (plumb/for-map [[k v] state]
                               k (make-port*
                                   (conj *current-module* k)
                                   (typeof v)
                                   :register))
-             port-map (plumb/map-vals
-                        (fn [v] {:port v}) register-ports)
+             port-map (push-down-map register-ports ::port)
              result (-<>> (graph/run
                             renamed-computation
                             (if (seq inputs)
@@ -555,9 +559,7 @@
              result (plumb/for-map [[k v] result
                                     :when (typeof v)]
                                    k v)
-             fn-map (plumb/map-vals
-                      (fn [v] {:fn v})
-                      result)
+             fn-map (push-down-map result ::fn)
              state-elements (->> (merge-with
                                    merge
                                    init-map
@@ -581,7 +583,7 @@
   [compiled-module]
   (apply concat
          (map #(-> % second
-                 :fn
+                 ::fn
                  (walk-expr (fn [expr]
                               (if (= :input (-> expr
                                               value
@@ -598,16 +600,16 @@
   (assert (empty? (find-inputs compiled-module))
           "Cannot have any input ports during simulation")
   (let [reg-keys (->> compiled-module
-                   (filter (comp :init second))
+                   (filter (comp #(contains? % ::init) second))
                    (map first))
         wire-keys (->> compiled-module
-                    (remove (comp :init second))
+                    (remove (comp #(contains? % ::init) second))
                     (map first))
-        wire-fns (plumb/map-vals (comp make-sim-fn :fn)
+        wire-fns (plumb/map-vals (comp make-sim-fn ::fn)
                                  (select-keys compiled-module wire-keys)) 
-        reg-fns (plumb/map-vals (comp make-sim-fn :fn)
+        reg-fns (plumb/map-vals (comp make-sim-fn ::fn)
                                 (select-keys compiled-module reg-keys))
-        reg-inits (plumb/map-vals :init compiled-module)
+        reg-inits (plumb/map-vals ::init compiled-module)
         inits (binding [*sim-state* reg-inits]
                        (merge reg-inits
                               (plumb/map-vals #(%) wire-fns)))]

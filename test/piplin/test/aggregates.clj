@@ -110,36 +110,27 @@
   (let [e (enum #{:a :b :c})
         b (bundle {:car e :cdr (uintm 4)})
         u (union {:x (uintm 5) :y b})
-        m (module [:outputs [v (u {:x ((uintm 5) 0)})
-                             o ((uintm 5) 22)]]
-            (union-match v
-              (:x x
-                  (connect o 22)
-                  (connect v (cast u {:y {:car :b 
-                                           :cdr 3}})))
-              (:y {:keys [car cdr]}
-                  (connect o 31)
-                  (mux2 (< cdr 7)
-                        (connect v (cast u {:y {:car :c 
-                                                :cdr (inc cdr)}}))
-                        (connect v (cast u {:x ((uintm 5) 3)}))))))
-        [state fns] (make-sim m)]
-    (is (= (get (exec-sim state fns 0)
-                [:v])
-           (u {:x ((uintm 5) 0)})))  
-    (is (= (get (exec-sim state fns 0)
-                [:o])
-           ((uintm 5) 22)))
-
-    (is (= (get (exec-sim state fns 1)
-                [:v])
-           (u {:y (cast b {:car :b
-                           :cdr 3}) })))  
-
-    (is (= (get (exec-sim state fns 1)
-                [:o])
-           ((uintm 5) 22)))
-    ))
+        m (modulize
+            :root
+            {:v (fnk [v]
+                     (union-match v
+                       (:x x (cast u {:y {:car :b 
+                                          :cdr 3}}))
+                       (:y {:keys [car cdr]}
+                           (mux2 (< cdr 7)
+                                 (cast u {:y {:car :c 
+                                              :cdr (inc cdr)}})
+                                 (cast u {:x ((uintm 5) 3)})))))
+             :o (fnk [v]
+                     (union-match v
+                       (:x _ 22)
+                       (:y _ 31)))}
+            {:v (cast u {:x ((uintm 5) 22)}) :o ((uintm 5) 0)})]
+    (are [cycle v o] (let [r (last (sim (compile-root m) cycle))]
+                       (and (= (get r [:root :v]) v)
+                            (= (get r [:root :o]) o)))
+         0 (u {:x ((uintm 5) 22)}) ((uintm 5) 0)
+         1 (u {:y (cast b {:car :b :cdr 3}) }) ((uintm 5) 22))))
 
 ;TODO: write a test that uses a union-match expr as a value.
 ;this should give more info on the wrongly-taken braken issue
@@ -148,38 +139,30 @@
   (let [e (enum #{:a :b :c})
         b (bundle {:car e :cdr (uintm 4)})
         u (union {:x (uintm 5) :y b})
-        m (module [:outputs [v (u {:x ((uintm 5) 0)})
-                             o ((uintm 5) 22)]]
-
-            (mux2
-              (= (get-tag v) :x)
-              (do
-                (connect o (uninst 22))
-                (connect v (cast u {:y {:car :b 
-                                        :cdr 3}}))) 
-              (let [{:keys [car cdr]} (get-value :y v)] 
-                (connect o (uninst 31))
-                (mux2 (< cdr 7)
-                      (connect v (cast u {:y {:car :c 
-                                              :cdr (inc cdr)}}))
-                      (connect v (cast u {:x ((uintm 5) 3)}))))))
-        [state fns] (make-sim m)]
-    (is (= (get (exec-sim state fns 0)
-                [:v])
-           (u {:x ((uintm 5) 0)})))  
-    (is (= (get (exec-sim state fns 0)
-                [:o])
-           ((uintm 5) 22)))
-
-    (is (= (get (exec-sim state fns 1)
-                [:v])
-           (u {:y (cast b {:car :b
-                           :cdr 3}) })))
-
-    (is (= (get (exec-sim state fns 1)
-                [:o])
-           ((uintm 5) 22)))
-    ))
+        m (modulize
+            :root
+            {:o (fnk [v]
+                     (mux2
+                       (= (get-tag v) :x)
+                       (uninst 22)
+                       (uninst 31)))
+             :v (fnk [v]
+                     (mux2
+                       (= (get-tag v) :x)
+                       (cast u {:y {:car :b 
+                                    :cdr 3}}) 
+                       (let [{:keys [car cdr]} (get-value :y v)] 
+                         (mux2 (< cdr 7)
+                               (cast u {:y {:car :c 
+                                            :cdr (inc cdr)}})
+                               (cast u {:x ((uintm 5) 3)})))))}
+            {:v (u {:x ((uintm 5) 0)})
+             :o ((uintm 5) 22)})]
+    (are [cycle v o] (let [r (last (sim (compile-root m) cycle))]
+                       (and (= (get r [:root :v]) v)
+                            (= (get r [:root :o]) o)))
+         0 (u {:x ((uintm 5) 0)}) ((uintm 5) 22)
+         1 (u {:y (cast b {:car :b :cdr 3}) }) ((uintm 5) 22))))
 
 (deftest maybe-test
   (let [maybe-uintm8 (maybe (uintm 8))

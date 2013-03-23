@@ -949,15 +949,16 @@
   (let [module-inputs (find-inputs compiled-module)
         port-names (plumb/for-map
                         [[name v] compiled-module]
-                        (:port v) (gen-verilog-name (last name)))
+                        (:piplin.modules/port v) (gen-verilog-name (last name)))
         input-names (plumb/for-map [port module-inputs
-                                    :let [name (-> port value :port)]]
+                                    :let [name (-> port value :piplin.modules/port)]]
                                    port name)
-        module-regs (filter (comp :port value second)
+        module-regs (filter (comp :piplin.modules/port value second)
                         compiled-module)
         regs-inits
         (join (map
-                (comp #(let [{:keys [init port]} %]
+                (comp #(let [{init :piplin.modules/init
+                              port :piplin.modules/port} %]
                          (format
                            "  reg %s %s = %s;\n"
                            (-> init
@@ -971,7 +972,7 @@
                 module-regs))
         [name-table code]
         (->> compiled-module
-               (map (comp :fn second))
+               (map (comp :piplin.modules/fn second))
                (reduce (fn [[name-table text] expr]
                          (verilog expr name-table text)) 
                        [(merge port-names
@@ -980,8 +981,8 @@
         (join (map
                 (comp (fn [[n v]]
                         (format "    %s <= %s;\n" n v))
-                      (juxt (comp port-names :port)
-                            (comp name-table :fn))
+                      (juxt (comp port-names :piplin.modules/port)
+                            (comp name-table :piplin.modules/fn))
                       second) 
           module-regs))
         input-decls (join
@@ -994,7 +995,8 @@
         output-decls
         (join (map
                 (fn [[path verilog-name]]
-                  (let [{function :fn port :port} (value (compiled-module path))]
+                  (let [{function :piplin.modules/fn port
+                         :piplin.modules/port} (value (compiled-module path))]
                          (format
                            "  output wire %s %s;\n"
                            (-> function
@@ -1005,8 +1007,8 @@
                 outputs))
         output-assigns (->> outputs
                          (map (fn [[path verilog-name]]
-                                (let [{p :port
-                                       f :fn} (compiled-module path)
+                                (let [{p :piplin.modules/port
+                                       f :piplin.modules/fn} (compiled-module path)
                                       ;Output gets the value of the
                                       ;register this cycle, not what it will
                                       ;be next cycle
@@ -1069,7 +1071,7 @@
       (join "\n"
             (map #(str "  wire " (-> (key %)
                                    compiled
-                                   :fn
+                                   :piplin.modules/fn
                                    typeof
                                    bit-width-of
                                    array-width-decl)
@@ -1087,7 +1089,7 @@
       "\n"
       "  initial begin\n"
       ;"    $dumpfile(\"dump.vcd\");\n"
-      ;"    $dumpvars(0);\n"
+      "    $dumpvars;\n"
       (->> samples
         
         (map #(assert-hierarchical-cycle "    "

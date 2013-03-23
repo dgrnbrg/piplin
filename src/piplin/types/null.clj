@@ -14,7 +14,7 @@
   :null
   [type obj]
   (when-not (nil? obj)
-    (throw+ (error (str obj "must be nil")))))
+    (throw+ (error (str obj " must be nil")))))
 
 (defmethod from-bits
   :null 

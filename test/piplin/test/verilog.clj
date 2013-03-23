@@ -57,21 +57,21 @@
   (icarus-test (verify
                  delayer-holder 50)))
 
-(comment (deftest seven-seg-test
-  (icarus-test (modules->verilog+testbench
+(deftest seven-seg-test
+  (icarus-test (verify
                  (seven-seg-tester 1) 10)) 
-  (icarus-test (modules->verilog+testbench
+  (icarus-test (verify
                  (seven-seg-tester 2) 10)) 
-  (icarus-test (modules->verilog+testbench
+  (icarus-test (verify
                  (seven-seg-tester 3) 10)) 
-  (icarus-test (modules->verilog+testbench
+  (icarus-test (verify
                  (seven-seg-tester 4) 30)) 
-  (icarus-test (modules->verilog+testbench
+  (icarus-test (verify
                  (seven-seg-tester 8) 300)) 
-  (icarus-test (modules->verilog+testbench
+  (icarus-test (verify
                  (seven-seg-tester 9) 600))
-  (icarus-test (modules->verilog+testbench
-                 (seven-seg-tester 10) 1025))))
+  (icarus-test (verify
+                 (seven-seg-tester 10) 1025)))
 
 (def and-or
   (modulize
