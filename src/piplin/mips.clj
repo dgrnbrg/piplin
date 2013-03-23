@@ -95,7 +95,7 @@
   (bundle {:op alu-op
            :x reg-or-imm
            :y reg-or-imm
-           :dst reg})) 
+           :dst reg}))
 
 (def alu-cmd (bundle {:op alu-op
                       :x u32m
@@ -192,11 +192,11 @@
   (->>
     (let [b (partial bit-slice inst)
           op (b 26 32)
-          rs (deserialize reg (b 21 26)) 
-          rt (deserialize reg (b 16 21)) 
-          imm (zext32 (b 0 16)) 
+          rs (deserialize reg (b 21 26))
+          rt (deserialize reg (b 16 21))
+          imm (zext32 (b 0 16))
           target (b 0 26)
-          rd (deserialize reg (b 11 16)) 
+          rd (deserialize reg (b 11 16))
           sa (b 6 11)
           short-func (b 0 6)
           func (b 0 11)
@@ -234,9 +234,9 @@
     (->>
       {:data (condp op =
                :add (h/+ x y)
-               :sub (h/- x y)) 
+               :sub (h/- x y))
        :dst dst}
-      (cast wb-result) 
+      (cast wb-result)
       )))
 
 (comment (clojure.java.shell/sh "gcc"

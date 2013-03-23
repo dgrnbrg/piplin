@@ -3,7 +3,7 @@
   a way to represent a constrained set of keywords.
   They also allow you to define the bit patterns for
   each keyword.
-  
+
   This namespace also adds keywords to the piplin type
   system so that they can be coerced to enum elements."
   (:refer-clojure :exclude [= not= cast])
@@ -13,10 +13,10 @@
 
 (derive-type clojure.lang.Keyword :piplin-type)
 
-(extend-protocol ITyped 
-  clojure.lang.Keyword 
-  (typeof [this] (anontype :keyword)) 
-  (value [this] this) 
+(extend-protocol ITyped
+  clojure.lang.Keyword
+  (typeof [this] (anontype :keyword))
+  (value [this] this)
   (pipinst? [this] true))
 
 (defcoercions = :enum [:keyword])
@@ -43,7 +43,7 @@
       (if (map? coll)
         (cond
           (some #(not= (kindof %) :bits) (vals coll))
-          (throw+ (error "Maps values must all be bits")) 
+          (throw+ (error "Maps values must all be bits"))
           (some #(not= (-> (seq coll)
                              first
                              val
@@ -52,9 +52,9 @@
                            (bit-width-of (typeof %)))
                 (vals coll))
           (throw+ (error
-                    "Map's values must be same bit width")) 
+                    "Map's values must be same bit width"))
           (some #(not (keyword? %)) (keys coll))
-          (throw+ (error "Map's keys must be keywords")) 
+          (throw+ (error "Map's keys must be keywords"))
           (and
             (not allow-dups)
             (not= (count (vals coll))
@@ -92,7 +92,7 @@
 (defmethod bit-width-of
   :enum
   [type]
-  (-> type 
+  (-> type
     :keymap
     vals
     first

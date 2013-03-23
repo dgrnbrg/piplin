@@ -24,15 +24,15 @@
         system (compile-root root)
         do-sim (fn [cycles]
                  (get (last (sim system cycles)) [:root :output]))]
-    (is (= (do-sim 0) ((uintm 8) 0)))  
-    (is (= (do-sim 1) ((uintm 8) 0)))  
-    (is (= (do-sim 2) ((uintm 8) 1)))  
-    (is (= (do-sim 3) ((uintm 8) 3)))  
-    (is (= (do-sim 4) ((uintm 8) 6)))  
-    (is (= (do-sim 5) ((uintm 8) 10)))  
-    (is (= (do-sim 6) ((uintm 8) 15)))  
-    (is (= (do-sim 7) ((uintm 8) 21)))  
-    (is (= (do-sim 8) ((uintm 8) 28)))  
+    (is (= (do-sim 0) ((uintm 8) 0)))
+    (is (= (do-sim 1) ((uintm 8) 0)))
+    (is (= (do-sim 2) ((uintm 8) 1)))
+    (is (= (do-sim 3) ((uintm 8) 3)))
+    (is (= (do-sim 4) ((uintm 8) 6)))
+    (is (= (do-sim 5) ((uintm 8) 10)))
+    (is (= (do-sim 6) ((uintm 8) 15)))
+    (is (= (do-sim 7) ((uintm 8) 21)))
+    (is (= (do-sim 8) ((uintm 8) 28)))
     (is (= (do-sim 9) ((uintm 8) 36)))))
 
 (def counter

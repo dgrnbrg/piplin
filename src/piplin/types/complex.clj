@@ -50,7 +50,7 @@
   [inst]
   (let [{:keys [real imag]} (typeof inst)
         [real-val imag-val] (value inst)]
-    [(check real-val) 
+    [(check real-val)
      (check imag-val)]))
 
 (defmethod promote
@@ -109,7 +109,7 @@
                (piplin.types.bits/bits (count bits))
                bits)
         {:keys [real imag]} type
-        imag-len (bit-width-of imag) 
+        imag-len (bit-width-of imag)
         imag-bits (bit-slice bits 0 imag-len)
         real-bits (bit-slice
                     bits
@@ -120,11 +120,11 @@
 #_(let [disp #(let [[a b] (value %)
                   a (value a)
                   b (value b)]
-              (str (/ a (Math/pow 2 8)) \space 
+              (str (/ a (Math/pow 2 8)) \space
                    (/ b (Math/pow 2 8)) \i))
       sfxpts-type (piplin.types.sfxpts/sfxpts 8 8)
       c1 (piplin.types/cast (complex sfxpts-type sfxpts-type)
-                                    [2.0 2.0]) 
+                                    [2.0 2.0])
       c2 (piplin.types/cast (complex sfxpts-type sfxpts-type)
                                     [2.8 1.5])]
   (println "c1 =" (disp c1))

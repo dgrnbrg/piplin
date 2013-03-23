@@ -19,7 +19,7 @@
   [x]
   (if (typeof x)
     (if (pipinst? x)
-      (clj/not x) 
+      (clj/not x)
       (mkast (anontype :boolean) :not [x] not))
     (clj/not x)))
 
@@ -73,7 +73,7 @@
   1)
 
 (defmethod get-bits
-  :boolean 
+  :boolean
   [expr]
   (if (value expr) [1] [0]))
 

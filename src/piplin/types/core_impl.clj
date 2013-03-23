@@ -3,7 +3,7 @@
   clojure core functions. It has them by default dispatch to clojure's
   core implementation, but opens the possibility to adding support for
   many bitwise and numeric types in piplin.
-  
+
   There are also several macros useful for making unary and binary functions
   that delegate to clojure.core implementations, which is useful for
   adding support for currently unsupported operations."
@@ -67,22 +67,22 @@
        (defmulti ~op binary-dispatch :hierarchy piplin.types/types)
        ~@core-methods)))
 
-(def-n-ary-binop + 0 [:j-num]) 
-(def-n-ary-binop - 0 [:j-num]) 
-(def-n-ary-binop * 0 [:j-num]) 
-(def-n-ary-binop bit-and 0 [:j-num]) 
-(def-n-ary-binop bit-or 0 [:j-num]) 
-(def-n-ary-binop bit-xor 0 [:j-num]) 
+(def-n-ary-binop + 0 [:j-num])
+(def-n-ary-binop - 0 [:j-num])
+(def-n-ary-binop * 0 [:j-num])
+(def-n-ary-binop bit-and 0 [:j-num])
+(def-n-ary-binop bit-or 0 [:j-num])
+(def-n-ary-binop bit-xor 0 [:j-num])
 
 (defmulti bit-not
   piplin.types/piplin-clojure-dispatch
   :hierarchy piplin.types/types)
 (defmethod bit-not :use-core-impl
   [x]
-  (clj/not x)) 
+  (clj/not x))
 (defmethod bit-not :default
   [x]
-  (clj/not x)) 
+  (clj/not x))
 
 (defn inc
   "Increments x"

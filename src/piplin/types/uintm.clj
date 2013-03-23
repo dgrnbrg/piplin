@@ -45,7 +45,7 @@
   (cond
     (= (typeof obj) this) obj ;Already correct
     (= (kindof obj)
-       (:kind this)) 
+       (:kind this))
     (throw+ (error (str "Cannot convert " obj " to " this)))
     (isa-type? :j-integral (kindof obj)) (instance
                                            this

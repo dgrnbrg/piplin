@@ -1,7 +1,7 @@
 (ns piplin.types.numbers
   (:refer-clojure :exclude [cast])
   (:use [slingshot.slingshot])
-  (:use [piplin.types]) 
+  (:use [piplin.types])
   (:use [piplin.protocols]))
 
 (derive-type java.lang.Long :piplin-type)
@@ -39,7 +39,7 @@
   (value [this] this)
   (pipinst? [this] true))
 
-(defmethod promote 
+(defmethod promote
   :j-int
   [type obj]
   (condp isa-type? (kindof obj)
@@ -50,7 +50,7 @@
                (throw+ (error obj "must be 32 bits or less"))))
     (throw+ (error "Cannot promote" obj "to Long"))))
 
-(defmethod promote 
+(defmethod promote
   :j-long
   [type obj]
   (condp isa-type? (kindof obj)

@@ -76,13 +76,13 @@
      13 (->inst :reg->acc 1)
      14 (->inst :mul 5)
      15 (->inst :acc->reg 2)
-     16 (->inst :reg->acc 6) 
-     17 (->inst :acc->reg 1) 
+     16 (->inst :reg->acc 6)
+     17 (->inst :acc->reg 1)
      18 (->inst :set {:reg1 1 :reg2 2})
      19 (->inst :jump 5)
      :else (->inst :noop #b0)
-     
-     })) 
+
+     }))
 
 (def program2
   (ifelse-memory
@@ -102,14 +102,14 @@
      13 (->inst :add 5)
      14 (->inst :acc->reg 4)
      15 (->inst :jump 5)
-     :else (->inst :noop #b0)})) 
+     :else (->inst :noop #b0)}))
 
 (defmodule simplecpu
   []
   [:outputs [
              memaddr ((uintm 14) 0)
              memdata #b1
-             pc ((uintm 8) 0) 
+             pc ((uintm 8) 0)
              fp-accum (cast (sfxpts 3 13) 0.0)
              ]
    :feedback [
@@ -137,7 +137,7 @@
           data (condp = tag
                  :loadi loadi-imm
                  :acc->reg fp-accum
-                 (cast (sfxpts 3 13) 0.0)) 
+                 (cast (sfxpts 3 13) 0.0))
           addr (condp = tag
                  :loadi loadi-reg
                  :acc->reg acc->reg-reg
@@ -222,16 +222,16 @@
             #b01 (mux2 border? #b1 #b0)
             ;else, do buffered image
             (get video-buffer (bit-cat
-                                (bit-slice (serialize vga$vcount) 1 8)  
+                                (bit-slice (serialize vga$vcount) 1 8)
                                 (bit-slice (serialize vga$hcount) 1 8)))
-            
+
             )
         g (condp =  (bit-slice sw 0 2)
             #b00 (bit-slice hcount 7 8)
             #b01 (mux2 border? #b1 #b0)
             ;else, do buffered image
             (get video-buffer (bit-cat
-                                (bit-slice (serialize vga$vcount) 1 8)  
+                                (bit-slice (serialize vga$vcount) 1 8)
                                 (bit-slice (serialize vga$hcount) 1 8)))
             )
         b (condp = (bit-slice sw 0 2)
@@ -239,11 +239,11 @@
             #b01 (mux2 border? #b1 #b0)
             ;else, do buffered image
             (get video-buffer (bit-cat
-                                (bit-slice (serialize vga$vcount) 1 8)  
+                                (bit-slice (serialize vga$vcount) 1 8)
                                 (bit-slice (serialize vga$hcount) 1 8)))
             )]
     (connect vgaRed (bit-cat r r r))
-    (connect vgaGreen (bit-cat g g g)) 
+    (connect vgaGreen (bit-cat g g g))
     (connect vgaBlue (bit-cat b b)))
   (connect led sw)
   (connect timer (inc timer))
@@ -261,7 +261,7 @@
            #_(bit-cat (bit-slice (serialize cpu$fp-accum) 8 16) cpu$pc)
            #_(serialize counter))
   (let [
-        ;Must multiplex in the millisecond regime 
+        ;Must multiplex in the millisecond regime
         current-state (bit-slice
                         (serialize timer) 10 12)
         anode (condp = current-state
@@ -335,7 +335,7 @@
 
 (-> (compile-root
       (modulize quadratic-counter {:value ((uintm 8) 0)}))
-  (sim 10) 
+  (sim 10)
   pprint )
 
 (def adder {:+1 (fnk [input] (inc input))})

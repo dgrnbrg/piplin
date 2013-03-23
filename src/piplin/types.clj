@@ -156,11 +156,11 @@
   (toString [this]
     (print-str "(ASTNode" type map ")"))
 
-  clojure.lang.ILookup 
-  (valAt 
+  clojure.lang.ILookup
+  (valAt
     [this key]
     (valAt-multi this key))
-  (valAt 
+  (valAt
     [this key notfound]
     (valAt-multi this key notfound))
 
@@ -231,15 +231,15 @@
     :prefix "(" :suffix ")"
     (clojure.pprint/pprint-logical-block
       (.write ^java.io.Writer *out* "type: ")
-      (clojure.pprint/pprint-newline :miser) 
-      (.write ^java.io.Writer *out* (print-str (.type node))) 
+      (clojure.pprint/pprint-newline :miser)
+      (.write ^java.io.Writer *out* (print-str (.type node)))
       (.write ^java.io.Writer *out* " ")
-      (clojure.pprint/pprint-newline :linear)) 
+      (clojure.pprint/pprint-newline :linear))
     (clojure.pprint/pprint-logical-block
       (.write ^java.io.Writer *out* "data: ")
       (clojure.pprint/pprint-newline :linear)
       (clojure.pprint/write-out (.map node))
-      (.write ^java.io.Writer *out* " "))) 
+      (.write ^java.io.Writer *out* " ")))
   )
 
 (defn instance
@@ -261,9 +261,9 @@
                         (get (meta val)
                              :sim-factory
                              [(fn []
-                                (apply instance 
-                                       type 
-                                       val 
+                                (apply instance
+                                       type
+                                       val
                                        more)) []])})
         checked (check inst)]
     (if checked
@@ -289,7 +289,7 @@
                        \[
                        (join ", "
                              (map pr-str [~@(map (fn [arg]
-                                            `(~(keyword arg) ~'o)) args)])) 
+                                            `(~(keyword arg) ~'o)) args)]))
                        \])))
      (derive-type ~name :piplin-type)))
 
@@ -313,9 +313,9 @@
   "Returns a map by filtering the values with
   the given predicate"
   [pred map]
-  (->> map 
+  (->> map
     (filter (fn [[k v]] (pred v)))
-    (apply concat) 
+    (apply concat)
     (apply hash-map)))
 
 (defn immediate-fragment-filter
@@ -349,7 +349,7 @@
                             (map vector perm# jumbled-args#))]
                 (apply ~f final-args#)))]
      (ASTNode. ~type
-               {:op ~op 
+               {:op ~op
                 :args ~argmap}
                {:pipinst? (fn [& ~'a] false)
                 :sim-factory [f# kwargs#]})))
@@ -376,7 +376,7 @@
                assoc :pipinst? (fn [x] false))))
 
 (defn assoc-dist-fn
-  "Takes an ast frag and returns a new ast frag w/ 
+  "Takes an ast frag and returns a new ast frag w/
   the given distribution fn"
   [ast f]
   (vary-meta ast assoc :distribute f))

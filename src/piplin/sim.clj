@@ -96,7 +96,7 @@
 (defn exec-sim
   "
   initial-state is a map from names to values of state elts.
-  
+
   initial-fns is a map from fns to a vector of the names of
   the state-elts they require (they will be applied to the
   fn in the order they're declared).
@@ -130,9 +130,9 @@
        every-cycle-fn)
      fnargs]))
 
-;;; State is 
+;;; State is
 
-(defn transition 
+(defn transition
   "State transition"
   [state transitions]
   (let [[state delta events] state]
@@ -153,7 +153,7 @@
 (defn state-machine*
   [init-state init-vars transitions]
   "init-state is a pair: a keyword, the state var, to a value, the initial state
-  
+
   init-vars is a seq of pairs from keyword var names to their initial values
 
   transitions is a map from state names to the functions to invoke if in that state.
@@ -165,7 +165,7 @@
         init-state (-> {} (conj init-state) (into init-vars))]
     [init-state
      {(fn f [state & args]
-        (let [[_ delta event] (apply (transitions state) args)] 
+        (let [[_ delta event] (apply (transitions state) args)]
           [delta {event {f fnargs}}]
           ))
       fnargs}]))
@@ -207,10 +207,10 @@
                           (-> old-state
                             (-x> b false)
                             (next-state :low)
-                            (delay' period))) 
+                            (delay' period)))
                    (:wait (-> old-state
                             (next-state :high)
-                            (delay' period))) 
+                            (delay' period)))
                    (:low (-> old-state
                            (-x> b true)
                            (next-state :wait)

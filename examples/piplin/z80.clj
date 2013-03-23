@@ -24,7 +24,7 @@
 
 (def alu-op
   (enum #{:+ :- :shift-left :shift-right-arith
-          :shift-right-logical 
+          :shift-right-logical
           :bit-set :bit-test
           :rotate-left :rotate-right}))
 
@@ -102,7 +102,7 @@
     4 :h
     5 :l
     6 (hl)
-    7 :a)) 
+    7 :a))
 
 (defn table-rp
   [x]
@@ -110,7 +110,7 @@
     0 :bc
     1 :de
     2 :hl
-    3 :sp)) 
+    3 :sp))
 
 (defn table-rp2
   [x]
@@ -118,7 +118,7 @@
     0 :bc
     1 :de
     2 :hl
-    3 :af)) 
+    3 :af))
 
 (defn table-cc
   [x]
@@ -130,7 +130,7 @@
     4 :po
     5 :pe
     6 :p
-    7 :m)) 
+    7 :m))
 
 (defn table-alu
   [x]
@@ -142,7 +142,7 @@
     4 :and
     5 :xor
     6 :or
-    7 :cp)) 
+    7 :cp))
 
 (defn table-rot
   [x]
@@ -154,7 +154,7 @@
     4 :sla
     5 :sra
     6 :sll
-    7 :srl)) 
+    7 :srl))
 
 (defn table-im
   [x]
@@ -166,7 +166,7 @@
     4 :0
     ;5 :0/1
     6 :1
-    7 :2)) 
+    7 :2))
 
 (defn table-bli
   [a b]
@@ -179,22 +179,22 @@
     [5 1] :cpd
     [6 1] :cpir
     [7 1] :cpdr
-    [4 2] :ini  
+    [4 2] :ini
     [5 2] :ind
     [6 2] :inir
     [7 2] :indr
-    [4 3] :outi  
+    [4 3] :outi
     [5 3] :outd
     [6 3] :outir
-    [7 3] :outdr)) 
+    [7 3] :outdr))
 
 (defn decode-unprefixed
   [opcode]
   (let [{:keys [x y z p q]} (decode-opcode opcode)]
-    (condp = x 
-      0 (condp = z 
+    (condp = x
+      0 (condp = z
           ;relative jumps and assorted ops
-          0 (condp = y 
+          0 (condp = y
               0 (nop)
               1 (ex-af-af')
               2 (djnz d)
@@ -202,23 +202,23 @@
               :else (jr (- y 4) d) ;jump conditional
               )
           ;16 bit load immediate/add
-          1 (condp = q 
+          1 (condp = q
               0 (ld rp[p] nn)
               1 (add HL, rp[p]))
           ;indirect loading
-          2 (condp = q 
-              0 (condp = p 
+          2 (condp = q
+              0 (condp = p
                   0 (ld (BC) A)
                   1 (ld (DE) A)
                   2 (ld (nn) HL)
                   3 (ld (nn) A))
-              1 (condp = p 
+              1 (condp = p
                   0 (ld (A) BC)
                   1 (ld (A) DE)
                   2 (ld (HL) nn)
                   3 (ld (A) nn)))
           ;16 bit inc/dec
-          3 (condp = q 
+          3 (condp = q
               0 (inc rp[p])
               1 (dec rp[p]))
           ;8 bit inc
@@ -228,7 +228,7 @@
           ;8 bit load immediate
           6 (ld r[y] n)
           ;assorted operations on accumulator flags
-          7 (condp = y 
+          7 (condp = y
               0 (rlca)
               1 (rrca)
               2 (rla)
@@ -246,11 +246,11 @@
               (ld r[y], r[z]))
       ;alu operations
       2 (alu[y] r[z])
-      3 (condp = z 
+      3 (condp = z
           ;conditional return
           0 (ret cc[y])
           ;pop and various ops
-          1 (condp = q 
+          1 (condp = q
               0 (pop rp2[p])
               1 (condp = p
                   0 (ret)
@@ -282,21 +282,21 @@
           ;operate on accumulator and immediate
           6 (alu[y] n)
           ;restart
-          7 (rst (* y 8 )))))) 
+          7 (rst (* y 8 ))))))
 
 (defn decode-cb-prefix
   "This does bit rotation"
   [opcode]
-  (let [{:keys [x y z p q]} (decode-opcode opcode)] 
+  (let [{:keys [x y z p q]} (decode-opcode opcode)]
     (condp = x
       0 (rot [y] r[z])
-      1 (bit y, r[z])   
-      2 (res y, r[z])   
-      3 (set y, r[z])))) 
+      1 (bit y, r[z])
+      2 (res y, r[z])
+      3 (set y, r[z]))))
 
 (defn decode-ed-prefix
   [opcode]
-  (let [{:keys [x y z p q]} (decode-opcode opcode)] 
+  (let [{:keys [x y z p q]} (decode-opcode opcode)]
     (condp = x
       0 (nop)
       3 (nop)
@@ -338,4 +338,4 @@
       2 (mux2 (and (<= z 3)
                    (>= y 4))
               (bli y z)
-              (nop)))))) 
+              (nop))))))

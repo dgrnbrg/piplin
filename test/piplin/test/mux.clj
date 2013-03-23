@@ -4,7 +4,7 @@
   (:use [piplin types math modules sim mux connect]
         plumbing.core)
   (:use [piplin.types bits boolean enum numbers core-impl binops uintm])
-  (:import clojure.lang.ExceptionInfo)) 
+  (:import clojure.lang.ExceptionInfo))
 
 (deftest cond-test
   (is (= (cond false 22)
@@ -29,10 +29,10 @@
                         (cond
                           (= (uninst true) true) 0
                           :else true)))
-  (is (= 
+  (is (=
         (cond
           true 1
-          false 0)  
+          false 0)
         (clojure.core/cond
           true 1
           false 0)))
@@ -90,32 +90,32 @@
                :i ((uintm 8) 3)})]
     (is (= (get (last (sim (compile-root mod) 0))
                 [:root :o])
-           false))  
+           false))
     (is (= (get (last (sim (compile-root mod) 0))
                 [:root :i])
-           ((uintm 8) 3)))  
+           ((uintm 8) 3)))
     (is (= (get (last (sim (compile-root mod) 1))
                 [:root :o])
            true))
     (is (= (get (last (sim (compile-root mod) 1))
                 [:root :i])
-           ((uintm 8) 2)))  
+           ((uintm 8) 2)))
     (is (= (get (last (sim (compile-root mod) 2))
                 [:root :o])
-           false))  
+           false))
     (is (= (get (last (sim (compile-root mod) 2))
                 [:root :i])
-           ((uintm 8) 4)))  
+           ((uintm 8) 4)))
     (is (= (get (last (sim (compile-root mod) 3))
                 [:root :o])
-           true))  
+           true))
     (is (= (get (last (sim (compile-root mod) 3))
                 [:root :i])
-           ((uintm 8) 3)))  
+           ((uintm 8) 3)))
     ))
 
 (deftest mux2-connect-test-nested
-  (let [e (enum #{:a :b :c}) 
+  (let [e (enum #{:a :b :c})
         mod (modulize
               :root
               {:o (fnk [o]
@@ -136,44 +136,44 @@
                :o false})]
     (is (= (get (last (sim (compile-root mod) 0))
                 [:root :o])
-           false))  
+           false))
     (is (= (get (last (sim (compile-root mod) 0))
                 [:root :i])
-           ((uintm 8) 3)))  
+           ((uintm 8) 3)))
     (is (= (get (last (sim (compile-root mod) 0))
                 [:root :x])
-           (e :a)))  
+           (e :a)))
     (is (= (get (last (sim (compile-root mod) 1))
                 [:root :o])
            true))
     (is (= (get (last (sim (compile-root mod) 1))
                 [:root :i])
-           ((uintm 8) 2)))  
+           ((uintm 8) 2)))
     (is (= (get (last (sim (compile-root mod) 1))
                 [:root :x])
-           (e :c)))  
+           (e :c)))
     (is (= (get (last (sim (compile-root mod) 2))
                 [:root :o])
-           false))  
+           false))
     (is (= (get (last (sim (compile-root mod) 2))
                 [:root :i])
-           ((uintm 8) 4)))  
+           ((uintm 8) 4)))
     (is (= (get (last (sim (compile-root mod) 2))
                 [:root :x])
-           (e :b)))  
+           (e :b)))
     (is (= (get (last (sim (compile-root mod) 3))
                 [:root :o])
-           true))  
+           true))
     (is (= (get (last (sim (compile-root mod) 3))
                 [:root :i])
-           ((uintm 8) 3)))  
+           ((uintm 8) 3)))
     (is (= (get (last (sim (compile-root mod) 3))
                 [:root :x])
            (e :c)))))
 
 (deftest cond-connect-test
   (let [e (enum #{:small :medium :big})
-        mod (modulize 
+        mod (modulize
               :root
               {:i (fnk [i]
                        (inc i))
@@ -186,10 +186,10 @@
                :i ((uintm 8) 0)})]
     (is (= (get (last (sim (compile-root mod) 10))
                 [:root :size])
-           (e :small)))  
+           (e :small)))
     (is (= (get (last (sim (compile-root mod) 70))
                 [:root :size])
-           (e :small)))  
+           (e :small)))
     (is (= (get (last (sim (compile-root mod) 110))
                 [:root :size])
            (e :medium)))
@@ -208,9 +208,9 @@
              :c ((uintm 8) 44)
              :d ((uintm 8) 0)
              ((uintm 8) 222))]
-    (is (= ((make-sim-fn (f :a))) ((uintm 8) 22)))  
-    (is (= ((make-sim-fn (f :b))) ((uintm 8) 32)))  
-    (is (= ((make-sim-fn (f :c))) ((uintm 8) 44)))  
+    (is (= ((make-sim-fn (f :a))) ((uintm 8) 22)))
+    (is (= ((make-sim-fn (f :b))) ((uintm 8) 32)))
+    (is (= ((make-sim-fn (f :c))) ((uintm 8) 44)))
     (is (= ((make-sim-fn (f :d))) ((uintm 8) 0)))
     (is (thrown? ExceptionInfo
                  (condp = (uninst (e :a))
@@ -218,12 +218,12 @@
                    :e ((uintm 8) 32)
                    :c ((uintm 8) 44)
                    :d ((uintm 8) 0)))
-        "invalid key to enum") 
+        "invalid key to enum")
     (is (thrown? ExceptionInfo
                  (condp = (uninst (e :a))
                    :a ((uintm 8) 22)
                    :b ((uintm 7) 32)
                    :c ((uintm 8) 44)
                    :d ((uintm 8) 0)))
-        "not matching bitwidths") 
+        "not matching bitwidths")
     ))

@@ -1,6 +1,6 @@
 (ns piplin.walk
   (:refer-clojure :exclude [compile cast])
-  (:use [piplin types protocols])) 
+  (:use [piplin types protocols]))
 
 (defn walk
   "Takes an expr, a function to reduce over with a depth
@@ -13,7 +13,7 @@
   of exprs to names and returns the form for the expr and
   its generated name, and it returns a list of all the
   forms in order.
-  
+
   You can provide pre-initialized name-lookup or form list."
   [expr expr->name+body name-table body]
   (letfn [(render-expr [expr name-table body]

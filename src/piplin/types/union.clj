@@ -40,7 +40,7 @@
           v (val (first obj))]
       (when-not (= (count obj) 1)
         (throw+ (error "Union map must have 1 key/value pair, goal type:" type "from:" obj)))
-    (if-let [val-type (get (:schema type) tag)] 
+    (if-let [val-type (get (:schema type) tag)]
         (let [v (cast val-type v)]
           (if (pipinst? v)
             (instance type obj :constrain)
@@ -120,8 +120,8 @@
     (if (pipinst? u)
       (let [v (-> (value u) first)]
           (comment (throw (RuntimeException. (str "invalid union: "
-                                         "expected " k 
-                                         " but got " (key v))))) 
+                                         "expected " k
+                                         " but got " (key v)))))
         (if (= (key v) k)
           (val v)
           (let [vtype (-> (typeof u)
@@ -129,7 +129,7 @@
                                  (get k))]
           (deserialize vtype (cast (-> vtype
                                      bit-width-of
-                                     bits) 0)))) 
+                                     bits) 0))))
           )
       (mkast (get (-> (typeof u) :schema) k)
              :get-value
@@ -141,7 +141,7 @@
   [u]
   (let [e (-> (typeof u) :enum)]
     (if (pipinst? u)
-      (e (-> (value u) first key)) 
+      (e (-> (value u) first key))
       (mkast e :get-tag [u] get-tag))))
 
 
@@ -154,7 +154,7 @@
   where :key is the keyword, binding is the form
   that the value is bound to, and ... is an
   implicit do within a cond-like form.
-  
+
   You can use any destructuring syntax as the
   binding form."
   [u & clauses]
@@ -171,7 +171,7 @@
                                :keys
                                set)
                              (set '~(map first clauses)))
-           (throw+ (error "keys don't match"))) 
+           (throw+ (error "keys don't match")))
          (mux/condp binops/= (get-tag ~u-sym)
            ~@(apply concat (butlast clauses))
            ~(second (last clauses)))))))

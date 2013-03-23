@@ -14,7 +14,7 @@
       (->
         (mkast (typeof v1) :mux2 [sel v1 v2] mux2-impl)
         (assoc-dist-fn
-          #(mux2-impl sel (cast % v1) (cast % v2)))))))  
+          #(mux2-impl sel (cast % v1) (cast % v2)))))))
 
 (defn mux2-helper
   [sel v1-thunk v2-thunk]
@@ -35,7 +35,7 @@
       (->> @v1-connections
         keys
         (map #(connect % (mux2-impl sel
-                                    (clj/get @v1-connections %) 
+                                    (clj/get @v1-connections %)
                                     (clj/get @v2-connections %))))
         dorun)
       :else,
@@ -54,10 +54,10 @@
                      (partition 2)
                      reverse
                      (reduce (fn [prev [p t]]
-                               (fn [] (mux2-helper p t prev))) 
+                               (fn [] (mux2-helper p t prev)))
                              (last thunks)))]
       (if (clj/= last-pred :else)
-        (mux-tree) 
+        (mux-tree)
         (throw+ (error "Must include :else in simulated cond"))))
     (let [thunk (->> thunks
                   (interleave predicates)

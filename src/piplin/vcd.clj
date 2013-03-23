@@ -1,6 +1,6 @@
 (ns piplin.vcd
   (:use [clojure.string :only [join]])
-  (:use [piplin.protocols :only [typeof value]]) 
+  (:use [piplin.protocols :only [typeof value]])
   (:use [clojure.java.shell :only [sh]])
   (:use [clojure.java.io :only [file]])
   (:use [piplin.types.bits :only [bit-width-of serialize]]))
@@ -32,13 +32,13 @@
                (let [bits (value (serialize v))]
                  (str
                    (if (> (count bits) 1)
-                     (str \b 
-                          (join bits) 
+                     (str \b
+                          (join bits)
                           \ )
                      (first bits))
                    (short-map k)
                    "\n")))
-             cycle-map))) 
+             cycle-map)))
 
 (defn trace->vcd
   "Takes a seq of maps of values at each cycle and

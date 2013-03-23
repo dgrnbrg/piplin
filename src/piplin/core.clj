@@ -13,7 +13,7 @@
                      (assoc <> :ns *ns*)
                      (with-meta sym <>))]
         (if (.hasRoot ^clojure.lang.Var var)
-          (intern *ns* sym @var) 
+          (intern *ns* sym @var)
           (intern *ns* sym)))
       (throw+ (str ns-sym \/ sym " does not exist")))))
 
@@ -37,23 +37,23 @@
 ;This is the list of functions we should reexport
 (redefine
   ;Module stuff
-  piplin.modules/defmodule 
-  piplin.modules/module 
-  piplin.modules/make-sim 
-  piplin.modules/get-all-registers 
+  piplin.modules/defmodule
+  piplin.modules/module
+  piplin.modules/make-sim
+  piplin.modules/get-all-registers
   piplin.modules/trace-module
   piplin.modules/input
   piplin.modules/modulize
   piplin.modules/compile-root
 
   ;Sim stuff -- this might be too low level
-  piplin.sim/exec-sim 
-  piplin.sim/trace-keys 
+  piplin.sim/exec-sim
+  piplin.sim/trace-keys
   piplin.modules/sim
 
   ;functions
-  piplin.mux/mux2 
-  piplin.mux/cond 
+  piplin.mux/mux2
+  piplin.mux/cond
   piplin.mux/condp
   piplin.types/kindof
   piplin.types/anontype
@@ -88,20 +88,20 @@
   piplin.types.core-impl/<=
   piplin.types.enum/enum
   piplin.types.uintm/uintm
-  piplin.types.sints/sints 
+  piplin.types.sints/sints
   piplin.types.sints/sign-extend
   piplin.types.sfxpts/sfxpts
   piplin.types.complex/complex
-  piplin.types.complex/real-part 
-  piplin.types.complex/imag-part 
+  piplin.types.complex/real-part
+  piplin.types.complex/imag-part
   piplin.types.union/union
   piplin.types.union/union-match
   piplin.types.union/maybe
   piplin.types.array/array
 
   ;vcd
-  piplin.vcd/spit-trace 
-  piplin.vcd/trace->gtkwave 
+  piplin.vcd/spit-trace
+  piplin.vcd/trace->gtkwave
 
   ;verilog
   piplin.verilog/->verilog

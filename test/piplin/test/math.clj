@@ -53,7 +53,7 @@
   (is (or false true true true))
   (is (or true true true false))
   (is (not (or false false false false)))
-  
+
   (is ((make-sim-fn (or true (uninst false)))))
   (is ((make-sim-fn (or (uninst true) false))))
   (is ((make-sim-fn (or (uninst true) (uninst false)))))
@@ -73,10 +73,10 @@
     (is (thrown? ExceptionInfo (promote (uintm 3) -1)))
     (is (thrown? ExceptionInfo (promote (uintm 3) 100)))
     (is (= (- 0 (um8 1)) (um8 255)))
-    (is ((make-sim-fn (> (uninst (um8 30)) (um8 20)))))  
-    (is ((make-sim-fn (>= (uninst (um8 20)) (um8 20)))))  
-    (is (>= (um8 20) (um8 20)))  
-    (is ((make-sim-fn (<= (uninst (um8 20)) (um8 30)))))  
+    (is ((make-sim-fn (> (uninst (um8 30)) (um8 20)))))
+    (is ((make-sim-fn (>= (uninst (um8 20)) (um8 20)))))
+    (is (>= (um8 20) (um8 20)))
+    (is ((make-sim-fn (<= (uninst (um8 20)) (um8 30)))))
     (is (<= (um8 20) (um8 30)))
     (is (thrown? ExceptionInfo
                  (cast (uintm 8) #b00)))))
@@ -109,10 +109,10 @@
   (is (= (serialize false) (cast (bits 1) 0)))
   (is (= (count (value (serialize
                          (promote (enum #{:a :b}) :a))))
-         1)) 
+         1))
   (is (= (count (value (serialize
                          (promote (enum #{:a :b :c}) :a))))
-         2)))  
+         2)))
 
 (deftest sim-uintm-bits-test
   (let [mod (modulize
@@ -123,8 +123,8 @@
                :d (promote (bits 4) 0)})]
     (are [cycle reg val] (= (get (last (sim (compile-root mod) cycle)) [:root reg])
                             val)
-         10 :c (instance (uintm 8) 10) 
-         10 :d (instance (bits 4) [1 0 0 1]) 
+         10 :c (instance (uintm 8) 10)
+         10 :d (instance (bits 4) [1 0 0 1])
          18 :d (instance (bits 4) [0 0 0 1]))))
 
 (deftest sim-cast-test
@@ -133,16 +133,16 @@
               {:new-c (fnk [c] (inc c))
                :c (fnk [new-c] new-c)
                :odd (fnk [new-c]
-                         (cast (anontype :boolean) 
+                         (cast (anontype :boolean)
                                (bit-slice (serialize new-c) 0 1)))}
               {:odd false
                :c (promote (uintm 3) 0)})]
     (are [cycle k v] (= (get (last (sim (compile-root mod) cycle)) [:root k]) v)
          1 :c (promote (uintm 3) 1)
-         1 :odd true 
-         2 :odd false 
-         3 :odd true 
-         30 :c (instance (uintm 3) 30 :constrain) 
+         1 :odd true
+         2 :odd false
+         3 :odd true
+         30 :c (instance (uintm 3) 30 :constrain)
          30 :odd false)))
 
 (deftest sim-equals-test
@@ -171,14 +171,14 @@
   (is (thrown? ExceptionInfo
                (enum {:a (cast (bits 2) 0)
                       :b (cast (bits 2) 0)})))
-  (is (thrown? ExceptionInfo 
+  (is (thrown? ExceptionInfo
                (enum {:a (cast (bits 2) 0)
                       2 (cast (bits 2) 1)})))
-  (is (thrown? ExceptionInfo 
+  (is (thrown? ExceptionInfo
                (enum {:a (cast (bits 2) 0)
                       :b (cast (bits 3) 1)})))
-  (is (thrown? ExceptionInfo 
+  (is (thrown? ExceptionInfo
                (enum {:a 0
                       :b (cast (bits 2) 1)})))
-  (is (thrown? ExceptionInfo 
+  (is (thrown? ExceptionInfo
                (enum #{:a 1 "a"}))))

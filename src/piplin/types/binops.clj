@@ -118,7 +118,7 @@
     (or (nil? x) (nil? y))
     false
     (not (or (instance? piplin.types.ASTNode x)
-             (instance? piplin.types.ASTNode y)))  
+             (instance? piplin.types.ASTNode y)))
     (clj/= x y)
     (and (pipinst? x) (pipinst? y))
     (let [[x y] (type-unify (kindof x) x y)]

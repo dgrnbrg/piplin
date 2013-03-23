@@ -3,9 +3,9 @@
   (:require [piplin.walk :as walk]
             [plumbing.core :as plumb])
   (:use [slingshot.slingshot])
-  (:use [clojure.walk :only [postwalk]]) 
+  (:use [clojure.walk :only [postwalk]])
   (:use [clojure.set :only [map-invert]])
-  (:use [clojure.string :only [join replace]]) 
+  (:use [clojure.string :only [join replace]])
   (:use [piplin [modules :exclude [verilog]] types])
   (:use [swiss-arrows.core :only [-<>>]])
   (:require [piplin.types.core-impl :as impl])
@@ -54,7 +54,7 @@
   [tag padding value]
   (str "{" tag
        (when (pos? padding)
-         (str ", " padding "'b" 0)) 
+         (str ", " padding "'b" 0))
        ", " value "}"))
 
 (defmulti verilog-repr
@@ -76,14 +76,14 @@
   [x]
   (let [t (typeof x)
         i (value x)
-        w (bit-width-of t)] 
+        w (bit-width-of t)]
     (str w "'d" i)))
 
-(defmethod verilog-repr :sints 
+(defmethod verilog-repr :sints
   [x]
   (let [t (typeof x)
         i (value x)
-        w (bit-width-of t)] 
+        w (bit-width-of t)]
     (str (when (neg? i) "-")
          w "'d"
          (if (neg? i) (- i) i))))
@@ -121,7 +121,7 @@
   [x]
   (let [t (typeof x)
         {:keys [schema enum]} t
-        v (first (value x)) 
+        v (first (value x))
         tag (key v)
         v (val v)
         w (bit-width-of t)
@@ -198,23 +198,23 @@
 
 (defmethod verilog-of :get-value
   [ast name-lookup]
-  (let [valtype (typeof ast) 
+  (let [valtype (typeof ast)
         union (:u (get-args ast))
         top  (dec (bit-width-of valtype))]
     [(str (lookup-expr name-lookup union)
-         "[" top (when-not (zero? top) ":0") "]")])) 
+         "[" top (when-not (zero? top) ":0") "]")]))
 
 (defmethod verilog-of :get-tag
   [ast name-lookup]
-  (let [enum (typeof ast) 
+  (let [enum (typeof ast)
         union (:u (get-args ast))
         top (dec (bit-width-of (typeof union)))
         bottom (inc (- top (bit-width-of enum)))]
     [(str (lookup-expr name-lookup union)
-         "[" top 
+         "[" top
          (when-not (= top bottom)
            (str ":" bottom))
-         "]")])) 
+         "]")]))
 
 (defmethod verilog-of :make-bundle
   [ast name-lookup]
@@ -249,7 +249,7 @@
         w (bit-width-of t)
         [high low] (get offsets k)
         v (lookup-expr name-lookup v)
-        bund (lookup-expr name-lookup bund)] 
+        bund (lookup-expr name-lookup bund)]
     [(str "{"
          (when-not (= (dec w) high)
            (str bund "[" (dec w) ":" (inc high) "], "))
@@ -284,7 +284,7 @@
         index (lookup-expr name-lookup i)]
     [(str
       (lookup-expr name-lookup array)
-      "[" 
+      "["
       (lookup-expr name-lookup i)
       "]")]))
 
@@ -297,7 +297,7 @@
   [ast name-lookup]
   (let [{:keys [array index v]} (get-args ast)
         {:keys [array-len array-type]} (typeof array)
-        upper-bound (dec (* (bit-width-of array-type) (inc index))) 
+        upper-bound (dec (* (bit-width-of array-type) (inc index)))
         lower-bound (* (bit-width-of array-type) index)
         array-sym (lookup-expr name-lookup array)
         arg-sym (lookup-expr name-lookup v)]
@@ -316,7 +316,7 @@
 
 (defmethod verilog-of :bit-cat
   [ast name-lookup]
-  (let-args ast name-lookup [b1 b2] 
+  (let-args ast name-lookup [b1 b2]
     (let [{b1-ast :b1 b2-ast :b2} (get-args ast)
           b1-zero? (zero? (-> b1-ast typeof bit-width-of))
           b2-zero? (zero? (-> b2-ast typeof bit-width-of))]
@@ -389,7 +389,7 @@
              r2 (real-part rhs)
              i2 (imag-part rhs)
              r' (impl/+ r1 r2)
-             i' (impl/+ i1 i2) 
+             i' (impl/+ i1 i2)
              r'-bits (serialize r')
              i'-bits (serialize i')
              result (bit-cat r'-bits i'-bits)
@@ -407,7 +407,7 @@
             lhs-sints (->> (serialize lhs)
                         (deserialize (sints width)))
             rhs-sints (->> (serialize rhs)
-                        (deserialize (sints width)))] 
+                        (deserialize (sints width)))]
         (verilog-of (impl/+ lhs-sints
                             rhs-sints)
                     (assoc name-lookup
@@ -417,7 +417,7 @@
       :sints
       (let [type (typeof ast)
             width (bit-width-of type)
-           
+
             lhs-tmp-name (gen-verilog-name "lhs")
             lhs-tmp (format-verilog width lhs-tmp-name lhs)
             rhs-tmp-name (gen-verilog-name "rhs")
@@ -470,11 +470,11 @@
                         (deserialize rhs-extended-type)
                         (impl/+ (sign-extend
                                   (inc rhs-width)
-                                  lhs-ast))) 
+                                  lhs-ast)))
              difference (-<>> raw-diff
-                              serialize 
-                              (bit-slice <> 0 rhs-width) 
-                              (deserialize rhs-type)) 
+                              serialize
+                              (bit-slice <> 0 rhs-width)
+                              (deserialize rhs-type))
              msb0 (-> raw-diff
                     serialize
                     (bit-slice rhs-width (inc rhs-width)))
@@ -495,10 +495,10 @@
                         min-val)
                       difference)
              [name-lookup' body] (walk/compile
-                                   result 
+                                   result
                                    render-single-expr
                                    name-lookup [])]
-        [(name-lookup' result) 
+        [(name-lookup' result)
          (vec body)])
       :sfxpts
       (let [{:as type
@@ -508,12 +508,12 @@
             lhs-sints (->> (serialize lhs)
                         (deserialize (sints width)))
             rhs-sints (->> (serialize rhs)
-                        (deserialize (sints width)))] 
+                        (deserialize (sints width)))]
         (verilog-of (impl/- lhs-sints
                             rhs-sints)
                     (assoc name-lookup
                            lhs-sints (name-lookup lhs)
-                           rhs-sints (name-lookup rhs)))) 
+                           rhs-sints (name-lookup rhs))))
       )))
 
 (defmethod verilog-of :*
@@ -533,7 +533,7 @@
              rhs-sints (->> (serialize rhs)
                          (deserialize (sints width))
                          (sign-extend (+ f width)))
-             sints-* (impl/* lhs-sints rhs-sints) 
+             sints-* (impl/* lhs-sints rhs-sints)
              [name-lookup' body] (walk/compile
                                    sints-*
                                    render-single-expr
@@ -580,17 +580,17 @@
                    width
                    prod-sym
                    "%s * %s"
-                   lhs-tmp-name rhs-tmp-name) 
+                   lhs-tmp-name rhs-tmp-name)
 
-            lhs-pos?-sym (gen-verilog-name "lhs_pos") 
-            rhs-pos?-sym (gen-verilog-name "rhs_pos") 
+            lhs-pos?-sym (gen-verilog-name "lhs_pos")
+            rhs-pos?-sym (gen-verilog-name "rhs_pos")
             lhs-pos? (format-verilog 1 lhs-pos?-sym "~%s[%d]" lhs-tmp-name (dec width))
             rhs-pos? (format-verilog 1 rhs-pos?-sym "~%s[%d]" rhs-tmp-name (dec width))
 
             lhs-leading-0s-sym (gen-verilog-name "lhs_leading_zeros")
             lhs-leading-0s-clauses (->> (range (dec width))
                                      (map #(format "~|%s[%d:%d] ? %d :"
-                                                   lhs-tmp-name 
+                                                   lhs-tmp-name
                                                    (dec width) %
                                                    (- width %)))
                                      (join " ")
@@ -601,7 +601,7 @@
             rhs-leading-0s-sym (gen-verilog-name "rhs_leading_zeros")
             rhs-leading-0s-clauses (->> (range (dec width))
                                      (map #(format "~|%s[%d:%d] ? %d :"
-                                                   rhs-tmp-name 
+                                                   rhs-tmp-name
                                                    (dec width) %
                                                    (- width %)))
                                      (join " ")
@@ -613,7 +613,7 @@
             lhs-leading-1s-sym (gen-verilog-name "lhs_leading_ones")
             lhs-leading-1s-clauses (->> (range (dec width))
                                      (map #(format "&%s[%d:%d] ? %d :"
-                                                   lhs-tmp-name 
+                                                   lhs-tmp-name
                                                    (dec width) %
                                                    (- width %)))
                                      (join " ")
@@ -624,12 +624,12 @@
             rhs-leading-1s-sym (gen-verilog-name "rhs_leading_ones")
             rhs-leading-1s-clauses (->> (range (dec width))
                                      (map #(format "&%s[%d:%d] ? %d :"
-                                                   rhs-tmp-name 
+                                                   rhs-tmp-name
                                                    (dec width) %
                                                    (- width %)))
                                      (join " ")
                                      (format "%s 1"))
-            rhs-leading-1s (format-verilog 
+            rhs-leading-1s (format-verilog
                              (log2 width) rhs-leading-1s-sym
                              rhs-leading-1s-clauses)
 
@@ -824,7 +824,7 @@
    (let [[name-table body]
          (walk/compile expr render-single-expr
                        name-table [])]
-     [name-table (str text (join body))]))) 
+     [name-table (str text (join body))])))
 
 (defn assert-hierarchical
   [indent dut-name var val cycle]
@@ -837,10 +837,10 @@
 
 (defn assert-hierarchical-cycle
   "indent is prepended as indentation (usually whitespace).
-  
+
   dut-name is the name of the dut module; registers will
   be asserted hierarchically rooted at the dut.
-  
+
   cycle-map is a map from vectors of keywords representing
   the hierarchical path to a register (excluding the dut's name)
   to the values."
@@ -897,16 +897,16 @@
         (->> compiled-module
                (map (comp :piplin.modules/fn second))
                (reduce (fn [[name-table text] expr]
-                         (verilog expr name-table text)) 
+                         (verilog expr name-table text))
                        [(merge port-names
                                input-names) ""]))
-        reg-assigns 
+        reg-assigns
         (join (map
                 (comp (fn [[n v]]
                         (format "    %s <= %s;\n" n v))
                       (juxt (comp port-names :piplin.modules/port)
                             (comp name-table :piplin.modules/fn))
-                      second) 
+                      second)
           module-regs))
         input-decls (join
                       (for [[port name] input-names
@@ -968,7 +968,7 @@
     )
   )
 
-(defn verify 
+(defn verify
   [module cycles]
   (let [compiled (compile-root module)
         flattened-string-keys (map (comp
@@ -982,7 +982,7 @@
         output-renames (zipmap (keys compiled)
                                (map plain-path->gensym-path
                                     flattened-string-keys))
-        samples (sim compiled cycles) 
+        samples (sim compiled cycles)
         dut-name "dut"]
     (str
       (->verilog compiled output-renames)
@@ -1005,7 +1005,7 @@
       "\n"
       "  piplin_module " dut-name "(\n"
       "    .clock(clk),\n"
-      (join ",\n" 
+      (join ",\n"
               (map #(str "    ." % \( (gensym-path->plain-path %) \))
                    (vals output-renames)))
       "\n  );\n"
@@ -1014,7 +1014,7 @@
       ;"    $dumpfile(\"dump.vcd\");\n"
       "    $dumpvars;\n"
       (->> samples
-        
+
         (map #(assert-hierarchical-cycle "    "
                                          dut-name
                                          %2 %1)

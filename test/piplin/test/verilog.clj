@@ -59,15 +59,15 @@
 
 (deftest seven-seg-test
   (icarus-test (verify
-                 (seven-seg-tester 1) 10)) 
+                 (seven-seg-tester 1) 10))
   (icarus-test (verify
-                 (seven-seg-tester 2) 10)) 
+                 (seven-seg-tester 2) 10))
   (icarus-test (verify
-                 (seven-seg-tester 3) 10)) 
+                 (seven-seg-tester 3) 10))
   (icarus-test (verify
-                 (seven-seg-tester 4) 30)) 
+                 (seven-seg-tester 4) 30))
   (icarus-test (verify
-                 (seven-seg-tester 8) 300)) 
+                 (seven-seg-tester 8) 300))
   (icarus-test (verify
                  (seven-seg-tester 9) 600))
   (icarus-test (verify

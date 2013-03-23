@@ -27,11 +27,11 @@
         vblankon (and hreset
                       (= vcount 767))
         vsyncon (and hreset
-                     (= vcount 776)) 
+                     (= vcount 776))
         vsyncoff (and hreset
-                      (= vcount 782)) 
+                      (= vcount 782))
         vreset (and hreset
-                    (= vcount 805)) 
+                    (= vcount 805))
 
         ;Sync and blanking
         hblank' (cond
@@ -57,7 +57,7 @@
     (connect vblank vblank')
     (connect vsync (cond
                      vsyncon false
-                     vsyncoff true 
+                     vsyncoff true
                      :else vsync))
 
     (connect blank (or vblank'

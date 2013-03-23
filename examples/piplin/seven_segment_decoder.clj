@@ -3,7 +3,7 @@
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast not and or bit-shift-left bit-shift-right])
   (:use plumbing.core
-        [piplin core 
+        [piplin core
          [protocols :only [typeof]]]))
 
 (defn log16
@@ -22,7 +22,7 @@
   :upper-right, :lower-left, :lower-right, :middle}`
   to indices into the 7 bit output. This allows
   whatever encoding scheme is needed on the output.
-  
+
   E.x. for
      _______
     |   0   |
@@ -81,47 +81,47 @@
 
 (def decoder-mapping
   {#b0000 #{:top :upper-left :lower-left
-            :upper-right :lower-right :bottom} 
+            :upper-right :lower-right :bottom}
 
-   #b0001 #{:upper-right :lower-right} 
+   #b0001 #{:upper-right :lower-right}
 
    #b0010 #{:top :upper-right :middle
-            :lower-left :bottom} 
+            :lower-left :bottom}
 
    #b0011 #{:top :middle :bottom
-            :upper-right :lower-right} 
+            :upper-right :lower-right}
 
    #b0100 #{:upper-left :upper-right
-            :middle :lower-right} 
+            :middle :lower-right}
 
    #b0101 #{:top :upper-left :middle
-            :lower-right :bottom} 
+            :lower-right :bottom}
 
    #b0110 #{:top :upper-left :middle
-            :lower-left :lower-right :bottom} 
+            :lower-left :lower-right :bottom}
 
-   #b0111 #{:top :upper-right :lower-right} 
+   #b0111 #{:top :upper-right :lower-right}
 
    #b1000 #{:top :upper-left :lower-left :middle
-            :upper-right :lower-right :bottom} 
+            :upper-right :lower-right :bottom}
 
    #b1001 #{:top :upper-left :middle
-            :upper-right :lower-right} 
+            :upper-right :lower-right}
 
    #b1010 #{:top :upper-left :middle :lower-left
-            :upper-right :lower-right} 
+            :upper-right :lower-right}
 
    #b1011 #{:upper-left :lower-left :middle
-            :lower-right :bottom} 
+            :lower-right :bottom}
 
    #b1100 #{:upper-left :lower-left
-            :top :bottom} 
+            :top :bottom}
 
    #b1101 #{:upper-right :lower-left :middle
-            :lower-right :bottom} 
+            :lower-right :bottom}
 
    #b1110 #{:upper-left :lower-left
-            :middle :top :bottom} 
+            :middle :top :bottom}
 
    #b1111 #{:upper-left :lower-left
             :middle :top}})

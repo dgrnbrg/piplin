@@ -68,7 +68,7 @@
       (throw+ (error "sints requires an integer, got" v)))
     (when (> v max)
       (throw+ (error "sints" n "is too big:" v)))
-    (when (< v min) 
+    (when (< v min)
       (throw+ (error "sints" n "is too small:" v)))
     inst))
 
@@ -128,12 +128,12 @@
 (defcoercions piplin.types.binops/= :sints [:j-integral])
 
 (defmethod bit-width-of
-  :sints 
+  :sints
   [type]
   (:n type))
 
 (defmethod get-bits
-  :sints 
+  :sints
   [expr]
   (let [n (bit-width-of (typeof expr))]
       (long-to-bitvec (value expr) n)))

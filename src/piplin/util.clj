@@ -18,7 +18,7 @@
           (fn [[name form]]
             (let [tmp-name (gensym)
                   meta-form `(if (and
-                                   (instance? clojure.lang.IObj ~tmp-name) 
+                                   (instance? clojure.lang.IObj ~tmp-name)
                                    (instance? clojure.lang.IMeta ~tmp-name))
                                (vary-meta ~tmp-name assoc :let-name '~name)
                                ~tmp-name)]

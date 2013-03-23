@@ -36,7 +36,7 @@
 
 (defmethod piplin.types/count-multi
   :bundle
-  [bundle] 
+  [bundle]
   (count (:schema (typeof bundle))))
 
 (defpiplintype Bundle [schema])
@@ -69,12 +69,12 @@
                        "or aren't part of the schema:" bad)))
       (let [casted-obj (into {}
                              (map (fn [[k v]]
-                                    [k (cast v (get obj k))]) 
-                                   schema))] 
+                                    [k (cast v (get obj k))])
+                                   schema))]
         (if (every? pipinst? (vals obj))
-          (instance type casted-obj :constrain) 
+          (instance type casted-obj :constrain)
           (mkast-explicit-keys type :make-bundle
-                               (keys obj) casted-obj 
+                               (keys obj) casted-obj
                                (fn [& args]
                                  (promote type
                                           (zipmap (keys obj)
@@ -85,7 +85,7 @@
 (defmethod bit-width-of
   :bundle
   [type]
-  (->> type 
+  (->> type
     :schema
     vals
     (map bit-width-of)
@@ -117,14 +117,14 @@
 
 (defmethod constrain
   :bundle
-  [type val] 
+  [type val]
   (let [schema (:schema type)]
     (->> val
       (mapcat (fn [[k v]]
                 [k (instance (k schema) (value v) :constrain)]))
       (apply hash-map))))
 
-(defmethod check 
+(defmethod check
   :bundle
   [inst]
   (let [schema (:schema (typeof inst))
@@ -140,6 +140,6 @@
     (when-not (every? identity correct)
       (throw+ (error (value inst)
                      "doesn't match schema"
-                     schema)))) 
+                     schema))))
   inst)
 

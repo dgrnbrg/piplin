@@ -19,7 +19,7 @@
       (throw+ (error "Must be :register or :subport or the whole thing must be an array location (not displayed yet TODO), was"
                      port-type)))
     {:type (or port-type :register)
-     :args {:reg reg 
+     :args {:reg reg
             :expr (cast (typeof reg) expr)}}))
 
 (comment
@@ -36,7 +36,7 @@
    [name args]
    (let [x (let [k (apply vector name args)]
              (if-let [id (get @module-name-cache k)]
-               id 
+               id
                (let [id (str name "__" (join "_" args))]
                  (swap! module-name-cache assoc k id)
                  id)))]
@@ -79,19 +79,19 @@
                                   ^java.lang.StackTraceElement (aget 2)
                                   .getLineNumber
                                   ))))
-        
+
         ;parses keyword arguments, defaulting them to {}
         {:keys [inputs outputs feedback modules connections]}
         (->> (apply hash-map args)
           (merge-with #(or %2 %1)
                       {:inputs {} :outputs {} :feedbock {}
-                       :modules {} :connections []})) 
-        
+                       :modules {} :connections []}))
+
         ;We define port objects for each input and state
         ;element. These are given to the functions to make
         ;the deferred ASTs that will be used in
         ;simulation/synthesis.
-       
+
         ;Start by merging outputs and feedback and making
         ;their ports
         register-ports (->> (concat outputs feedback)
@@ -102,11 +102,11 @@
                 (map #(apply make-port* %)))
 
         ;Then, we make the input ports
-        input-ports 
+        input-ports
                 (map #(make-port* (key %) (val %) :input) inputs)
 
         ;Next we'll make the final list of ports.
-        ports (concat input-ports register-ports) 
+        ports (concat input-ports register-ports)
 
         ;TODO: reject duplicated keywords between inputs and
         ;outputs/feedback
@@ -155,12 +155,12 @@
         sym->type (concat reg-types
                           (map (fn [[k v]] [k v :input])
                                (partition 2 inputs)))
-        
+
         ;Now we can create the port declarations
         port-decls (mapcat (fn [[k v t]]
                           `(~k (make-port* ~(keyword k) ~v ~t)))
                         sym->type)
-        
+
         ;Finally, we need to make the arguments compatible with
         ;module*. To do this, we must keywordize all the symbol
         ;names, and put them into maps
@@ -168,9 +168,9 @@
                      (into {} (map (fn [[k v]]
                                      [(keyword k) v])
                                    (partition 2 macro-format))))
-        inputs (keywordize inputs)  
-        outputs (keywordize outputs)  
-        feedback (keywordize feedback)  
+        inputs (keywordize inputs)
+        outputs (keywordize outputs)
+        feedback (keywordize feedback)
         modules (keywordize modules)
         module-decls (mapcat (fn [[k v]]
                             [(symbol (name k)) v]) modules)
@@ -180,7 +180,7 @@
         module-names (map (comp #(str % \$) name) (keys modules))
         symbols (->> (flatten body)
                   (filter (fn [node]
-                            (symbol? node))) 
+                            (symbol? node)))
                   (mapcat (fn [node]
                             (let [name (name node)]
                               (when (some #(.startsWith name %1) module-names)
@@ -199,8 +199,8 @@
            ~@symbols]
        (module* ~@(cond
                     (symbol? module-name) `('~module-name)
-                    (not (nil? module-name)) `(~module-name)  
-                    :else nil) 
+                    (not (nil? module-name)) `(~module-name)
+                    :else nil)
                 :inputs ~inputs
                 :outputs ~outputs
                 :feedback ~feedback
@@ -236,7 +236,7 @@
     (if (seq (:modules ast))
       (reduce combine x
               (map (fn [[name mod]]
-                     (let [[input-fns input-ports] 
+                     (let [[input-fns input-ports]
                             (input-map name)]
                        (binding [*module-path* (conj *module-path* name)
                                  *input-fns* input-fns
@@ -252,7 +252,7 @@
   for every connection in every module"
   [ast visit combine]
   (walk-modules
-   ast 
+   ast
     (fn [ast]
       (doall ;note: force eagerness here for *module-path* correctness
         (map visit
@@ -267,7 +267,7 @@
   for every connection in every module"
   [ast visit combine]
   (walk-modules
-   ast 
+   ast
     (fn [ast]
       (doall ;note: force eagerness here for *module-path* correctness
         (map visit
@@ -319,7 +319,7 @@
   As the function is built, all termini will be const or
   ports. The ports' access fn will read the value from
   the binding.
-  
+
   This is done by make-connection and make-sim-fn.)
 
 (def ^:dynamic *sim-state*)
@@ -335,8 +335,8 @@
   [expr]
   (let [[my-sim-fn my-args]
         (if (pipinst? expr)
-          [#(identity expr) []] 
-          (-> expr 
+          [#(identity expr) []]
+          (-> expr
             meta
             :sim-factory))]
     (let [args (:args (value expr))
@@ -344,8 +344,8 @@
           arg-map (zipmap (keys args)
                           arg-fns)
           fn-vec (map #(get arg-map %) my-args)]
-      (if (= (:op (value expr)) 
-             :port) 
+      (if (= (:op (value expr))
+             :port)
         (condp = (:port-type (value expr))
           :register
           (let [path (conj *module-path* (:port (value expr)))]
@@ -353,7 +353,7 @@
               ;(println "Getting" (:port (value expr)))
               ;(println "state is" *sim-state*)
               (get *sim-state* (:port (value expr)))))
-          :input 
+          :input
           (let [f (get *input-fns* (:port (value expr)))]
             f)
           :subport
@@ -367,10 +367,10 @@
   "Takes an expression and returns a list
   of the needed state elements to compute the expression."
   [expr]
-  (walk-expr expr 
+  (walk-expr expr
              #(when-let [port (:port (value %))]
                 (condp = (:port-type (value %))
-                  :register 
+                  :register
                   [(conj *module-path* port)]
                   :subport
                   [(conj *module-path* (:module %) port)]
@@ -398,7 +398,7 @@
       (apply merge-with
              (fn [[x deps1] [y deps2]]
                [(merge-with
-                  #(throw+ (error "duplicate connection" %1 %2)) 
+                  #(throw+ (error "duplicate connection" %1 %2))
                   x y) (concat deps1 deps2)])))))
 
 (defn make-connection
@@ -414,7 +414,7 @@
         index-fn (when index-expr (make-sim-fn index-expr))
         reg (if-not index-expr reg
               (-> reg value :args :array))
-        reg-state (conj *module-path* (:port (value reg))) 
+        reg-state (conj *module-path* (:port (value reg)))
         ports (get-required-state expr)
         ports (concat ports *input-fn-ports*)]
     (every-cycle
@@ -454,12 +454,12 @@
   [root-module]
   (walk-registers root-module
                  #(identity
-                    (conj *module-path* 
+                    (conj *module-path*
                           (let [reg (value (get-in % [:args :reg]))]
                             (-> (if (= (:op reg) :array-get)
                                   (get-in reg [:args :array])
                                   reg)
-                              value 
+                              value
                               :port))))
                  concat))
 
@@ -517,7 +517,7 @@
   ([computation state]
    (assert (map? computation)
            "You forgot to include the register map")
-   (modulize 
+   (modulize
      (-<> (RuntimeException.)
           .getStackTrace
           ^java.lang.StackTraceElement (aget 2)
@@ -606,7 +606,7 @@
                     (remove (comp #(contains? % ::init) second))
                     (map first))
         wire-fns (plumb/map-vals (comp make-sim-fn ::fn)
-                                 (select-keys compiled-module wire-keys)) 
+                                 (select-keys compiled-module wire-keys))
         reg-fns (plumb/map-vals (comp make-sim-fn ::fn)
                                 (select-keys compiled-module reg-keys))
         reg-inits (plumb/map-vals ::init compiled-module)

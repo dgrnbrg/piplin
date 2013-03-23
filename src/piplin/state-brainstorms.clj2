@@ -35,7 +35,7 @@
   i.e. it produces a result no faster than the longest pipline in it.
 
   Many primitives are only valid when their inputs are valid. How do
-  we communicate validity? With 
+  we communicate validity? With
 
   Suppose not: does it become hard to reason about how the data flows?
   Needs a priority encoder/round robin primitive--when 2 things could
@@ -92,7 +92,7 @@
             intpipe (mkintmath op
                                (guarded-with intmath-op
                                              data))
-            ;the expr (valid? [guard]) is 
+            ;the expr (valid? [guard]) is
             cordicpipe (mkcordic op
                                  (guarded-with cordic-op
                                                data))]

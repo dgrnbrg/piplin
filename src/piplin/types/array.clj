@@ -26,7 +26,7 @@
           s (value obj)]
       (if-not (= alen (:array-len type))
         (throw+ (error (str "Array is not of length"
-                            (:array-len type) 
+                            (:array-len type)
                             "=>" obj)))
         (instance type (into {}
                              (map (fn [[k v]]
@@ -44,7 +44,7 @@
         (let [casted-obj (zipmap (->> (range array-len)
                                    (map (comp keyword str)))
                                  (map (partial cast array-type)
-                                      s))] 
+                                      s))]
           (if (every? pipinst? (vals casted-obj))
             (instance type casted-obj :constrain)
             (mkast-explicit-keys type :make-array
@@ -83,7 +83,7 @@
   :array
   [type bs]
   (let [{array-type :array-type array-len :array-len} type
-        objs (partition (bit-width-of array-type) bs)] 
+        objs (partition (bit-width-of array-type) bs)]
     (mapv (partial from-bits array-type) objs)))
 
 (defmethod piplin.types/nth-multi
@@ -104,7 +104,7 @@
               (pipinst? array))
        (get (value array) (-> i value str keyword) notfound)
        (mkast (:array-type (typeof array))
-              :array-get 
+              :array-get
               [array i]
               piplin.types/valAt-multi)))))
 
@@ -114,7 +114,7 @@
    (let [alen (:array-len (typeof array))]
      (when (>= i alen)
        (throw+ (str "Array is only " alen
-                    "long; tried to access index " i))) 
+                    "long; tried to access index " i)))
      (get array i))))
 
 (defmethod piplin.types/assoc-multi

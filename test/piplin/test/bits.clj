@@ -3,7 +3,7 @@
   (:use [piplin.types bundle bits boolean core-impl binops uintm])
   (:use [plumbing.core :only [fnk]])
   (:use [piplin types mux modules sim connect protocols verilog])
-  (:import clojure.lang.ExceptionInfo) 
+  (:import clojure.lang.ExceptionInfo)
   (:use clojure.test
         piplin.test.util))
 
