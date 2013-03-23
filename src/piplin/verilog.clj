@@ -817,7 +817,6 @@
        (conj (vec structural)
              (format-verilog bit-width name body))])))
 
-;todo this can take a long time
 (defn verilog
   ([expr name-table]
    (verilog expr name-table ""))
@@ -826,82 +825,6 @@
          (walk/compile expr render-single-expr
                        name-table [])]
      [name-table (str text (join body))]))) 
-
-(defn module-decl
-  "Declares a module, using a map from strings
-  to strings to populate the connections."
-  [decl-name module connections]
-  (str "  " (sanitize-str (name (:token module))) " " decl-name "(\n"
-       "    .clock(clock), .reset(reset)" (when (seq connections) \,)
-       "\n"
-       (join ",\n"
-         (map (partial str "    ")
-                  (map (fn [[port conn]]
-                         (str \. port \( conn \)))
-                       connections)))
-       "\n"
-       "  );\n"))
-
-(defn init-name-table [module-inst]
-  (let [module-ports (->> module-inst
-                       :ports
-                       (reduce (fn [accum port]
-                                 (let [{port-kw :port} (value port)]
-                                   (assoc accum port (sanitize-str port-kw))))
-                               {}))
-        ;We must find all the submodule port
-        ;references to add to the name-table
-        module-exprs (walk-connects module-inst
-                                    #(get-in % [:args :expr])
-                                    concat)
-        module-array-exprs (walk-connects module-inst
-                                    (fn [connection]
-                                      (if (= (-> connection
-                                               :args
-                                               :reg
-                                               value
-                                               :op) 
-                                             :array-get)
-                                        (-> connection
-                                           :args
-                                           :reg
-                                           value
-                                           :args
-                                           :i)
-                                        nil))
-                                    concat)
-        subports (mapcat (fn [expr]
-                        (walk-expr expr
-                          (fn [expr]
-                              (if (= (:port-type (value expr))
-                                    :subport)
-                               [expr] nil))
-                          concat)) (concat module-exprs module-array-exprs))
-        subports-map (->> (set subports)
-                       (mapcat (fn [{:keys [module port] :as subport}]
-                                 [subport (str (sanitize-str module)
-                                               \_
-                                               (sanitize-str port))]))
-                       (apply hash-map))]
-    (merge subports-map module-ports)))
-
-(defn regs-for-inputs
-  [module]
-  [(map #(let [w (-> % val bit-width-of)]
-           (str "reg "
-                (array-width-decl w)
-                " "
-                (-> % key name)
-                " = " w "'b" (join (repeat w \z)) ";\n"))
-        (:inputs module))
-   (map #(let [n (-> % key name)] (str \. n \( n \)))
-        (:inputs module))])
-
-(defn wire-for-regs
-  [module]
-  [[]
-   (map #(str \. (-> % key sanitize-str) "()")
-        (mapcat #(get module %) [:outputs]))]) ;TODO: should this include :feedback?
 
 (defn assert-hierarchical
   [indent dut-name var val cycle]
