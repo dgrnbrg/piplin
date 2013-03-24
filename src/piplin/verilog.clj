@@ -867,6 +867,48 @@
           ""
           cycle-map))
 
+(defn register-declarations
+  "This takes a map from register port objects to verilog names,
+  and a seq of register configurations (i.e. maps containing the keys
+  `:piplin.modules/port` and `:piplin.modules/init`) and returns a
+  string which is a block of `reg [3:0] foo = 4'd7;`-style verilog
+  register declarations."
+  [port-names module-regs]
+  (join (map
+          ;The anonymous fn groups the initial value and port object
+          (fn [{init :piplin.modules/init
+                port :piplin.modules/port}]
+            ;declare a register of proper bit width, name,
+            ;and default value
+            (format
+              "  reg %s %s = %s;\n"
+              (-> init
+                typeof
+                bit-width-of
+                array-width-decl)
+              ;looks up gensym name
+              (port-names port)
+              ;must be using an immediate by contract
+              (verilog-repr init)))
+          module-regs)))
+
+(defn register-assignments
+  "This takes a name-table and a seq of register configurations
+  (i.e. maps containing the keys `:piplin.modules/port` and
+  `:piplin.modules/fn`) and returns a strin which is a block of
+  `  foo <= my_value48529`\n`-style verilog register assignments."
+  [name-table module-regs]
+  (join (map
+          ;each module-regs entry gets the following:
+          ; - convert the register conf to the pair of port+fn
+          ; - take that pair and lookup their true names in verilog
+          ; - make proper decl
+          (comp (fn [[n v]]
+                  (format "    %s <= %s;\n" n v))
+                (juxt (comp name-table :piplin.modules/port)
+                      (comp name-table :piplin.modules/fn)))
+          module-regs)))
+
 (defn ->verilog
   [compiled-module outputs]
   (let [;seq of all the input ports used in the module
@@ -881,29 +923,12 @@
                                    port name)
         ;list of k/v pairs which is the subset of the compiled module that
         ;has the logic to assign to each register
-        module-regs (filter (comp :piplin.modules/port value second)
-                        compiled-module)
+        module-regs (->> compiled-module
+                      (filter (comp :piplin.modules/port value second))
+                      (map second))
         ;string containing the register decls
-        regs-inits
-        (join (map
-                ;The anonymous fn groups the initial value and port object
-                (comp #(let [{init :piplin.modules/init
-                              port :piplin.modules/port} %]
-                         ;declare a register of proper bit width, name,
-                         ;and default value
-                         (format
-                           "  reg %s %s = %s;\n"
-                           (-> init
-                             typeof
-                             bit-width-of
-                             array-width-decl)
-                           ;looks up gensym name
-                           (port-names port)
-                           ;must be using an immediate by contract
-                           (verilog-repr init)
-                           ))
-                      second)
-                module-regs))
+        regs-inits (register-declarations port-names module-regs)
+        
         ;Compile the main logic
         [name-table code]
         (->> compiled-module
@@ -914,19 +939,8 @@
                   [(merge port-names
                           input-names) ""]))
         ;string containing the register assigns
-        reg-assigns
-        (join (map
-                ;each module-regs entry gets the following:
-                ; - first grab the val
-                ; - next convert to the pair of port+fn
-                ; - take that pair and lookup their true names in verilog
-                ; - make proper decl
-                (comp (fn [[n v]]
-                        (format "    %s <= %s;\n" n v))
-                      (juxt (comp port-names :piplin.modules/port)
-                            (comp name-table :piplin.modules/fn))
-                      second)
-          module-regs))
+        reg-assigns (register-assignments name-table module-regs)
+        
         ;string containing the input wire decls
         input-decls (join
                       (for [[port name] input-names
