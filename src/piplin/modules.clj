@@ -574,6 +574,90 @@
          ;in this map
          (merge result register-ports))))))
 
+;;How to make arbitrary modules
+;;- need a fn that takes some requested state and updates
+;;  the internal state.
+;;- need a fn that returns some other requested state
+;;- need a fn that marks a cycle happened, so that registers
+;;  can activate
+;;
+;;For memory, we need to model read ports, write ports,
+;;and the clock. Our model of simulation is that a clock
+;;happens, then all the signals are propagated down the
+;;wires. The clock function should take the state of the
+;;world, so that the memory can look up the values it needs
+;;to know the status of the write port. The memory module
+;;constructor needs to create wires for these inputs, so that
+;;no additional computation is done by the memory itself.
+;;When the clock function is called, it will update the
+;;memory's internal state and return a value representing it.
+;;
+;;This model does not support combinational feedback paths
+;;since those require delta cycles.
+(defn make-memory
+  "Declares a single write port memory initialized to `init`."
+  [init write-enable index value]
+  (let [current-module (conj *current-module*
+                             (keyword
+                               (name
+                                 (gensym
+                                   "memory"))))
+        write-enable-path (conj current-module :we)
+        index-path (conj current-module :index)
+        value-path (conj current-module :value)
+        array-path (conj current-module :memory)
+        array-port (make-port* array-path (typeof init) :register)]
+    (swap! *state-elements*
+           assoc
+           write-enable-path
+           {::fn write-enable}
+           index-path
+           {::fn index}
+           value-path
+           {::fn value})
+    (let [init-fn (fn []
+                    (let [internal-state (atom init)]
+                      {:accessors
+                       {array-path (fn [] @internal-state)}
+                       :clock
+                       (fn clock-fn [state]
+                         (let [{we write-enable-path
+                                index index-path
+                                value value-path}
+                               state]
+                           (when we
+                             (swap! internal-state
+                                    assoc
+                                    index
+                                    value))))}))
+          verilog-fn
+          (fn []
+            (let [memory-name (piplin.verilog/gen-verilog-name "memory")
+                  {:keys [array-type array-len]} (typeof init)]
+              {:preamble
+               (format "  reg %s %s %s;\n"
+                       (piplin.verilog/array-width-decl
+                         (piplin.types.bits/bit-width-of
+                           array-type))
+                       memory-name
+                       (piplin.verilog/array-width-decl
+                         (log2 array-len)))
+               :name-table
+               {array-port memory-name}
+               :side-effect
+               (fn [name-table]
+                 (format "    if (%s) %s[%s] <= %s;\n"
+                         (name-table write-enable)
+                         memory-name
+                         (name-table index)
+                         (name-table value)))}))]
+      (swap! *state-elements*
+             assoc
+             current-module
+             {::special-init init-fn
+              ::verilog verilog-fn})
+      {:value array-port})))
+
 (defn compile-root
   [module & inputs]
   (assert (::module (meta module)) "Must pass a module as first argument")

@@ -928,6 +928,20 @@
                       (map second))
         ;string containing the register decls
         regs-inits (register-declarations port-names module-regs)
+
+        ;special modules maps
+        special-modules (->> compiled-module
+                          (map second)
+                          (filter :piplin.modules/verilog)
+                          (map #((:piplin.modules/verilog %))))
+        ;name table ports for special modules
+        special-name-table (->> special-modules
+                             (mapcat :name-table)
+                             (into {}))
+        ;structural code for special modules
+        special-decls (->> special-modules
+                        (map :preamble)
+                        (join))
         
         ;Compile the main logic
         [name-table code]
@@ -937,10 +951,16 @@
           (reduce (fn [[name-table text] expr]
                     (verilog expr name-table text))
                   [(merge port-names
-                          input-names) ""]))
+                          input-names
+                          special-name-table) ""]))
         ;string containing the register assigns
         reg-assigns (register-assignments name-table module-regs)
         
+        ;assignment code for special modules
+        special-assigns (->> special-modules
+                          (map #((:side-effect %) name-table))
+                          (join))
+
         ;string containing the input wire decls
         input-decls (join
                       (for [[port name] input-names
@@ -991,6 +1011,7 @@
          "  //Input and output declarations\n"
          input-decls
          output-decls
+         special-decls
          "\n  //Registers\n"
          regs-inits
          "\n  //Main code\n"
@@ -1000,6 +1021,7 @@
          "\n"
          "  always @(posedge clock) begin\n"
          reg-assigns
+         special-assigns
          "  end\n"
          "endmodule\n"
          )))
