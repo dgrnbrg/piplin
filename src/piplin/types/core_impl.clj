@@ -7,7 +7,7 @@
   There are also several macros useful for making unary and binary functions
   that delegate to clojure.core implementations, which is useful for
   adding support for currently unsupported operations."
-  (:refer-clojure :exclude [= not= bit-and bit-or bit-xor bit-not + - * inc dec > >= < <= cast and or bit-shift-left bit-shift-right])
+  (:refer-clojure :exclude [= not= bit-and bit-or bit-xor bit-not + - * inc dec > >= < <= cast and or bit-shift-left bit-shift-right pos? neg? zero?])
   (:require [piplin.types])
   (:require [piplin.types.numbers])
   (:require [clojure.core :as clj])
@@ -102,3 +102,18 @@
 (def-binary-binop <= [:j-num])
 (def-binary-binop bit-shift-left [:j-num])
 (def-binary-binop bit-shift-right [:j-num])
+
+(defn zero?
+  "Returns true if x is 0"
+  [x]
+  (= x 0))
+
+(defn pos?
+  "Returns true if x is positive"
+  [x]
+  (> x 0))
+
+(defn neg?
+  "Returns true if x is negative" 
+  [x]
+  (< x 0))

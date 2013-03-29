@@ -1,6 +1,6 @@
 (ns piplin.test.mux
   (:use clojure.test)
-  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-right bit-shift-left])
+  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-right bit-shift-left pos? neg? zero?])
   (:use [piplin types math modules sim mux connect]
         plumbing.core)
   (:use [piplin.types bits boolean enum numbers core-impl binops uintm])

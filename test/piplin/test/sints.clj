@@ -1,5 +1,5 @@
 (ns piplin.test.sints
-  (:refer-clojure :exclude [cond condp cast not = not= > >= < <= + - * inc dec bit-and bit-or bit-xor bit-not and or bit-shift-left bit-shift-right])
+  (:refer-clojure :exclude [cond condp cast not = not= > >= < <= + - * inc dec bit-and bit-or bit-xor bit-not and or bit-shift-left bit-shift-right pos? neg? zero?])
   (:import clojure.lang.ExceptionInfo)
   (:use clojure.test
         piplin.core

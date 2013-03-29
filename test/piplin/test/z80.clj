@@ -1,5 +1,5 @@
 (ns piplin.test.z80
-  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-left bit-shift-right])
+  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-left bit-shift-right pos? neg? zero?])
   (:use piplin.core)
   (:use clojure.test)
   (:use piplin.z80))

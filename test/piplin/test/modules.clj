@@ -1,6 +1,6 @@
 (ns piplin.test.modules
   (:use clojure.test)
-  (:refer-clojure :as clj :exclude [not= + - * inc dec < > <= >= = cast not bit-and bit-or bit-xor bit-not and or bit-shift-left bit-shift-right])
+  (:refer-clojure :as clj :exclude [not= + - * inc dec < > <= >= = cast not bit-and bit-or bit-xor bit-not and or bit-shift-left bit-shift-right pos? neg? zero?])
   (:use [piplin.types boolean numbers core-impl binops uintm])
   (:use plumbing.core)
   (:use [piplin types math sim modules connect]))

@@ -4,7 +4,7 @@
   (:use [slingshot.slingshot :only [throw+]])
   (:use piplin.test.util
         plumbing.core)
-  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not and or bit-shift-left bit-shift-right])
+  (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast get not and or bit-shift-left bit-shift-right pos? neg? zero?])
   (:use [piplin.types bits boolean bundle enum numbers union core-impl binops uintm])
   (:use [piplin connect types math modules mux sim verilog [seven-segment-decoder :only [seven-seg-tester]]]))
 
