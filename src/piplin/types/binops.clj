@@ -125,6 +125,7 @@
       (clj/= (value x) (value y)))
     :else
     (mkast (anontype :boolean) := [x y] =)))
+
 (defmethod = ::n-ary
   [x y & more]
   (if (= x y)
@@ -132,8 +133,3 @@
       (recur x (first more) (rest more))
       true)
     false))
-
-(defn not=
-  ([x] false)
-  ([x y] (not (= x y)))
-  ([x y & more] (not (apply = x y more))))

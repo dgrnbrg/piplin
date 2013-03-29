@@ -60,7 +60,6 @@
   piplin.types/log2
   piplin.types/cast
   piplin.types.binops/=
-  piplin.types.binops/not=
   piplin.types.bits/bits
   piplin.types.bits/bit-width-of
   piplin.types.bits/serialize
@@ -76,6 +75,7 @@
   piplin.types.boolean/not
   piplin.types.boolean/and
   piplin.types.boolean/or
+  piplin.types.boolean/not=
   piplin.types.bundle/bundle
   piplin.types.core-impl/+
   piplin.types.core-impl/-

@@ -1,10 +1,10 @@
 (ns piplin.types.boolean
   "This namespaces contains support for booleans. It also
   provides an implementation of `not`."
-  (:refer-clojure :exclude [not cast and or])
+  (:refer-clojure :exclude [not cast and or = not=])
   (:require [clojure.core :as clj])
   (:use [piplin protocols types])
-  (:use [piplin.types.bits])
+  (:use [piplin.types bits binops])
   (:use [slingshot.slingshot]))
 
 (derive-type java.lang.Boolean :piplin-type)
@@ -22,6 +22,11 @@
       (clj/not x)
       (mkast (anontype :boolean) :not [x] not))
     (clj/not x)))
+
+(defn not=
+  ([x] false)
+  ([x y] (not (= x y)))
+  ([x y & more] (not (apply = x y more))))
 
 (defn and
   ([] true)
@@ -80,5 +85,5 @@
 (defmethod from-bits
   :boolean
   [type bits]
-  (= (first bits) 1))
+  (clj/= (first bits) 1))
 

@@ -6,10 +6,10 @@
 
   This namespace also adds keywords to the piplin type
   system so that they can be coerced to enum elements."
-  (:refer-clojure :exclude [= not= cast])
+  (:refer-clojure :exclude [= not= cast and or not])
   (:use [slingshot.slingshot])
   (:use [piplin protocols types])
-  (:use [piplin.types binops bits]))
+  (:use [piplin.types binops bits boolean]))
 
 (derive-type clojure.lang.Keyword :piplin-type)
 
