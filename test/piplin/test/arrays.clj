@@ -1,7 +1,8 @@
 (ns piplin.test.arrays
   (:refer-clojure :exclude [cast])
   (:use [clojure.test])
-  (:use piplin.test.util)
+  (:use piplin.test.util
+        plumbing.core)
   (:require [piplin.core :as p])
   (:use [piplin.types [array]]))
 
@@ -27,32 +28,39 @@
     (is (not= inst (p/cast a (repeat 7 false))))
     (is (= ((piplin.modules/make-sim-fn inst)) (p/cast a (repeat 7 false))))))
 
-(comment (p/defmodule filler []
-  [:outputs [a (p/cast (array (p/anontype :boolean) 8)
-                     (repeat 8 false))]
-   :feedback [x ((p/uintm 3) 0)]]
-  (p/connect x (p/inc x))
-  (p/condp p/= x
-    1 (p/connect a (assoc a 0 true))
-    2 (p/connect a (assoc a 1 true))
-    3 (p/connect a (assoc a 2 true))
-    4 (p/connect a (assoc a 3 true))
-    5 (p/connect a (assoc a 4 true))
-    6 (p/connect a (assoc a 5 true))
-    7 (p/connect a (assoc a 6 true))
-    (p/connect a a)))
+
+(def filler
+  (p/modulize :root
+    {:a (fnk [a x]
+             (p/store a (p/not= x 0)
+                      (p/condp p/= x
+                               1 0
+                               2 1
+                               3 2
+                               4 3
+                               5 4
+                               6 5
+                               7 6
+                               0)
+                      true))
+     :x (fnk [x] (p/inc x))}
+    {:a (p/cast (array (p/anontype :boolean) 8)
+                (repeat 8 false))
+     :x ((p/uintm 3) 0)}))
 
 (deftest array-module
-  (let [[state fns] (p/make-sim (filler))]
-    (is (p/= ((p/exec-sim state fns 1) [:a])
-             [true false false false false false false false]))
-    (is (p/= ((p/exec-sim state fns 3) [:a])
-             [true true true false false false false false]))
-    (is (p/= ((p/exec-sim state fns 5) [:a])
-             [true true true true true false false false]))
-    (is (p/= ((p/exec-sim state fns 10) [:a])
-             [true true true true true true true false]))))
+  (are [cycle state]
+       (p/= (get (last (p/sim (p/compile-root filler)
+                              cycle))
+                 [:root :a])
+            (p/cast (array (p/anontype :boolean) 8)
+                    state))
+       1 [true false false false false false false false]
+       3 [true true true false false false false false]
+       5 [true true true true true false false false]
+       10 [true true true true true true true false]))
 
+(comment
 (def states (p/enum #{:foo :bar :baz :quux}))
 
 (def replay-data (p/cast (array states 30) (take 30 (cycle [:foo :bar :foo :baz :foo :quux]))))

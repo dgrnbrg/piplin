@@ -6,6 +6,7 @@
   (:refer-clojure :exclude [replace cast])
   (:use [clojure.string :only [join replace split]])
   (:use [swiss-arrows.core :only [-<> -<>>]])
+  (:use [clojure.pprint :only [pprint]])
   (:require [plumbing.graph :as graph]
             [plumbing.core :as plumb])
   (:require [piplin.connect :as conn]))
@@ -513,6 +514,7 @@
 ;;of their sim fns (:fn) and initial values (:init)
 (def ^:dynamic *state-elements*)
 
+;TODO: move memory to be declared separately from scalar regs
 (defn modulize
   ([computation state]
    (assert (map? computation)
@@ -579,37 +581,100 @@
     (apply module inputs)
     @*state-elements*))
 
-(defn find-inputs
-  [compiled-module]
+(defn find-exprs
+  [compiled-module pred]
   (apply concat
          (map #(-> % second
                  ::fn
                  (walk-expr (fn [expr]
-                              (if (= :input (-> expr
-                                              value
-                                              :port-type))
+                              (if (pred expr)
                                 [expr]))
                             concat))
               compiled-module)))
 
+(defn find-inputs
+  [compiled-module]
+  (find-exprs compiled-module
+              #(= :input (-> % value :port-type))))
+
+(defn find-stores
+  [compiled-module]
+  (find-exprs compiled-module
+              #(= :array-store (-> % value :op))))
+
+(defn assert-stores-as-roots
+  [compiled-module]
+  (let [root-stores (->> compiled-module
+                      (map (comp value ::fn second))
+                      (filter #(= (:op %) :array-store)))
+        all-stores (find-stores compiled-module)]
+    (assert (= (count root-stores) (count all-stores))
+            "All stores must be located at roots")))
+
 (def ^{:arglists (list '[name type])}
   input #(make-port* %1 %2 :input))
+
+(defn make-port->mem-name
+  "Takes a module and return a map from port to
+  the memory's keyword name."
+  [compiled-module]
+  (let [mems (->> compiled-module
+               (filter #(-> % second ::init kindof
+                          (= :array))))]
+    (plumb/for-map [[name {port ::port}] mems]
+                   port name)))
+
+(defn make-store-fn
+  [port->name store-op]
+  (let [{:keys [array condition index v]}
+        (-> store-op value :args)
+        _ (print "condition ")
+        _ (pprint condition)
+        condition (make-sim-fn condition)
+        index (make-sim-fn index)
+        v (make-sim-fn v)]
+    (assert (= :port (:op (value array)))
+            "Can only assign to memories themselves")
+    (fn [state]
+      (println "state before:" state)
+      (println "port" array "path" (port->name array))
+      (doto (binding [*sim-state* state]
+              ;;TODO: this condition is always false in the currently failing unit test, which is wrong. Why?
+              ;;TODO: detect multiple writes to same cell each cycle
+        (let [condition (condition)
+              index (index)
+              v (v)]
+          (println "condition" condition "index" index "v" v)
+          (if condition
+            (assoc-in state [(port->name array) index] v)
+            state)))
+        (#(println "state after:" %))))))
 
 (defn sim
   [compiled-module cycles]
   (assert (empty? (find-inputs compiled-module))
           "Cannot have any input ports during simulation")
+  (assert-stores-as-roots compiled-module)
   (let [reg-keys (->> compiled-module
                    (filter (comp #(contains? % ::init) second))
                    (map first))
-        wire-keys (->> compiled-module
-                    (remove (comp #(contains? % ::init) second))
-                    (map first))
+        store-keys (->> compiled-module
+                     (filter #(-> % second ::fn value :op
+                                (= :array-store)))
+                     (map first))
+        wire-keys (->> (concat reg-keys store-keys)
+                    (apply dissoc compiled-module)
+                    keys)
         wire-fns (plumb/map-vals (comp make-sim-fn ::fn)
                                  (select-keys compiled-module wire-keys))
         reg-fns (plumb/map-vals (comp make-sim-fn ::fn)
                                 (select-keys compiled-module reg-keys))
-        reg-inits (plumb/map-vals ::init compiled-module)
+        port->mem-name (make-port->mem-name compiled-module)
+        mem-fns (map (comp (partial make-store-fn port->mem-name) ::fn second)
+                     (select-keys compiled-module store-keys))
+        reg-inits (plumb/map-vals
+                    ::init
+                    (select-keys compiled-module reg-keys))
         inits (binding [*sim-state* reg-inits]
                        (merge reg-inits
                               (plumb/map-vals #(%) wire-fns)))]
@@ -620,9 +685,13 @@
         history
         (let [state' (binding [*sim-state* state]
                        (plumb/map-vals #(%) reg-fns))
-              state'' (binding [*sim-state* state']
+              state* (reduce (fn [state store]
+                               (store state))
+                             state'
+                             mem-fns)
+              state'' (binding [*sim-state* state*]
                         (plumb/map-vals #(%) wire-fns))
-              state'' (merge state' state'')]
+              state'' (merge state* state'')]
           (recur
             state''
             (dec cycles)

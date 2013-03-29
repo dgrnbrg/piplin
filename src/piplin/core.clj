@@ -98,6 +98,7 @@
   piplin.types.union/union-match
   piplin.types.union/maybe
   piplin.types.array/array
+  piplin.types.array/store
 
   ;vcd
   piplin.vcd/spit-trace

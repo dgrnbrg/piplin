@@ -136,6 +136,20 @@
              [array index v]
              assoc))))
 
+(defn store
+  "Takes an array, a location, a value, and a condition, and calls
+  `(assoc array key value)` if the condition is true. Returns the
+  resulting or original array."
+  [array condition index v]
+  (if (every? pipinst? [array condition index v])
+    (if (cast (anontype :boolean) condition)
+      (assoc array (value index) v)
+      array)
+    (mkast (typeof array)
+           :array-store
+           [array condition index v]
+           store)))
+
 (defmethod piplin.types/count-multi
   :array
   [array]
@@ -151,3 +165,13 @@
     (->> (range array-len)
       (map (comp keyword str))
       (map val-map))))
+
+(defn empty-array
+  "Takes an array type and returns an empty array,
+  as if all the memory was initialized to zero."
+  [type]
+  (let [{:keys [array-len array-type]} type
+        width (bit-width-of array-type)
+        bits (cast (bits width) 0)
+        template (deserialize array-type bits)]
+    (cast type (vec (repeat array-len template)))))
