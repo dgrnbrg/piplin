@@ -136,20 +136,6 @@
              [array index v]
              assoc))))
 
-(defn store
-  "Takes an array, a location, a value, and a condition, and calls
-  `(assoc array key value)` if the condition is true. Returns the
-  resulting or original array."
-  [array condition index v]
-  (if (every? pipinst? [array condition index v])
-    (if (cast (anontype :boolean) condition)
-      (assoc array (value index) v)
-      array)
-    (mkast (typeof array)
-           :array-store
-           [array condition index v]
-           store)))
-
 (defmethod piplin.types/count-multi
   :array
   [array]
@@ -175,3 +161,32 @@
         bits (cast (bits width) 0)
         template (deserialize array-type bits)]
     (cast type (vec (repeat array-len template)))))
+
+(defn store
+  ([array write-enable index v]
+   (assert (= :boolean (kindof write-enable)) "Write enable must be a boolean")
+   (let [{:keys [array-type array-len]} (typeof array)
+         v (cast array-type v)]
+     (if (and (pipinst? array)
+              (pipinst? index)
+              (pipinst? write-enable)
+              (pipinst? v))
+       (if write-enable
+         (assoc array index v)
+         array)
+       (mkast (typeof array)
+              :array-store
+              [array write-enable index v]
+              store))))
+  ([a we i v & more]
+   (assert (zero? (mod (count more) 3)) "Inputs must come in groups of 3")
+   (when (every? pipinst? (list* we i v more))
+     (let [indices (conj i (take-nth 2 more))]
+       (assert (= (count indices) (count (distinct indices)))
+               "Must assign to different indices")))
+   (apply store (store a we i v) more)))
+
+(defn array?
+  "Predicate to determine if the argument is an array"
+  [a]
+  (= (kindof a) :array))

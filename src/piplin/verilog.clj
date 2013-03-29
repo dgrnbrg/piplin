@@ -11,6 +11,7 @@
   (:require [piplin.types.core-impl :as impl])
   (:use [piplin.types.sints :only [sign-extend sints]])
   (:use [piplin.types.uintm :only [uintm]])
+  (:use [piplin.types.array :only [array?]])
   (:use [piplin.types.complex :only [real-part imag-part]])
   (:use [piplin.types [bits :only [bit-width-of bits deserialize serialize bit-cat bit-slice]]])
   (:require [piplin.mux :as mux]
@@ -855,7 +856,7 @@
                                           (join \_ (map sanitize-str path))
                                           (verilog-repr val)
                                           cycle)
-                     (->> (map (fn [val index]
+                     "" #_(->> (map (fn [val index]
                                  (assert-hierarchical
                                    indent dut-name
                                    (str (join \. (map sanitize-str path))
@@ -880,22 +881,44 @@
                 port :piplin.modules/port}]
             ;declare a register of proper bit width, name,
             ;and default value
-            (format
-              "  reg %s %s = %s;\n"
-              (-> init
-                typeof
-                bit-width-of
-                array-width-decl)
-              ;looks up gensym name
-              (port-names port)
-              ;must be using an immediate by contract
-              (verilog-repr init)))
+            (if (= (kindof init) :array)
+              ;TODO some arrays are written with stores,
+              ;but others are written all at once. We should
+              ;compile the latter to normal registers instead
+              ;of verilog memories.
+              (let [{:keys [array-type array-len]} (typeof init)
+                    inits (map #(format "    %s[%d] = %s;\n"
+                                        (port-names port)
+                                        %2
+                                        (verilog-repr %1))
+                               init
+                               (range))]
+                (format
+                  "  reg %s %s %s;\n  initial begin\n%s  end\n"
+                  (-> array-type
+                      bit-width-of
+                      array-width-decl)
+                  ;looks up gensym name
+                  (port-names port)
+                  ;array width
+                  (array-width-decl array-len)
+                  (join inits)))
+              (format
+                "  reg %s %s = %s;\n"
+                (-> init
+                    typeof
+                    bit-width-of
+                    array-width-decl)
+                ;looks up gensym name
+                (port-names port)
+                ;must be using an immediate by contract
+                (verilog-repr init))))
           module-regs)))
 
 (defn register-assignments
   "This takes a name-table and a seq of register configurations
   (i.e. maps containing the keys `:piplin.modules/port` and
-  `:piplin.modules/fn`) and returns a strin which is a block of
+  `:piplin.modules/fn`) and returns a string which is a block of
   `  foo <= my_value48529`\n`-style verilog register assignments."
   [name-table module-regs]
   (join (map
@@ -909,6 +932,23 @@
                       (comp name-table :piplin.modules/fn)))
           module-regs)))
 
+(defn memory-stores
+  "This takes a name-table and a seq of store operations
+   and returns a string which is a block of gated
+   `  foo <= my_value48529`\n`-style verilog register assignments."
+  [name-table stores]
+  (join (map
+          (fn [{i :piplin.modules/index
+                 we :piplin.modules/write-enable?
+                 v :piplin.modules/value
+                 mem :piplin.modules/dest}]
+            (format "    if (%s) %s[%s] <= %s;\n"
+                    (name-table we)
+                    (name-table mem)
+                    (name-table i)
+                    (name-table v)))
+          stores)))
+
 (defn ->verilog
   [compiled-module outputs]
   (let [;seq of all the input ports used in the module
@@ -921,52 +961,52 @@
         input-names (plumb/for-map [port module-inputs
                                     :let [name (-> port value :piplin.modules/port)]]
                                    port name)
-        ;list of k/v pairs which is the subset of the compiled module that
-        ;has the logic to assign to each register
-        module-regs (->> compiled-module
-                      (filter (comp :piplin.modules/port value second))
-                      (map second))
-        ;string containing the register decls
-        regs-inits (register-declarations port-names module-regs)
 
-        ;special modules maps
-        special-modules (->> compiled-module
-                          (map second)
-                          (filter :piplin.modules/verilog)
-                          (map #((:piplin.modules/verilog %))))
-        ;name table ports for special modules
-        special-name-table (->> special-modules
-                             (mapcat :name-table)
-                             (into {}))
-        ;structural code for special modules
-        special-decls (->> special-modules
-                        (map :preamble)
-                        (join))
-        
+        ;seqs of the keys that are registers, wires, and stores
+        {:keys [reg-keys store-keys wire-keys]} (module-keys-by-type compiled-module)
+
+        ;string containing the register decls
+        regs-inits (register-declarations
+                     port-names
+                     (map compiled-module reg-keys))
+
         ;Compile the main logic
+        ;collect all scalar roots
+        scalar-roots (map (comp :piplin.modules/fn second) compiled-module)
+        memory-roots (mapcat (comp (juxt
+                                     :piplin.modules/index
+                                     :piplin.modules/write-enable?
+                                     :piplin.modules/value
+                                     :piplin.modules/dest)
+                                   second)
+                             compiled-module)
         [name-table code]
-        (->> compiled-module
-          (map (comp :piplin.modules/fn second))
-          ;could insert a filter here to allow DCE to work
-          (reduce (fn [[name-table text] expr]
-                    (verilog expr name-table text))
-                  [(merge port-names
-                          input-names
-                          special-name-table) ""]))
+        (->> (concat scalar-roots memory-roots)
+             ;TODO remove this once nil is synthesizable
+             (remove nil?)
+             ;could insert a filter here to allow DCE to work
+             (reduce (fn [[name-table text] expr]
+                       (verilog expr name-table text))
+                     [(merge port-names
+                             input-names) ""]))
         ;string containing the register assigns
-        reg-assigns (register-assignments name-table module-regs)
-        
-        ;assignment code for special modules
-        special-assigns (->> special-modules
-                          (map #((:side-effect %) name-table))
-                          (join))
+        reg-assigns (register-assignments
+                      name-table
+                      (->> reg-keys
+                           (map compiled-module)
+                           (remove (comp array?
+                                         :piplin.modules/init))))
+        ;string containing the memory stores
+        memory-stores (memory-stores
+                        name-table
+                        (map compiled-module store-keys))
 
         ;string containing the input wire decls
         input-decls (join
                       (for [[port name] input-names
                             :let [width (-> port
-                                          typeof
-                                          piplin.types.bits/bit-width-of)]]
+                                            typeof
+                                            piplin.types.bits/bit-width-of)]]
                         (format "  input wire %s %s;\n"
                                 (array-width-decl width) name)))
         ;string containing the output wire decls
@@ -975,34 +1015,34 @@
                 (fn [[path verilog-name]]
                   (let [{function :piplin.modules/fn port
                          :piplin.modules/port} (value (compiled-module path))]
-                         (format
-                           "  output wire %s %s;\n"
-                           (-> function
-                             typeof
-                             bit-width-of
-                             array-width-decl)
-                           verilog-name)))
+                    (format
+                      "  output wire %s %s;\n"
+                      (-> function
+                          typeof
+                          bit-width-of
+                          array-width-decl)
+                      verilog-name)))
                 outputs))
         ;string containing the assigns linking the output names to the
         ;internal, gensym'ed names
         output-assigns (->> outputs
-                         (map (fn [[path verilog-name]]
-                                (let [{p :piplin.modules/port
-                                       f :piplin.modules/fn} (compiled-module path)
-                                      ;Output gets the value of the
-                                      ;register this cycle, not what it will
-                                      ;be next cycle
-                                      lookup-name (name-table (or p f))]
-                                  (format
-                                    "  assign %s = %s;\n"
-                                    verilog-name
-                                    lookup-name))))
-                         join)
+                            (map (fn [[path verilog-name]]
+                                   (let [{p :piplin.modules/port
+                                          f :piplin.modules/fn} (compiled-module path)
+                                         ;Output gets the value of the
+                                         ;register this cycle, not what it will
+                                         ;be next cycle
+                                         lookup-name (name-table (or p f))]
+                                     (format
+                                       "  assign %s = %s;\n"
+                                       verilog-name
+                                       lookup-name))))
+                            join)
         ;string containing the port names for pre-decl in module arg list
         port-names (->> (merge input-names outputs)
-                       vals
-                       (map #(str "  " % ",\n"))
-                       join)]
+                        vals
+                        (map #(str "  " % ",\n"))
+                        join)]
     (str "module piplin_module(\n"
          "  clock,\n"
          port-names
@@ -1011,7 +1051,6 @@
          "  //Input and output declarations\n"
          input-decls
          output-decls
-         special-decls
          "\n  //Registers\n"
          regs-inits
          "\n  //Main code\n"
@@ -1021,7 +1060,7 @@
          "\n"
          "  always @(posedge clock) begin\n"
          reg-assigns
-         special-assigns
+         memory-stores
          "  end\n"
          "endmodule\n"
          )))
@@ -1029,15 +1068,27 @@
 (defn verify
   [module cycles]
   (let [compiled (compile-root module)
+        ;These are the keys in the `compiled` map
+        ;that correspond to scalar outputs
+        scalar-output-keys (->> compiled
+                                (filter
+                                  (fn [[k v]]
+                                    (or (wire? v)
+                                        (and (register? v)
+                                             (-> v
+                                                 :piplin.modules/init 
+                                                 array?
+                                                 not)))))
+                                (map first))
         flattened-string-keys (map (comp
                                      sanitize-str
                                      #(join "_" (map name %)))
-                                   (keys compiled))
+                                   scalar-output-keys)
         plain-path->gensym-path (plumb/for-map [path flattened-string-keys]
                                                path (gen-verilog-name path))
         gensym-path->plain-path (plumb/for-map [[k v] plain-path->gensym-path]
                                                v k)
-        output-renames (zipmap (keys compiled)
+        output-renames (zipmap scalar-output-keys
                                (map plain-path->gensym-path
                                     flattened-string-keys))
         samples (sim compiled cycles)
@@ -1071,6 +1122,7 @@
       "  initial begin\n"
       ;"    $dumpfile(\"dump.vcd\");\n"
       "    $dumpvars;\n"
+      "    #1\n"
       (->> samples
 
         (map #(assert-hierarchical-cycle "    "

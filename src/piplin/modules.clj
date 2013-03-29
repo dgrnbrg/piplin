@@ -351,8 +351,6 @@
           :register
           (let [path (conj *module-path* (:port (value expr)))]
             (fn []
-              ;(println "Getting" (:port (value expr)))
-              ;(println "state is" *sim-state*)
               (get *sim-state* (:port (value expr)))))
           :input
           (let [f (get *input-fns* (:port (value expr)))]
@@ -514,7 +512,8 @@
 ;;of their sim fns (:fn) and initial values (:init)
 (def ^:dynamic *state-elements*)
 
-;TODO: move memory to be declared separately from scalar regs
+;TODO: automatically cast the return values of fnks
+;that are being assigned to regs
 (defn modulize
   ([computation state]
    (assert (map? computation)
@@ -530,7 +529,8 @@
           )
      computation state))
   ([module-name computation state]
-   (doseq [[k] state]
+   (doseq [[k v] state
+           :when (not= (kindof v) :array)]
      (assert (computation k)
              (str "Missing register definition for " k)))
    ^::module
@@ -558,105 +558,46 @@
                               register-ports))
                           (plumb/map-keys
                             #(or (reverse-renames %) %)))
-             result (plumb/for-map [[k v] result
-                                    :when (typeof v)]
+             result-fns (plumb/for-map [[k v] result
+                                    :when (and (typeof v)
+                                               (not= (-> v value :op) :array-store))]
                                    k v)
-             fn-map (push-down-map result ::fn)
+             store-fns (plumb/for-map [[k v] result
+                                       :when (= (-> v value :op) :array-store)
+                                       :let [{:keys [array index write-enable v]}
+                                             (-> v value :args)]]
+                                      k {::index index
+                                         ::write-enable? write-enable
+                                         ::value v
+                                         ::dest array})
+             fn-map (push-down-map result-fns ::fn)
              state-elements (->> (merge-with
                                    merge
                                    init-map
                                    fn-map
+                                   store-fns
                                    port-map)
                               (plumb/map-keys
                                 #(conj *current-module* %)))]
          (swap! *state-elements* merge state-elements)
          ;We actually want to refer to registers, not their inputs,
          ;in this map
-         (merge result register-ports))))))
+         (merge result-fns register-ports))))))
 
-;;How to make arbitrary modules
-;;- need a fn that takes some requested state and updates
-;;  the internal state.
-;;- need a fn that returns some other requested state
-;;- need a fn that marks a cycle happened, so that registers
-;;  can activate
-;;
-;;For memory, we need to model read ports, write ports,
-;;and the clock. Our model of simulation is that a clock
-;;happens, then all the signals are propagated down the
-;;wires. The clock function should take the state of the
-;;world, so that the memory can look up the values it needs
-;;to know the status of the write port. The memory module
-;;constructor needs to create wires for these inputs, so that
-;;no additional computation is done by the memory itself.
-;;When the clock function is called, it will update the
-;;memory's internal state and return a value representing it.
-;;
-;;This model does not support combinational feedback paths
-;;since those require delta cycles.
-(defn make-memory
-  "Declares a single write port memory initialized to `init`."
-  [init write-enable index value]
-  (let [current-module (conj *current-module*
-                             (keyword
-                               (name
-                                 (gensym
-                                   "memory"))))
-        write-enable-path (conj current-module :we)
-        index-path (conj current-module :index)
-        value-path (conj current-module :value)
-        array-path (conj current-module :memory)
-        array-port (make-port* array-path (typeof init) :register)]
-    (swap! *state-elements*
-           assoc
-           write-enable-path
-           {::fn write-enable}
-           index-path
-           {::fn index}
-           value-path
-           {::fn value})
-    (let [init-fn (fn []
-                    (let [internal-state (atom init)]
-                      {:accessors
-                       {array-path (fn [] @internal-state)}
-                       :clock
-                       (fn clock-fn [state]
-                         (let [{we write-enable-path
-                                index index-path
-                                value value-path}
-                               state]
-                           (when we
-                             (swap! internal-state
-                                    assoc
-                                    index
-                                    value))))}))
-          verilog-fn
-          (fn []
-            (let [memory-name (piplin.verilog/gen-verilog-name "memory")
-                  {:keys [array-type array-len]} (typeof init)]
-              {:preamble
-               (format "  reg %s %s %s;\n"
-                       (piplin.verilog/array-width-decl
-                         (piplin.types.bits/bit-width-of
-                           array-type))
-                       memory-name
-                       (piplin.verilog/array-width-decl
-                         (log2 array-len)))
-               :name-table
-               {array-port memory-name}
-               :side-effect
-               (fn [name-table]
-                 (format "    if (%s) %s[%s] <= %s;\n"
-                         (name-table write-enable)
-                         memory-name
-                         (name-table index)
-                         (name-table value)))}))]
-      (swap! *state-elements*
-             assoc
-             current-module
-             {::special-init init-fn
-              ::verilog verilog-fn})
-      {:value array-port})))
+(defn store?
+  "Returns true if the given map represents a store ast node"
+  [value]
+  (contains? value ::write-enable?))
+
+(defn register?
+  "Returns true if the given map represents a register ast node"
+  [value]
+  (contains? value ::port)) 
+
+(defn wire?
+  "Returns true if the given map represents a wire ast node"
+  [value]
+  (not (or (store? value) (register? value))))
 
 (defn compile-root
   [module & inputs]
@@ -681,20 +622,6 @@
   (find-exprs compiled-module
               #(= :input (-> % value :port-type))))
 
-(defn find-stores
-  [compiled-module]
-  (find-exprs compiled-module
-              #(= :array-store (-> % value :op))))
-
-(defn assert-stores-as-roots
-  [compiled-module]
-  (let [root-stores (->> compiled-module
-                      (map (comp value ::fn second))
-                      (filter #(= (:op %) :array-store)))
-        all-stores (find-stores compiled-module)]
-    (assert (= (count root-stores) (count all-stores))
-            "All stores must be located at roots")))
-
 (def ^{:arglists (list '[name type])}
   input #(make-port* %1 %2 :input))
 
@@ -708,75 +635,85 @@
     (plumb/for-map [[name {port ::port}] mems]
                    port name)))
 
-(defn make-store-fn
-  [port->name store-op]
-  (let [{:keys [array condition index v]}
-        (-> store-op value :args)
-        _ (print "condition ")
-        _ (pprint condition)
-        condition (make-sim-fn condition)
-        index (make-sim-fn index)
-        v (make-sim-fn v)]
-    (assert (= :port (:op (value array)))
-            "Can only assign to memories themselves")
-    (fn [state]
-      (println "state before:" state)
-      (println "port" array "path" (port->name array))
-      (doto (binding [*sim-state* state]
-              ;;TODO: this condition is always false in the currently failing unit test, which is wrong. Why?
-              ;;TODO: detect multiple writes to same cell each cycle
-        (let [condition (condition)
-              index (index)
-              v (v)]
-          (println "condition" condition "index" index "v" v)
-          (if condition
-            (assoc-in state [(port->name array) index] v)
-            state)))
-        (#(println "state after:" %))))))
+(defn compute-store-fns
+  "Given a map of memory registers and a list of store ops,
+  make a map from memory names to their simulation-store fns."
+  [registers stores]
+  ;;TODO: check that registers is a subset of arrays in stores
+  (let [stores (map (fn [{dest ::dest :as reg}]
+                      (assoc reg
+                             ::dest
+                             (-> dest value :port)))
+                    stores)
+        reg->stores (group-by ::dest stores)]
+    (plumb/for-map [[reg {f ::fn}] registers
+                    :let [stores (->> (reg->stores reg)
+                                      (map (comp
+                                             (partial map make-sim-fn)
+                                             (juxt ::index
+                                                   ::write-enable?
+                                                   ::value))))
+                          f (make-sim-fn f)]]
+                   reg (fn []
+                         (reduce (fn [mem [i we v]]
+                                     (if (we)
+                                       (assoc mem (i) (v))
+                                       mem))
+                                 (*sim-state* reg)
+                                 stores)))))
+
+(defn module-keys-by-type
+  "Takes a compiled module and returns a map containing
+   reg-keys, store-keys, and wire-keys. These are useful
+   to compilers, as they're the 3 kinds of runnable code."
+  [compiled-module]
+  (let [reg-keys (->> compiled-module
+                      (filter (comp register? second))
+                      (map first))
+        store-keys (->> compiled-module
+                        (filter (comp store? second))
+                        (map first))
+        wire-keys (->> compiled-module
+                       (filter (comp wire? second))
+                       (map first))]
+    {:reg-keys reg-keys
+     :store-keys store-keys
+     :wire-keys wire-keys}))
 
 (defn sim
   [compiled-module cycles]
   (assert (empty? (find-inputs compiled-module))
           "Cannot have any input ports during simulation")
-  (assert-stores-as-roots compiled-module)
-  (let [reg-keys (->> compiled-module
-                   (filter (comp #(contains? % ::init) second))
-                   (map first))
-        store-keys (->> compiled-module
-                     (filter #(-> % second ::fn value :op
-                                (= :array-store)))
-                     (map first))
-        wire-keys (->> (concat reg-keys store-keys)
-                    (apply dissoc compiled-module)
-                    keys)
+  (let [{:keys [reg-keys store-keys wire-keys]} (module-keys-by-type compiled-module)
         wire-fns (plumb/map-vals (comp make-sim-fn ::fn)
                                  (select-keys compiled-module wire-keys))
-        reg-fns (plumb/map-vals (comp make-sim-fn ::fn)
-                                (select-keys compiled-module reg-keys))
+        reg-fns (plumb/for-map [[k {f ::fn}] (select-keys compiled-module reg-keys)
+                                :when f]
+                               k (make-sim-fn f))
+        store-fns (compute-store-fns (select-keys compiled-module reg-keys)
+                                     (vals (select-keys compiled-module store-keys)))
         port->mem-name (make-port->mem-name compiled-module)
-        mem-fns (map (comp (partial make-store-fn port->mem-name) ::fn second)
-                     (select-keys compiled-module store-keys))
         reg-inits (plumb/map-vals
                     ::init
                     (select-keys compiled-module reg-keys))
         inits (binding [*sim-state* reg-inits]
-                       (merge reg-inits
-                              (plumb/map-vals #(%) wire-fns)))]
+                (merge reg-inits
+                       (plumb/map-vals #(%) wire-fns)))]
     (loop [state inits
            cycles cycles
            history [inits]]
       (if (zero? cycles)
         history
-        (let [state' (binding [*sim-state* state]
-                       (plumb/map-vals #(%) reg-fns))
-              state* (reduce (fn [state store]
-                               (store state))
-                             state'
-                             mem-fns)
-              state'' (binding [*sim-state* state*]
-                        (plumb/map-vals #(%) wire-fns))
-              state'' (merge state* state'')]
+        (let [reg-state (binding [*sim-state* state]
+                          (merge state
+                                 (plumb/map-vals #(%) store-fns)
+                                 (plumb/map-vals #(%) reg-fns)  
+                                 
+                                 )) 
+              wire-state (binding [*sim-state* reg-state]
+                           (merge reg-state
+                                  (plumb/map-vals #(%) wire-fns)))]
           (recur
-            state''
+            wire-state
             (dec cycles)
-            (conj history state'')))))))
+            (conj history wire-state)))))))
