@@ -959,7 +959,7 @@
                         (:piplin.modules/port v) (gen-verilog-name (last name)))
         ;map from input port object to their verilog name
         input-names (plumb/for-map [port module-inputs
-                                    :let [name (-> port value :piplin.modules/port)]]
+                                    :let [name (-> port value :port)]]
                                    port name)
 
         ;seqs of the keys that are registers, wires, and stores
