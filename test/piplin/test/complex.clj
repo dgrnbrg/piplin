@@ -1,7 +1,7 @@
 (ns piplin.test.complex
   (:refer-clojure :exclude [cond condp cast not = not= > >= < <= + - * inc dec bit-and bit-or bit-xor bit-not and or bit-shift-left bit-shift-right pos? neg? zero?])
   (:use [piplin.types bundle sfxpts bits boolean core-impl binops uintm complex])
-  (:use [piplin types mux modules sim connect protocols verilog]
+  (:use [piplin types mux modules sim protocols verilog]
         plumbing.core)
   (:import clojure.lang.ExceptionInfo)
   (:use clojure.test

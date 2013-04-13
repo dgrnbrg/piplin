@@ -3,7 +3,7 @@
   (:refer-clojure :as clj :exclude [not= + - * inc dec < > <= >= = cast not bit-and bit-or bit-xor bit-not and or bit-shift-left bit-shift-right pos? neg? zero?])
   (:use [piplin.types boolean numbers core-impl binops uintm])
   (:use plumbing.core)
-  (:use [piplin types math sim modules connect]))
+  (:use [piplin types math sim modules]))
 
 (deftest module-counter'
   (let [m (compile-root (modulize :root {:x (fnk [x] (inc x))}

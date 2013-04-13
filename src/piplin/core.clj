@@ -22,33 +22,17 @@
   (cons `do (map (fn [sym] `(redefine* '~sym)) symbols)))
 
 
-(require 'piplin.connect)
-(defn connect
-  [& args]
-  (apply piplin.connect/connect args))
-(alter-var-root
-  #'connect
-  #(with-meta % (assoc (meta #'piplin.connect/connect)
-                       :ns *ns*)))
-
 ;Other important inclusions
 (require 'piplin.types.null)
 
 ;This is the list of functions we should reexport
 (redefine
   ;Module stuff
-  piplin.modules/defmodule
-  piplin.modules/module
-  piplin.modules/make-sim
-  piplin.modules/get-all-registers
-  piplin.modules/trace-module
   piplin.modules/input
   piplin.modules/modulize
   piplin.modules/compile-root
 
-  ;Sim stuff -- this might be too low level
-  piplin.sim/exec-sim
-  piplin.sim/trace-keys
+  ;Sim stuff
   piplin.modules/sim
 
   ;functions

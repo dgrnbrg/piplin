@@ -3,6 +3,8 @@
   (:use piplin.core
         [piplin.util :only [let']]))
 
+;TODO: update this to use new modules
+
 ;This generates xvga display signals (1024 x 768 @ 60 Hz)
 ;Requires a 65MHz clock
 (defmodule xvga

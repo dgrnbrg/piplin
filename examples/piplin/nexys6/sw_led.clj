@@ -7,6 +7,8 @@
   (:use [piplin.vga :only [xvga]])
   (:use [piplin.seven-segment-decoder :only [decoder]]))
 
+;TODO: update this to use new modules
+
 (def seven-seg-map
   {:top 0
    :upper-left 5

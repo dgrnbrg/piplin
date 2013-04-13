@@ -3,7 +3,7 @@
         plumbing.core)
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not and or bit-shift-right bit-shift-left pos? neg? zero?])
-  (:use [piplin types math modules sim connect protocols])
+  (:use [piplin types math modules sim protocols])
   (:use [piplin.types bits boolean enum numbers core-impl binops uintm])
   (:import clojure.lang.ExceptionInfo))
 

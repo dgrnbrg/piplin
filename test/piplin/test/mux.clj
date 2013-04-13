@@ -1,7 +1,7 @@
 (ns piplin.test.mux
   (:use clojure.test)
   (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-right bit-shift-left pos? neg? zero?])
-  (:use [piplin types math modules sim mux connect]
+  (:use [piplin types math modules sim mux]
         plumbing.core)
   (:use [piplin.types bits boolean enum numbers core-impl binops uintm])
   (:import clojure.lang.ExceptionInfo))
@@ -59,8 +59,7 @@
                           (mux2 flip
                                 false
                                 true))}
-              {:flip false})
-        [state fns] (make-sim mod)]
+              {:flip false})]
     (is (= (get (last (sim (compile-root mod) 0))
                 [:root :flip])
            false))
