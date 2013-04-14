@@ -24,7 +24,7 @@ If possible, try to explain what behavior you expected and why. Bonus points for
 Project Name uses [Leiningen 2](https://github.com/technomancy/leiningen/blob/master/doc/TUTORIAL.md). Make sure you have it installed and then run tests against
 supported Clojure versions using
 
-    lein2 all test
+    lein test
 
 Then create a branch and make your changes on it. Once you are done with your changes and all tests pass, submit a pull request
 on Github.
