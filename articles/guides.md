@@ -5,7 +5,7 @@ layout: article
 
 ## Guide list
 
-[Piplin documentation](piplin.org) is organized as a number of guides, covering all kinds of topics.
+[Piplin documentation](http://piplin.org) is organized as a number of guides, covering all kinds of topics.
 
 We recommend that you read these guides, if possible, in this order:
 
