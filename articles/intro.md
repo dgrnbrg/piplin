@@ -24,6 +24,8 @@ If you don't know Clojure, I recommend going to the [Clojure Doc Site](http://cl
 
 ## A Brief Introduction to Piplin
 
+You can get a working project with all of the code in this tutorial from [Piplin Starter](https://github.com/dgrnbrg/piplin-starter), which is a preconfigured sample project for Piplin on Github. If you'd like to use Piplin yourself, just add `[piplin "0.1.0"]` as a `:dependency` in your project.clj.
+
 ### Example ns form
 
 First, we'll set up the `ns` form for this piplin project. You can copy the sample below, changing the namespace to yours:
@@ -31,8 +33,7 @@ First, we'll set up the `ns` form for this piplin project. You can copy the samp
 {% highlight clojure %}
 (ns piplin.my-first-project
   (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-left bit-shift-right pos? neg? zero?])
-  (:use piplin.core plumbing.core)
-  (:require piplin.seven-segment-decoder))
+  (:use piplin.core plumbing.core))
 {% endhighlight %}
 
 ### Piplin code
