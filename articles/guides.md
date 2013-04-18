@@ -12,8 +12,8 @@ We recommend that you read these guides, if possible, in this order:
 
 ###  [Getting started](/articles/intro.html)
 
-An overview of Project Name with a quick tutorial that helps you to get started with it. It should take about
-10 minutes to read and study the provided code examples
+An overview of Piplin with a quick tutorial that helps you to get started with it. It should take about
+30 minutes to read and study the provided code examples
 
 ## Tell Us What You Think!
 

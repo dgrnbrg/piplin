@@ -21,7 +21,7 @@ If possible, try to explain what behavior you expected and why. Bonus points for
 
 ## Contributing
 
-Project Name uses [Leiningen 2](https://github.com/technomancy/leiningen/blob/master/doc/TUTORIAL.md). Make sure you have it installed and then run tests against
+Piplin uses [Leiningen 2](https://github.com/technomancy/leiningen/blob/master/doc/TUTORIAL.md). Make sure you have it installed and then run tests against
 supported Clojure versions using
 
     lein test
