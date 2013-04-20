@@ -7,8 +7,16 @@ layout: article
 
 [Piplin documentation](http://piplin.org) is organized as a number of guides, covering all kinds of topics.
 
-We recommend that you read these guides, if possible, in this order:
+All of these guides assume that your namespace looks like this:
 
+{% highlight clojure %}
+(ns piplin.guide-contents
+  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-left bit-shift-right pos? neg? zero?])
+  (:use piplin.core plumbing.core))
+{% endhighlight %}
+
+
+We recommend that you read these guides, if possible, in this order:
 
 ###  [Getting started](/articles/intro.html)
 
