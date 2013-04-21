@@ -148,7 +148,8 @@
                                    port-map)
                               (plumb/map-keys
                                 #(conj *current-module* %)))]
-         (swap! *state-elements* merge state-elements)
+         (when (bound? #'*state-elements*)
+           (swap! *state-elements* merge state-elements))
          ;We actually want to refer to registers, not their inputs,
          ;in this map
          (merge result-fns register-ports))))))
@@ -173,7 +174,8 @@
   (assert (::module (meta module)) "Must pass a module as first argument")
   (binding [*state-elements* (atom {})]
     (apply module inputs)
-    @*state-elements*))
+    (with-meta @*state-elements*
+               {::compiled true})))
 
 (defn find-exprs
   [compiled-module pred]
@@ -251,6 +253,8 @@
 
 (defn sim
   [compiled-module cycles]
+  (assert (::compiled (meta compiled-module))
+          "Module must be compiled")
   (assert (empty? (find-inputs compiled-module))
           "Cannot have any input ports during simulation")
   (let [{:keys [reg-keys store-keys wire-keys]} (module-keys-by-type compiled-module)

@@ -58,3 +58,12 @@
          4 3
          5 4
          6 5)))
+
+(deftest sim-fail-test
+  (is (thrown? java.lang.AssertionError (sim {} 10)))
+  (is (thrown? java.lang.AssertionError
+               (sim (compile-root
+                      (modulize
+                        {:a (fnk [x] x)} {})
+                      :x (input "foo" (uintm 8)))
+                    10))))
