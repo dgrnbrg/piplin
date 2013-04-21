@@ -23,6 +23,10 @@ We recommend that you read these guides, if possible, in this order:
 An overview of Piplin with a quick tutorial that helps you to get started with it. It should take about
 30 minutes to read and study the provided code examples
 
+###  [Modules](/articles/modules.html)
+
+An explaination of the Piplin module system. Goes over how to declare modules, how to incorpate state and feedback loops in your designs, and how to compose modules together to make more complex designs.
+
 ## Tell Us What You Think!
 
 Please take a moment to tell us what you think about this guide on Twitter or the [Piplin mailing list](https://groups.google.com/forum/#!forum/piplin)

@@ -21,11 +21,11 @@ Let's take a simple Piplin function, an incrementer, and see how it can be used 
 
 Modules are created using the `modulize` function. They take an optional keyword name and two maps.
 
-The first map is the connectivity graph. Its keys are the names of signals, and its values are `fnk`s that compute the signals. The `fnk`s will automatically be invoked by passing the value returned by the `fnk` with that name to all of the `fnk`s that have that value in their argument lists. Any `fnk` that returns a Piplin type will automatically be accesible as a simulatable and synthesizable wire.
+The first map is the connectivity graph. Its keys are the names of signals, and its values are `fnk`s that compute the signals. The `fnk`s will automatically be invoked by passing the value returned by the `fnk` with that name to all of the `fnk`s that have that value in their argument lists. Any `fnk` that returns a Piplin type will automatically be accesible as a simulatable and synthesizable signal.
 
 The second map declares the registers. Since combinational paths are forbidden, we must declare which of the nodes in the connectivity graph are state elements. Every cycle in the connectivity graph must have at least one register to avoid infinite/unstable loops.
 
-The `modulize` function returns a map whose keys are all of the keys of `fnk`s that returned Piplin types, and whose values are those types. For example, you can see in the example about that invoking `inc-module` returns a map `{:output 2}`.
+The `modulize` function returns a map whose keys are all of the keys of `fnk`s that returned Piplin types, and whose values are those types. For example, you can see in the example above that invoking `inc-module` returns a map `{:output 2}`.
 
 ### Modules as state machines
 
@@ -42,7 +42,7 @@ Now that we've see simple combinational modules, let's look at a module that has
            (map (uintm 8) (range 10))))
 {% endhighlight %}
 
-`counter-module` demonstrates a very simple use of state - we can insert a register at the `:output` node so that we can actually compute a feedback cycle. The register is declared in the second map, by specifying the node to be registered as the key, and its initial value as the val. If we tried to make the counter module without specifying that `:output` is a register, then we would get an exception about cyclic graphs! Remember: in Piplin, all logic must be computed, and then all registers get updated. This repetition is the model of computation.
+`counter-module` demonstrates a very simple use of state - we insert a register at the `:output` node so that we can compute a feedback cycle. The register is declared in the second map, by specifying the node to be registered as the key, and its initial value as the val. If we tried to make the counter module without specifying that `:output` is a register, then we would get an exception about cyclic graphs! In Piplin, all logic is first computed, and then all registers get updated.
 
 `compile-root` is an important function. Try invoking `(counter-module)`. You will get a result, but it only contains the register output of the `counter-module`. Where did the `inc` go? `compile-root` is the function that you should use to invoke the root module of your design, because it is able to capture all of the uses of registers and memories in your design, so that they can be properly simulated or synthesized to Verilog. `compile-root` does this by binding a special thread-local variable that all of the module instantiations store their logic into as a side effect of being invoked.
 
