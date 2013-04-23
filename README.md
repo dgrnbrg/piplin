@@ -8,7 +8,7 @@ Piplin is currently in active development. The main interfaces will probably not
 
 You can include it in your project.clj:
 
-    [piplin "0.1.0"]
+    [piplin "0.1.1"]
 
 # Documentation
 
