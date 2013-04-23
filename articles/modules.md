@@ -32,7 +32,7 @@ The `modulize` function returns a map whose keys are all of the keys of `fnk`s t
 
 ## Modules as state machines
 
-Now that we've see simple combinational modules, let's look at a module that has state. We'll make a simple counter:
+Now that we've seen simple combinational modules, let's look at a module that has state. We'll make a simple counter:
 
 {% highlight clojure %}
 (def counter-module
@@ -50,7 +50,7 @@ Now that we've see simple combinational modules, let's look at a module that has
 
 `compile-root` is an important function. Try invoking `(counter-module)`. You will get a result, but it only contains the register output of the `counter-module`. Where did the `inc` go? `compile-root` is the function that you should use to invoke the root module of your design, because it is able to capture all of the uses of registers and memories in your design, so that they can be properly simulated or synthesized to Verilog. `compile-root` does this by binding a special thread-local variable that all of the module instantiations store their logic into as a side effect of being invoked.
 
-We saw `sim` in the [introduction](/articles/intro.html), but I want to point out one more important aspect of it here: the keys from each cycle of the simulation results are vectors, whose elements represent the module hierarchy and register name of the signal. We can see here how every cycle's results are stored as `[:counter :output]`, since the module's name is `:counter` and its register is `:output`. We will see nested modules in the next section.
+We saw `sim` in the [introduction](/articles/intro.html), but I want to point out one more important aspect of it here: the keys from each cycle of the simulation results are vectors, whose elements represent the module hierarchy and register name of the signal. We can see here how every cycle's results are stored as `[:counter :output]`, since the module's name is `:counter` and its register is `:output`. We will see nested modules in a later section.
 
 ## Defining inputs
 
@@ -68,12 +68,14 @@ Modules take every undefined signal as an input. We will look at a basic arithme
 
 (assert (= (alu-module :op 0 :x 2 :y 3) 5))
 (assert (= (alu-module :op 1 :x 2 :y 3) -1))
-(assert (= (alu-module :op 1 :x 2 :y 3) 6))
+(assert (= (alu-module :op 2 :x 2 :y 3) 6))
 {% endhighlight %}
+
+As you can see, inputs are passed to modules as key-value arguments to module function.
 
 ## Composing modules
 
-Although modules can have names generated for them, if you do this, you will not easily be able to refer to particular signals within the module. We will make a module that outputs the sum 1, 1+2, 1+2+3, 1+2+3+4, etc:
+Although modules can have names generated for them, if you do this, you will not easily be able to refer to particular signals within the module. We will make a module that outputs the sum `1`, `1 + 2`, `1 + 2 + 3`, `1 + 2 + 3 + 4`, etc:
 
 {% highlight clojure %}
 (def summer
