@@ -24,7 +24,7 @@ If you don't know Clojure, I recommend going to the [Clojure Doc Site](http://cl
 
 ## A Brief Introduction to Piplin
 
-You can get a working project with all of the code in this tutorial from [Piplin Starter](https://github.com/dgrnbrg/piplin-starter), which is a preconfigured sample project for Piplin on Github. If you'd like to use Piplin yourself, just add `[piplin "0.1.0"]` as a `:dependency` in your project.clj.
+You can get a working project with all of the code in this tutorial from [Piplin Starter](https://github.com/dgrnbrg/piplin-starter), which is a preconfigured sample project for Piplin on Github. If you'd like to use Piplin yourself, just add `[piplin "0.1.1"]` as a `:dependency` in your project.clj.
 
 ### Example ns form
 
