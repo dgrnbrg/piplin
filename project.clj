@@ -1,4 +1,4 @@
-(defproject piplin "0.1.1-SNAPSHOT" 
+(defproject piplin "0.1.1"
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/core.logic "0.6.7"]
                  [slingshot "0.10.1"]
