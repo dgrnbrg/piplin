@@ -93,7 +93,7 @@ Although modules can have names generated for them, if you do this, you will not
   (sim (compile-root summer) 10))
 {% endhighlight %}
 
-Here we can see how submodules are handled. Submodules are always instantiated within the `fnk`s of their parent module. This is necessary so that their proper place in the hierarchy can be inferred, and so that their state elements can be captured by `compile-root`. You can see that the `:sub-module` key in the `summer` module is not included in the module's output map (just try `(summer)` and see how it has only 2 keys: `:n` and `:x`).
+Here we can see how submodules are handled. Submodules are always instantiated within the `fnk`s of their parent module. This is necessary so that their proper place in the hierarchy can be inferred, and so that their state elements can be captured by `compile-root`. You can see that the `:sub-counter` key in the `summer` module is not included in the module's output map because it is not a possible type for a signal (just try `(summer)` and see how it has only 2 keys: `:n` and `:x`).
 
 When you look at the output of the simulation, you can see the traces of the signals in `summer`, `counter-module`, and `alu-module`. Now, you can see why it is useful to name modules: it makes it easy to dig into the simulation results to see what each module in the hierarchy is doing.
 
