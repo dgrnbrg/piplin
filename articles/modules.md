@@ -13,7 +13,10 @@ Let's take a simple Piplin function, an incrementer, and see how it can be used 
 {% highlight clojure %}
 (defn inc-function [x] (+ 1 x))
 
-(def inc-module (modulize :inc-module {:output (fnk [input] (+ 1 input))} {}))
+(def inc-module (modulize :inc-module
+                  {:output (fnk [input]
+                             (+ 1 input))}
+                    {}))
 
 (assert (= (inc-function 1) 2))
 (assert (= (:output (inc-module :input 1)) 2))
@@ -34,7 +37,8 @@ Now that we've see simple combinational modules, let's look at a module that has
 {% highlight clojure %}
 (def counter-module
   (modulize :counter
-    {:output (fnk [output] (inc output))}
+    {:output (fnk [output]
+               (inc output))}
     {:output ((uintm 8) 0)}))
 
 (assert (= (->> (sim (compile-root counter-module) 9)
@@ -74,7 +78,8 @@ Although modules can have names generated for them, if you do this, you will not
 {% highlight clojure %}
 (def summer
   (modulize :summer
-    {:n (fnk [n x] (:output (alu-module :op 0 :x n :y x)))
+    {:n (fnk [n x]
+          (:output (alu-module :op 0 :x n :y x)))
      :sub-counter (fnk []
                     (counter-module))
      :x (fnk [sub-counter]
