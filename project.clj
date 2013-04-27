@@ -12,7 +12,7 @@
   :profiles {:1.5 {:dependencies [[org.clojure/clojure "1.5.1"]]}
              :dev {:plugins [[lein-marginalia "0.7.0"]]}}
 
-  :aliases {"all" ["with-profile" "dev:dev,1.3:dev,1.5"]}
+  :aliases {"all" ["with-profile" "dev:dev,1.5"]}
 
   :min-lein-version "2.0.0"
   :source-paths ["src" "examples"]
