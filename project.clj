@@ -8,7 +8,12 @@
                  [org.clojure/tools.macro "0.1.1"]
                  [org.clojure/algo.monads "0.1.0"]
                  [org.clojure/algo.generic "0.1.0"]]
+
+  :profiles {:1.5 {:dependencies [[org.clojure/clojure "1.5.1"]]}
+             :dev {:plugins [[lein-marginalia "0.7.0"]]}}
+
+  :aliases {"all" ["with-profile" "dev:dev,1.3:dev,1.5"]}
+
   :min-lein-version "2.0.0"
-  :plugins [[lein-marginalia "0.7.0"] [lein-pprint "1.1.1"]]
   :source-paths ["src" "examples"]
   :description "A tool for programming FPGAs")

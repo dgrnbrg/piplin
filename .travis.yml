@@ -1,8 +1,13 @@
 language: clojure
 
+jvm:
+  - openjdk7
+  - oraclejdk7
+  - openjdk6
+
 lein: lein2
 
-script: lein2 test
+script: lein2 all test
 
 # May need other tools later
 before_install:
