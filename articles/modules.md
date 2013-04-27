@@ -4,6 +4,8 @@ layout: article
 ---
 ## Why modules?
 
+The goal of this guide is to help you understand what are modules, and how to use the `modulize` function.
+
 State machines are everywhere in hardware. Piplin modules are a way to encapsulate and compose state machines. They can also be used to encapsulate purely functional logic.
 
 ## Modules as functions

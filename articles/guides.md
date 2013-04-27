@@ -23,9 +23,13 @@ We recommend that you read these guides, if possible, in this order:
 An overview of Piplin with a quick tutorial that helps you to get started with it. It should take about
 30 minutes to read and study the provided code examples
 
+###  [Piplin values and deferred evaluation](/articles/deferred-evaluation.html)
+
+This guide explains how you can use the same functions and types at the REPL, in simulation, and in the generated Verilog. It goes over the simple and aggregate types and how they are constructed and interact.
+
 ###  [Modules](/articles/modules.html)
 
-An explaination of the Piplin module system. Goes over how to declare modules, how to incorpate state and feedback loops in your designs, and how to compose modules together to make more complex designs.
+An explanation of the Piplin module system. Goes over how to declare modules, how to incorpate state and feedback loops in your designs, and how to compose modules together to make more complex designs.
 
 ## Tell Us What You Think!
 
