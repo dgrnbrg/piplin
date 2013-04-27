@@ -1,7 +1,7 @@
 (ns piplin.test.sfxpts
   (:refer-clojure :exclude [cond condp cast not = not= > >= < <= + - * inc dec bit-and bit-or bit-xor bit-not and or bit-shift-left bit-shift-right pos? neg? zero?])
   (:use [piplin.types bundle sfxpts bits boolean core-impl binops uintm])
-  (:use [piplin types mux modules sim protocols verilog])
+  (:use [piplin types mux modules protocols verilog])
   (:import clojure.lang.ExceptionInfo)
   (:use clojure.test
         plumbing.core

@@ -1,5 +1,5 @@
 (ns piplin.modules
-  (:use [piplin sim types protocols])
+  (:use [piplin types protocols])
   (:use [clojure.string :only [join]]
         [clojure.set :only [map-invert]])
   (:use [slingshot.slingshot :only [throw+]])
