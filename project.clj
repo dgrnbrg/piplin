@@ -10,7 +10,12 @@
                  [org.clojure/algo.generic "0.1.0"]]
 
   :profiles {:1.5 {:dependencies [[org.clojure/clojure "1.5.1"]]}
-             :dev {:plugins [[lein-marginalia "0.7.0"]]}}
+             :dev {:plugins [[lein-marginalia "0.7.0"]
+                             [codox "0.6.4"]]
+                   :codox {:sources ["src"]
+                           :exclude piplin.mips
+                           :src-dir "https://github.com/dgrnbrg/piplin/blob/master"
+                           :src-linenum-anchor-prefix "L"}}}
 
   :aliases {"all" ["with-profile" "dev:dev,1.5"]}
 
