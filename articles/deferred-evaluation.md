@@ -13,7 +13,7 @@ The goal of this guide is to help you understand how so-called "synthesizable" v
 
 Let's look at some examples of pipinsts:
 
-- `((uintm 8) 3)` is a **u**nsigned **int** with **m**odulo on overflow, 8 bits wide, with the value 3 (binary `#b0000_0011`)
+- `((uintm 8) 3)` is an **u**nsigned **int** with **m**odulo on overflow, 8 bits wide, with the value 3 (binary `#b0000_0011`)
 - `(cast (sfxpts 7 3) 5.23)` is a **s**igned **f**i**x**ed-**p**oin**t** number that **s**atures on overflow (tops or bottoms out), with 7 bits for the integer part, and 3 bits for the fractional part, with the closest representable value to 5.23 (binary `#b0000101_001`)
 - `true` is a boolean (which is 1 bit wide) (binary `#b1`)
 
