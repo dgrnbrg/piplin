@@ -31,6 +31,10 @@ This guide explains how you can use the same functions and types at the REPL, in
 
 An explanation of the Piplin module system. Goes over how to declare modules, how to incorpate state and feedback loops in your designs, and how to compose modules together to make more complex designs.
 
+### [API Documentation](/articles/docs.html)
+
+This is an API documentation guide, organized by functionality.
+
 ## Tell Us What You Think!
 
 Please take a moment to tell us what you think about this guide on Twitter or the [Piplin mailing list](https://groups.google.com/forum/#!forum/piplin)
