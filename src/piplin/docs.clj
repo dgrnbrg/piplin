@@ -38,15 +38,6 @@
   (println (remove :line (apply get-var-info var-syms)))
   (str "## " title "\n"
        (->> (apply get-var-info var-syms)
-            (map (fn [{:keys [ns name] :as r}]
-                   (cond
-                     (and (= ns 'piplin.protocols)
-                          (= name 'typeof))
-                     (assoc r :file "piplin/protocols.clj" :line 5)
-                     :else
-                     r
-                     )
-                   ))
             (mapcat (fnk [{arglists []} ns name {doc ""} line file]
                          (let [anchor (gensym)]
                            `(~(str "### <a href='https://github.com/dgrnbrg/piplin/blob/" my-rev "/src/" file "#L" line "'>" (escape ns) "/" (escape name)  "</a>")

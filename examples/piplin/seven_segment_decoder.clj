@@ -3,8 +3,7 @@
   (:use [slingshot.slingshot :only [throw+]])
   (:refer-clojure :as clj :exclude [not= bit-or cond bit-xor + - * bit-and assoc assoc-in inc dec bit-not condp < > <= >= = cast not and or bit-shift-left bit-shift-right pos? neg? zero?])
   (:use plumbing.core
-        [piplin core
-         [protocols :only [typeof]]]))
+        [piplin core]))
 
 (defn log16
   "log base 16"
