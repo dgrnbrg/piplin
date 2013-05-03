@@ -39,6 +39,7 @@
   piplin.mux/mux2
   piplin.mux/cond
   piplin.mux/condp
+  piplin.protocols/typeof
   piplin.types/kindof
   piplin.types/anontype
   piplin.types/log2
