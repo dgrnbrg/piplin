@@ -1,255 +1,727 @@
 (ns piplin.mips
-  (:refer-clojure :exclude [cast condp cond = not=])
-  (:use [slingshot.slingshot])
-  (:use [piplin types modules mux protocols])
-  (:use [piplin.types binops uintm enum bundle union bits])
-  (:require [clojure.core :as clj])
-  (:require [piplin.types.core-impl :as h]))
+  (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-right bit-shift-left pos? neg? zero?])
+  (:use piplin.core))
 
+(defmacro defunion
+  [name & clauses]
+  `(def ~name (union (hash-map ~@clauses))))
 
-(def mips-ops
-  (enum {:func #b000_000
-         :addi #b001_000
-         :addiu #b001_001
-         :andi #b001_100
-         :beq #b000_100 ;todo
-         :bgez #b000_001 ;todo
-         :bgezal #b000_001 ;todo
-         :bgtz #b000_111 ;todo
-         :blez #b000_110 ;todo
-         :bltz #b000_001 ;todo
-         :bltzal #b000_001 ;todo
-         :bne #b000_101 ;todo
-         :j #b000_010 ;todo
-         :jal #b000_011 ;todo
-         :lb #b100_000 ;todo
-         :lui #b001_111
-         :lw #b100_011 ;todo
-         :ori #b001_101
-         :sb #b101_000 ;todo
-         :slti #b001_010
-         :sltiu #b0010_11
-         :sw #b101_011 ;todo
-         :xori #b001_110
-         } :allow-dups))
+(defmacro defenum
+  [name & values]
+  `(def ~name (enum (conj #{} ~@values))))
 
-(def mips-short-funcs
-  (enum {:sll #b000_000
-         :sllv #b000_100
-         :sra #b000_011
-         :srl #b000_010
-         :syscall #b001_100 ;todo
-         :xor #b100_110
-         }))
+;; Register index
+(defenum rindx
+  :r0
+  :r1
+  :r2
+  :r3
+  :r4
+  :r5
+  :r6
+  :r7
+  :r8
+  :r9
+  :r10
+  :r11
+  :r12
+  :r13
+  :r14
+  :r15
+  :r16
+  :r17
+  :r18
+  :r19
+  :r20
+  :r21
+  :r22
+  :r23
+  :r24
+  :r25
+  :r26
+  :r27
+  :r28
+  :r29
+  :r30
+  :r31)
 
-(def mips-funcs
-  (enum {:add #b000_0010_0000
-         :addu #b000_0010_0001
-         :and #b000_0010_0100
-         :div #b000_0001_1010 ;todo
-         :divu #b000_0001_1011 ;todo
-         :jr #b000_0000_1000
-         :mfhi #b000_0001_0000 ;todo
-         :mflo #b000_0001_0010 ;todo
-         :mult #b000_0001_1000 ;todo
-         :multu #b000_0001_1001 ;todo
-         :or #b000_0010_0101
-         :slt #b000_0010_1010
-         :sltu #b000_0010_1011
-         :srlv #b000_0000_0110
-         :sub #b000_0010_0010
-         :subu #b000_0010_0011
-         }))
+(def simm (bits 16))
+(def zimm (bits 16))
+(def shamt (bits 5))
+(def target (bits 26))
+(def cp0indx (bits 5))
+(def data (bits 32))
+(def addr (uintm 32))
 
-(def mips-branches
-  (enum {:bgez #b00001
-         :bgezal #b10001
-         :bltzal #b10000}))
+(defunion instr
 
-(def reg (enum #{:0 :1 :2 :3
-                 :4 :5 :6 :7
-                 :8 :9 :10 :11
-                 :12 :13 :14 :15
-                 :16 :17 :18 :19
-                 :20 :21 :22 :23
-                 :24 :25 :26 :27
-                 :28 :29 :30 :31}))
+  ;; Memory operations
+  :lw (bundle {:rbase rindx :rdst rindx :offset simm})
+  :sw (bundle {:rbase rindx :rsrc rindx :offset simm})
 
-(def u32m (uintm 32))
+  ;; Arithmetic operations
+  :addiu (bundle {:rsrc rindx :rdst rindx :imm simm})
+  :slti  (bundle {:rsrc rindx :rdst rindx :imm simm})
+  :sltiu (bundle {:rsrc rindx :rdst rindx :imm zimm})
+  :andi  (bundle {:rsrc rindx :rdst rindx :imm zimm})
+  :ori   (bundle {:rsrc rindx :rdst rindx :imm zimm})
+  :xori  (bundle {:rsrc rindx :rdst rindx :imm zimm})
+  :lui   (bundle {            :rdst rindx :imm zimm})
 
-(def reg-or-imm (union {:reg reg :imm u32m}))
+  :sll   (bundle {:rsrc rindx :rdst rindx :shamt shamt})
+  :srl   (bundle {:rsrc rindx :rdst rindx :shamt shamt})
+  :sra   (bundle {:rsrc rindx :rdst rindx :shamt shamt})
+  :sllv  (bundle {:rsrc rindx :rdst rindx :rshamt rindx})
+  :srlv  (bundle {:rsrc rindx :rdst rindx :rshamt rindx})
+  :srav  (bundle {:rsrc rindx :rdst rindx :rshamt rindx})
+  :addu  (bundle {:rsrc1 rindx :rsrc2 rindx :rdst rindx})
+  :subu  (bundle {:rsrc1 rindx :rsrc2 rindx :rdst rindx})
+  :and   (bundle {:rsrc1 rindx :rsrc2 rindx :rdst rindx})
+  :or    (bundle {:rsrc1 rindx :rsrc2 rindx :rdst rindx})
+  :xor   (bundle {:rsrc1 rindx :rsrc2 rindx :rdst rindx})
+  :nor   (bundle {:rsrc1 rindx :rsrc2 rindx :rdst rindx})
+  :slt   (bundle {:rsrc1 rindx :rsrc2 rindx :rdst rindx})
+  :sltu  (bundle {:rsrc1 rindx :rsrc2 rindx :rdst rindx})
 
-(def alu-op (enum #{:add
-                    :addu
-                    :sub
-                    :and
-                    :lui
-                    :or
-                    :xor
-                    :slt
-                    :sltu
-                    :sll
-                    }))
+  ;; Jump and branch operations
+  :j     (bundle {:target target})
+  :jal   (bundle {:target target})
+  :jr    (bundle {:rsrc rindx})
+  :jalr  (bundle {:rsrc rindx :rdst rindx})
+  :beq   (bundle {:rsrc1 rindx :rsrc2 rindx :offset simm})
+  :bne   (bundle {:rsrc1 rindx :rsrc2 rindx :offset simm})
+  :blez  (bundle {:rsrc rindx :offset simm})
+  :bgtz  (bundle {:rsrc rindx :offset simm})
+  :bltz  (bundle {:rsrc rindx :offset simm})
+  :bgez  (bundle {:rsrc rindx :offset simm})
 
-(def alu-unresolved-cmd
-  (bundle {:op alu-op
-           :x reg-or-imm
-           :y reg-or-imm
-           :dst reg}))
+  :mfc0  (bundle {:rdst rindx :cop0src cp0indx})
+  :mtc0  (bundle {:rsrc rindx :cop0dst cp0indx})
 
-(def alu-cmd (bundle {:op alu-op
-                      :x u32m
-                      :y u32m
-                      :dst reg}))
+  :illegal (bits 1)
+  )
 
-(def wb-result (bundle {:data u32m
-                        :dst reg}))
+(defn- ->instr
+  "Takes a nested map that has the same structure
+   as an instr but with `bits` in every location instead
+   of the correct type. Recursively converts all the
+   bits to the correct types, then casts that result
+   to `instr`."
+  [instr-data]
+  (let [[[tag value]] (seq instr-data)
+        schema (:schema (get (:schema instr) tag))
+        data (if (= tag :illegal)
+               data
+               (reduce (fn [x [k v]]
+                         (assoc x k (deserialize
+                                      v (get value k))))
+                       {}
+                       schema))]
+    (cast instr {tag data})))
 
-(comment
-  MIPS architecture decomposed
+(defunion alu-result
+  :alu (bundle {:dst rindx :data data})
+  :nothing (bits 1)
+  )
 
-  given an instruction, determine if it's an
-  alu op (arithmetic and branching), a load op,
-  a store op, or an immediate jump (can be
-  bypassed). Returns a union of the possibilities.
-  ALU ops' arguments are unions of immediate
-  and register. Destination is a register.
-  others are undetermined.
+(defn ->alu-result
+  ([]
+   (cast alu-result {:nothing #b0}))
+  ([dst data]
+   (cast wbresult {:alu {:dst dst :data data}})))
 
-  given 2 immediate_or_registers, return
-  a pair of immediates, resolving the registers.
+(let [opFUNC  #b000000  fcSLL   #b000000
+      opRT    #b000001  fcSRL   #b000010
+      opRS    #b010000  fcSRA   #b000011
+      fcSLLV  #b000100
+      opLW    #b100011  fcSRLV  #b000110
+      opSW    #b101011  fcSRAV  #b000111
+      fcADDU  #b100001
+      opADDIU #b001001  fcSUBU  #b100011
+      opSLTI  #b001010  fcAND   #b100100
+      opSLTIU #b001011  fcOR    #b100101
+      opANDI  #b001100  fcXOR   #b100110
+      opORI   #b001101  fcNOR   #b100111
+      opXORI  #b001110  fcSLT   #b101010
+      opLUI   #b001111  fcSLTU  #b101011
 
-  given 2 immediates, an alu op, and the current pc,
-  return the next pc, an immediate, and a register
-  to write to
+      opJ     #b000010
+      opJAL   #b000011
+      fcJR    #b001000
+      fcJALR  #b001001
+      opBEQ   #b000100
+      opBNE   #b000101
+      opBLEZ  #b000110
+      opBGTZ  #b000111
+      rtBLTZ  #b00000
+      rtBGEZ  #b00001
 
-  given a register an an immediate, store the immediate
-  in the register)
+      rsMFC0  #b00000
+      rsMTC0  #b00100
+      
+      bit-cat (fn [& args] (apply bit-cat (map serialize args)))]
+  (defn encode
+    [instr]
+    (union-match instr
+
+      (:lw {:keys [rbase rdst offset]}
+           (bit-cat opLW rbase rdst offset))
+      (:sw {:keys [rbase rsrc offset]}
+           (bit-cat opSW rbase rsrc offset))
+
+      (:addiu {:keys [rsrc rdst imm]}
+              (bit-cat opADDIU rsrc rdst imm))
+      (:slti {:keys [rsrc rdst imm]}
+             (bit-cat opSLTI, rsrc, rdst, imm))
+      (:sltiu {:keys [rsrc rdst imm]}
+              (bit-cat opSLTIU, rsrc, rdst, imm))
+      (:andi {:keys [rsrc rdst imm]}
+             (bit-cat opANDI, rsrc, rdst, imm))
+      (:ori {:keys [rsrc rdst imm]}
+            (bit-cat opORI, rsrc, rdst, imm))
+      (:xori {:keys [rsrc rdst imm]}
+             (bit-cat opXORI, rsrc, rdst, imm))
+      (:lui {:keys [rdst imm]}
+            (bit-cat opLUI, #b00_000, rdst, imm))
+
+      (:sll {:keys [rsrc rdst shamt]}
+            (bit-cat opFUNC, #b00_000, rsrc, rdst, shamt, fcSLL))
+      (:srl {:keys [rsrc rdst shamt]}
+            (bit-cat opFUNC, #b00_000, rsrc, rdst, shamt, fcSRL))
+      (:sra {:keys [rsrc rdst shamt]}
+            (bit-cat opFUNC, #b00_000, rsrc, rdst, shamt, fcSRA))
+
+      (:sllv {:keys [rsrc rdst rshamt]}
+             (bit-cat opFUNC, rshamt, rsrc, rdst, #b00_000, fcSLLV))
+      (:srlv {:keys [rsrc rdst rshamt]}
+             (bit-cat opFUNC, rshamt, rsrc, rdst, #b00_000, fcSRLV))
+      (:srav {:keys [rsrc rdst rshamt]}
+             (bit-cat opFUNC, rshamt, rsrc, rdst, #b00_000, fcSRAV))
+
+      (:addu {:keys [rsrc1 rsrc2 rdst]}
+             (bit-cat opFUNC, rsrc1, rsrc2, rdst, #b00_000, fcADDU))
+      (:subu {:keys [rsrc1 rsrc2 rdst]}
+             (bit-cat opFUNC, rsrc1, rsrc2, rdst, #b00_000, fcSUBU))
+      (:and {:keys [rsrc1 rsrc2 rdst]}
+            (bit-cat opFUNC, rsrc1, rsrc2, rdst, #b00_000, fcAND)) 
+      (:or {:keys [rsrc1 rsrc2 rdst]}
+           (bit-cat opFUNC, rsrc1, rsrc2, rdst, #b00_000, fcOR)) 
+      (:xor {:keys [rsrc1 rsrc2 rdst]}
+            (bit-cat opFUNC, rsrc1, rsrc2, rdst, #b00_000, fcXOR)) 
+      (:nor {:keys [rsrc1 rsrc2 rdst]}
+            (bit-cat opFUNC, rsrc1, rsrc2, rdst, #b00_000, fcNOR)) 
+      (:slt {:keys [rsrc1 rsrc2 rdst]}
+            (bit-cat opFUNC, rsrc1, rsrc2, rdst, #b00_000, fcSLT)) 
+      (:sltu {:keys [rsrc1 rsrc2 rdst]}
+             (bit-cat opFUNC, rsrc1, rsrc2, rdst, #b00_000, fcSLTU)) 
+
+      (:j {:keys [target]}
+          (bit-cat opJ, target))
+      (:jal {:keys [target]}
+            (bit-cat opJAL, target))
+      (:jr {:keys [rsrc]}
+           (bit-cat opFUNC, rsrc, #b00_000, #b00_000, #b00_000, fcJR))
+      (:jalr {:keys [rsrc rdst]}
+             (bit-cat opFUNC, rsrc, #b00_000, rdst, #b00_000, fcJALR))
+      (:beq {:keys [rsrc1 rsrc2 offset]}
+            (bit-cat opBEQ, rsrc1, rsrc2, offset))
+      (:bne {:keys [rsrc1 rsrc2 offset]}
+            (bit-cat opBNE, rsrc1, rsrc2, offset))
+      (:blez {:keys [rsrc offset]}
+             (bit-cat opBLEZ, rsrc, #b00_000, offset))
+      (:bgtz {:keys [rsrc offset]}
+             (bit-cat opBGTZ, rsrc, #b00_000, offset))
+      (:bltz {:keys [rsrc offset]}
+             (bit-cat opRT, rsrc, rtBLTZ, offset))
+      (:bgez {:keys [rsrc offset]}
+             (bit-cat opRT, rsrc, rtBGEZ, offset))
+
+      (:mfc0 {:keys [rdst cop0src]}
+             (bit-cat opRS, rsMFC0, rdst, cop0src, #b000_000_000_00))
+      (:mtc0 {:keys [rsrc cop0dst]}
+             (bit-cat opRS, rsMTC0, rsrc, cop0dst, #b000_000_000_00))
+      )
+    )
+
+  (defn decode
+    [instr-bits]
+    (let [opcode (bit-slice instr-bits 26 32)
+          rs (bit-slice instr-bits 21 26)
+          rt (bit-slice instr-bits 16 21)
+          rd (bit-slice instr-bits 11 16)
+          rshamt (bit-slice instr-bits 6 11)
+          funct (bit-slice instr-bits 0 6)
+          imm (bit-slice instr-bits 0 16)
+          target (bit-slice instr-bits 0 25)]
+
+      (condp = opcode
+        opLW (->instr {:lw {:rbase rs :rdst rt :offset imm}})
+        opSW (->instr {:lw {:rbase rs :rsrc rt :offset imm}})
+        opADDIU (->instr {:addiu { :rsrc rs :rdst rt :imm imm}})
+        opSLTI (->instr {:slti { :rsrc rs :rdst rt :imm imm}})
+        opSLTIU (->instr {:sltiu { :rsrc rs :rdst rt :imm imm}})
+        opANDI (->instr {:andi { :rsrc rs :rdst rt :imm imm}})
+        opORI (->instr {:ori { :rsrc rs :rdst rt :imm imm}})
+        opXORI (->instr {:xori { :rsrc rs :rdst rt :imm imm}})
+        opLUI (->instr {:lui {  :rdst rt :imm imm}})
+        opJ (->instr {:j { :target target}})
+        opJAL (->instr {:jal { :target target}})
+        opBEQ (->instr {:beq { :rsrc1 rs :rsrc2 rt :offset imm}})
+        opBNE (->instr {:bne { :rsrc1 rs :rsrc2 rt :offset imm}})
+        opBLEZ (->instr {:blez { :rsrc rs :offset imm}})
+        opBGTZ (->instr {:bgtz { :rsrc rs :offset imm}})
+        opFUNC  
+        (condp = funct
+          fcSLL   (->instr {:sll   {:rsrc rt  :rdst rd  :shamt shamt }})
+          fcSRL   (->instr {:srl   {:rsrc rt  :rdst rd  :shamt shamt }})
+          fcSRA   (->instr {:sra   {:rsrc rt  :rdst rd  :shamt shamt }})
+          fcSLLV  (->instr {:sllv  {:rsrc rt  :rdst rd  :rshamt rs   }})
+          fcSRLV  (->instr {:srlv  {:rsrc rt  :rdst rd  :rshamt rs   }})
+          fcSRAV  (->instr {:srav  {:rsrc rt  :rdst rd  :rshamt rs   }})
+          fcADDU  (->instr {:addu  {:rsrc1 rs :rsrc2 rt :rdst rd     }})
+          fcSUBU  (->instr {:subu  {:rsrc1 rs :rsrc2 rt :rdst rd     }})
+          fcAND   (->instr {:and   {:rsrc1 rs :rsrc2 rt :rdst rd     }})
+          fcOR    (->instr {:or    {:rsrc1 rs :rsrc2 rt :rdst rd     }})
+          fcXOR   (->instr {:xor   {:rsrc1 rs :rsrc2 rt :rdst rd     }})
+          fcNOR   (->instr {:nor   {:rsrc1 rs :rsrc2 rt :rdst rd     }})
+          fcSLT   (->instr {:slt   {:rsrc1 rs :rsrc2 rt :rdst rd     } })
+          fcSLTU  (->instr {:sltu  {:rsrc1 rs :rsrc2 rt :rdst rd     }})
+          fcJR    (->instr {:jr    {:rsrc rs                         }})
+          fcJALR  (->instr {:jalr  {:rsrc rs  :rdst rd               }})
+          (->instr {:illegal #b0}))
+
+        opRT
+        (condp = rt
+          rtBLTZ (->instr {:bltz {:rsrc rs :offset imm}})
+          rtBGEZ (->instr {:bltz {:rsrc rs :offset imm}})
+          (->instr {:illegal #b0}))
+
+        opRS
+        (condp = rs
+          rsMFC0 (->instr {:mfc0 {:rdst rt :cop0src rd}})
+          rsMTC0 (->instr {:mtc0 {:rsrc rt :cop0dst rd}})
+          (->instr {:illegal #b0}))
+
+        (->instr {:illegal #b0})))))
+
+(defn sext32
+  "Sign extends the input to 32 bits"
+  [x]
+  (let [width (bit-width-of (typeof x))
+        high-bit (bit-slice x (dec width) width)]
+    (if (not= width 32)
+      (sext32 (bit-cat high-bit x))
+      x)))
+
+(assert (= (sext32 #b0001) #b00000000_00000000_00000000_0000_0001))
+(assert (= (sext32 #b1000) #b11111111_11111111_11111111_1111_1000))
 
 (defn zext32
-  "zero extend bits to 32"
-  [b]
-  (deserialize u32m
-    (bit-cat
-      (cast (bits (- 32 (bit-width-of (typeof b)))) 0)
-      b)))
+  "Zero extends the input to 32 bits"
+  [x]
+  (let [width (bit-width-of (typeof x))]
+    (if (not= width 32)
+      (zext32 (bit-cat #b0 x))
+      x)))
+(assert (= (zext32 #b0001) #b00000000_00000000_00000000_0000_0001))
+(assert (= (zext32 #b1000) #b00000000_00000000_00000000_0000_1000))
 
-(defn decode-func
-  "Takes a partially decoded function and completes
-  the decoding"
-  [func short-func rs rt rd sa]
-  (let [cmd {:x {:reg rs}
-             :y {:reg rt}
-             :dst rd}]
-    (->>
-      (condp = (deserialize mips-short-funcs short-func)
-        :sll (-> cmd
-               (assoc
-                 :op :sll)
-               (assoc
-                 :x
-                 {:imm (zext32 sa)}))
-        :sllv (assoc
-                cmd :op :sll)
-        :sra (-> cmd
-               (assoc
-                 :op :sra)
-               (assoc
-                 :x
-                 {:imm (zext32 sa)}))
-        :srl (-> cmd
-               (assoc
-                 :op :srl)
-               (assoc
-                 :y
-                 {:imm (zext32 sa)}))
-        :xor (assoc
-               cmd [ :op] :xor)
-        (assoc
-          cmd
-          :op
-          (condp = (deserialize mips-funcs func)
-            :add :add
-            :addu :addu
-            :and :and
-            :jr :jr
-            :or :or
-            :slt :slt
-            :sltu :sltu
-            :srl :srlv
-            :sub :sub
-            :subu :subu)))
-      (cast alu-unresolved-cmd)
-      identity
-      )))
+(defmacro defbarrelshifter
+  [name docstring [x shamt] case-fn ovf-expr]
+  `(defn ~name
+     ~docstring
+     [~x ~shamt]
+     (condp = ~shamt
+       ~@(mapcat (fn [i]
+                   [`(cast (bits 32) ~i) (list case-fn i)])
+                (range 32))
+       ~ovf-expr
+       )))
 
-(defn decode
-  "Takes an instruction and returns an
-  alu-cmd or mem-cmd"
-  [inst]
-  (when-not (= (typeof inst) (bits 32))
-    (throw (IllegalArgumentException. "must be bits32")))
-  (->>
-    (let [b (partial bit-slice inst)
-          op (b 26 32)
-          rs (deserialize reg (b 21 26))
-          rt (deserialize reg (b 16 21))
-          imm (zext32 (b 0 16))
-          target (b 0 26)
-          rd (deserialize reg (b 11 16))
-          sa (b 6 11)
-          short-func (b 0 6)
-          func (b 0 11)
-          partial-imm {:x {:reg rs}
-                       :y {:imm imm}
-                       :dst rt}
-          ]
-      (mux2 (= (deserialize mips-ops op) :func)
-            (decode-func func short-func
-                         rs rt rd sa)
-            (cast alu-unresolved-cmd
-                  (assoc partial-imm :op
-                         (condp = (deserialize mips-ops op)
-                           :addi :add
-                           :addiu :addu
-                           :andi :and
-                           :lui :lui
-                           :ori :or
-                           :slti :slt
-                           :sltiu :sltu
-                           :xori :xor
-                           ;branches
-                           ;jumps
-                           ;loads
-                           ;stores
-                           )))))
-    (cast alu-unresolved-cmd)
-    ))
+(defbarrelshifter sra
+  "Shift right arithmetic"
+  [x shamt]
+  (fn [i]
+    (let [high-bit (bit-slice x 31 32)]
+      (apply bit-cat (concat (repeat i high-bit)
+                             [(bit-slice x i 32)]))))
+  (apply bit-cat (repeat 32 (bit-slice x 31 32)))
+  )
+
+;; shift by 7 without sign bit
+(assert (= (sra #b00000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00000111)
+           #b00000000_00000000_00000001_00000000))
+
+;; shift by 7 with sign bit
+(assert (= (sra #b10000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00000111)
+           #b11111111_00000000_00000001_00000000))
+
+;; shift by 0
+(assert (= (sra #b10000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00000000)
+           #b10000000_00000000_10000000_00000000))
+
+;; shift by 31 without sign bit
+(assert (= (sra #b00000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00011111)
+           #b00000000_00000000_00000000_00000000))
+
+;; shift by 31 with sign bit
+(assert (= (sra #b10000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00011111)
+           #b11111111_11111111_11111111_11111111))
+
+;; shift by 32 without sign bit
+(assert (= (sra #b00000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00100000)
+           #b00000000_00000000_00000000_00000000))
+
+;; shift by 32 with sign bit
+(assert (= (sra #b10000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00100000)
+           #b11111111_11111111_11111111_11111111))
+
+(defbarrelshifter srl
+  "Shift right logical"
+  [x shamt]
+  (fn [i]
+      (apply bit-cat (concat (repeat i #b0)
+                             [(bit-slice x i 32)])))
+  (cast (bits 32) 0))
+
+;; shift by 7
+(assert (= (srl #b00000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00000111)
+           #b00000000_00000000_00000001_00000000))
+
+;; shift by 0
+(assert (= (srl #b00000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00000000)
+           #b00000000_00000000_10000000_00000000))
+
+;; shift by 31
+(assert (= (srl #b00000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00011111)
+           #b00000000_00000000_00000000_00000000))
+
+;; shift by 63
+(assert (= (srl #b00000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00111111)
+           #b00000000_00000000_00000000_00000000))
+
+(defbarrelshifter sll
+  "Shift left logical"
+  [x shamt]
+  (fn [i]
+      (apply bit-cat (concat 
+                             [(bit-slice x 0 (- 32 i))]
+                       (repeat i #b0) 
+                       )))
+  (cast (bits 32) 0))
+
+;; shift by 7
+(assert (= (sll #b00000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00000111)
+           #b00000000_01000000_00000000_00000000))
+
+;; shift by 0
+(assert (= (sll #b00000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00000000)
+           #b00000000_00000000_10000000_00000000))
+
+;; shift by 31
+(assert (= (sll #b00000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00011111)
+           #b00000000_00000000_00000000_00000000))
+
+;; shift by 63
+(assert (= (sll #b00000000_00000000_10000000_00000000
+                #b00000000_00000000_00000000_00111111)
+           #b00000000_00000000_00000000_00000000))
+
+(defn s>
+  [x y]
+  (> (deserialize (sints 32) x) (deserialize (sints 32) y)))
+(defn s>=
+  [x y]
+  (>= (deserialize (sints 32) x) (deserialize (sints 32) y))) 
+(defn s<
+  [x y]
+  (< (deserialize (sints 32) x) (deserialize (sints 32) y))) 
+(defn s<=
+  [x y]
+  (<= (deserialize (sints 32) x) (deserialize (sints 32) y)))
 
 (defn alu
-  "Takes an alu command and returns
-  a writeback result"
-  [cmd]
-  (let [{:keys [op x y dst]} cmd]
-    (->>
-      {:data (condp op =
-               :add (h/+ x y)
-               :sub (h/- x y))
-       :dst dst}
-      (cast wb-result)
-      )))
+  "Does an ALU operation. Could be extended
+   to include reorder tag, pc predicted addr,
+   and prediction epoch.
+   
+   This is a helper function, not a hardware function,
+   although its results are synthesizable, the dispatch
+   isn't."
+  [op x y rdst]
+  (let [->wb (partial ->wb :reg rdst)]
+    (case op
+      :+ (->wb (+ x y))
+      ;; TODO: make sure the signed/unsigned comparison
+      ;; of slt/sltu works
+      :slt (->wb (mux2 (< x y)
+                       1 0))
+      :sltu (->wb (mux2 (< x y)
+                        1 0))
+      :sll (->wb (bit-shift-left x y))
+      :srl (->wb (bit-shift-right x y))
+      ;; TODO: srl and sra should be different
+      :sra (->wb (bit-shift-right x y))
+      :sub (->wb (- x y))
+      :and (->wb (bit-and x y))
+      :or (->wb (bit-or x y))
+      :xor (->wb (bit-xor x y))
+      :nor (->wb (bit-not (bit-or x y)))
+      :lui (->wb (bit-cat (bit-slice x 0 16)
+                          (cast (bits 16) 0)))
+      )
+    )
+  )
 
-(comment (clojure.java.shell/sh "gcc"
-                                "-xc"
-                                "-nostdlib"
-                                "-c"
-                                "-o"
-                                "tmp.o"
-                                "-"
-                                :in (.getBytes
-                                      "int main() {
-                                      return 22;
-                                      }")))
+(def alu-op
+  (bundle {:op (:enum instr)
+           :pc addr
+           :imm simm
+           :x data
+           :y data
+           :dst rindx}))
 
-;addiu encoded
-;(decode (str-to-bits "001001_00001_00010_1000_0000_0000_0000"))
+(def store-op
+  (bundle {:pc addr
+           :addr data
+           :data data}))
+
+(defunion alu-or-store-op
+  :alu alu-op
+  :store store-op)
+
+(defn- ->alu-op
+  "Returns an alu-or-store-op"
+  [op pc x y dst]
+  (cast alu-or-store-op
+        {:alu {:op op :pc pc :x x :y x :dst dst :imm (cast simm 0)}}))
+
+(defn- ->br-op
+  "Returns an alu-or-store-op"
+  [op pc offset x y]
+  (cast alu-or-store-op
+        {:alu {:op op :pc pc :x x :y x :dst (cast rindx 0) :imm offset}}))
+
+(defn- ->store-op
+  "Returns an alu-or-store-op"
+  [pc addr data]
+  (cast alu-or-store-op
+        {:store {:pc pc :addr addr :data data}}))
+
+(defn resolve
+  "Takes a decoded instr, the pc, and the regfile
+   and resolves the operands, returning either
+   a store or an alu op."
+  [instr pc regfile]
+  (union-match
+    instr
+    ;; Memory operations
+    (:lw {:keys [rbase rdst offset]}
+         (->alu-op :lw pc (regfile rbase) (zext32 offset) rdst))
+    (:sw {:keys [rbase rsrc offset]}
+         (->store-op pc
+                     (+ (regfile rbase) (zext32 offset))
+                     (regfile rsrc)))
+
+    (:addiu {:keys [rsrc rdst imm]}
+            (->alu-op :add pc (regfile rsrc) (sext32 imm) rdst))
+    (:slti {:keys [rsrc rdst imm]}
+           (->alu-op :slt pc (regfile rsrc) (sext32 imm) rdst))
+    (:sltiu {:keys [rsrc rdst imm]}
+            (->alu-op :sltu pc (regfile rsrc) (zext32 imm) rdst))
+    (:andi {:keys [rsrc rdst imm]}
+           (->alu-op :and pc (regfile rsrc) (zext32 imm) rdst))
+    (:ori {:keys [rsrc rdst imm]}
+          (->alu-op :or pc (regfile rsrc) (zext32 imm) rdst))
+    (:xori {:keys [rsrc rdst imm]}
+           (->alu-op :xor pc (regfile rsrc) (zext32 imm) rdst))
+    (:lui {:keys [rdst imm]}
+          (->alu-op :add pc
+                    (bit-cat imm (cast (bits 16) 0))
+                    (cast data 0)
+                    rdst))
+
+    (:sll {:keys [rsrc rdst shamt]}
+          (->alu-op :sll pc (regfile rsrc) (zext32 shamt) rdst))
+    (:srl {:keys [rsrc rdst shamt]}
+          (->alu-op :srl pc (regfile rsrc) (zext32 shamt) rdst)) 
+    (:sra {:keys [rsrc rdst shamt]}
+          (->alu-op :sra pc (regfile rsrc) (zext32 shamt) rdst)) 
+    (:sllv {:keys [rsrc rdst rshamt]}
+           (->alu-op :sll pc (regfile rsrc) (regfile rshamt) rdst)) 
+    (:srlv {:keys [rsrc rdst rshamt]}
+           (->alu-op :srl pc (regfile rsrc) (regfile rshamt) rdst)) 
+    (:srav {:keys [rsrc rdst rshamt]}
+           (->alu-op :sra pc (regfile rsrc) (regfile rshamt) rdst)) 
+    (:addu {:keys [rsrc1 rsrc2 rdst]}
+           (->alu-op :add pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+    (:subu {:keys [rsrc1 rsrc2 rdst]}
+           (->alu-op :sub pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+    (:and {:keys [rsrc1 rsrc2 rdst]}
+          (->alu-op :and pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+    (:or  {:keys [rsrc1 rsrc2 rdst]}
+         (->alu-op :or pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+    (:xor {:keys [rsrc1 rsrc2 rdst]}
+          (->alu-op :xor pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+    (:nor {:keys [rsrc1 rsrc2 rdst]}
+          (->alu-op :nor pc (regfile rsrc1) (regfile rsrc2) rdst))
+    (:slt {:keys [rsrc1 rsrc2 rdst]}
+          (->alu-op :slt pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+    (:sltu {:keys [rsrc1 rsrc2 rdst]}
+           (->alu-op :sltu pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+
+    ;; Jump and branch operations
+    (:j {:keys [target]}
+        (->alu-op :jal pc (zext32 target) (cast data 0) :r0))
+    (:jal {:keys [target]}
+          (->alu-op :jal pc (zext32 target) (cast data 0) :r31))
+    (:jr {:keys [rsrc]}
+         (->alu-op :jal pc (regfile rsrc) (cast data 0) :r0))
+    (:jalr {:keys [rsrc rdst]}
+           (->alu-op :jal pc (regfile rsrc) (cast data 0) :r31))
+    (:beq {:keys [rsrc1 rsrc2 offset]}
+          (->br-op :beq pc (regfile rsrc1) (regfile rsrc2) offset))
+    (:bne {:keys [rsrc1 rsrc2 offset]}
+          (->br-op :bne pc (regfile rsrc1) (regfile rsrc2) offset))
+    (:blez {:keys [rsrc offset]}
+           (->br-op :blez pc (regfile rsrc) (cast data 0) offset))
+    (:bgtz {:keys [rsrc offset]}
+           (->br-op :bgtz pc (regfile rsrc) (cast data 0) offset))
+    (:bltz {:keys [rsrc offset]}
+           (->br-op :bltz pc (regfile rsrc) (cast data 0) offset))
+    (:bgez {:keys [rsrc offset]}
+           (->br-op :bgez pc (regfile rsrc) (cast data 0) offset))
+
+    (:mfc0 {:keys [rdst cop0src]}
+           ;; TODO implement this
+           (->alu-op :add pc (cast data 0) (cast data 0) (cast rindx 0)))
+    (:mtc0 {:keys [rsrc cop0dst]}
+           ;; TODO implement this
+           (->alu-op :add pc (cast data 0) (cast data 0) (cast rindx 0)))
+    (:illegal _
+              (->alu-op :add pc (cast data 0) (cast data 0) (cast rindx 0)))))
+
+(def reg-writeback
+  (bundle {:pc data
+           :dst rindx
+           :val data}))
+
+(defn ->writeback
+  ""
+  [pc dst val]
+  (cast reg-writeback {:pc pc :dst dst :val val}))
+
+(defn execute
+  ""
+  [op memory]
+  (union-match
+    op
+    (:store {pc :pc} (->writeback (+ pc 4) :r0 0))
+    (:alu {:keys [op pc x y dst imm]}
+          (let [pc+4 (+ pc 4)
+                pc+imm (+ pc (sext32 imm))
+                ux (deserialize (uintm 32) x)
+                uy (deserialize (uintm 32) y)
+                x+y (serialize (+ ux uy))
+                x-y (serialize (- ux uy))]
+            (condp = op
+              :lw (->writeback pc+4 dst (memory x+y))
+              :add (->writeback pc+4 dst x+y)
+              :sub (->writeback pc+4 dst x-y)
+              :slt (->writeback pc+4 dst (mux2 (s< x y)
+                                               (cast (bits 32) 0)
+                                               (cast (bits 32) 1)))
+              :sltu (->writeback pc+4 dst (mux2 (< ux uy)
+                                               (cast (bits 32) 0)
+                                               (cast (bits 32) 1)))
+              :and (->writeback pc+4 dst (bit-and x y))
+              :or (->writeback pc+4 dst (bit-or x y))
+              :xor (->writeback pc+4 dst (bit-xor x y))
+              :nor (->writeback pc+4 dst (bit-not (bit-or x y)))
+              :sll (->writeback pc+4 dst (sll x y)) 
+              :srl (->writeback pc+4 dst (srl x y)) 
+              :sra (->writeback pc+4 dst (sra x y)) 
+              
+              :jal (->writeback x dst pc+4)
+              :beq (->writeback (mux2 (= x y)
+                                      pc+4
+                                      pc+imm) :r0 0)
+              :bne (->writeback (mux2 (not= x y)
+                                      pc+4
+                                      pc+imm) :r0 0)
+              :blez (->writeback (mux2 (s<= x y)
+                                      pc+4
+                                      pc+imm) :r0 0)
+              :bgtz (->writeback (mux2 (s>= x y)
+                                      pc+4
+                                      pc+imm) :r0 0)
+              :bltz (->writeback (mux2 (s< x y)
+                                      pc+4
+                                      pc+imm) :r0 0)
+              :bgez (->writeback (mux2 (s> x y)
+                                      pc+4
+                                      pc+imm) :r0 0))))))
+
+#_(defn evaluate
+  "Takes an instr, a regfile, and a memory, and returns the result."
+  [instr regfile memory]
+  (letfn [(sreg [rindx] (->signed (regfile rindx)))
+          (zreg [rindx] (->unsigned (regfile rindx)))]
+    (union-match
+      instr
+      ;; Memory operations
+      (:lw {:keys [rbase rdst offset]}
+           (->wb :reg
+                 rdst
+                 (get memory (+ (sreg rbase)
+                                (sext32 offset)))))
+      (:sw {:keys [rbase rsrc offset]}
+           (->wb :mem
+                 (+ (sreg rbase)
+                    (sext32 offset))
+                 (regfile rsrc)))
+
+      (:addiu {:keys [rsrc rdst imm]}
+              (alu :+ (sreg rsrc) (sext32 imm) rdst))
+      (:stli {:keys [rsrc rdst imm]}
+             (->wb :reg
+                   rdst
+                   (mux2 (< (sreg rsrc) (sext32 imm))
+                         1 0)))
+      (:stliu {:keys [rsrc rdst imm]}
+              (->wb :reg
+                    rdst
+                    (mux2 (< (zreg rsrc) (zext32 imm))
+                          1 0)))
+      (:andi {:keys [rsrc rdst imm]}
+              (->wb :reg
+                    rdst
+                    (bit-and (zreg rsrc) (zext32 imm))))
+      (:ori {:keys [rsrc rdst imm]}
+              (->wb :reg
+                    rdst
+                    (bit-or (zreg rsrc) (zext32 imm))))
+      (:xori {:keys [rsrc rdst imm]}
+              (->wb :reg
+                    rdst
+                    (bit-xor (zreg rsrc) (zext32 imm))))
+      (:lui {:keys [rdst imm]}
+              (->wb :reg
+                    rdst
+                    (bit-cat imm (cast (bits 16) 0))))
+      ))
+  )

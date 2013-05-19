@@ -700,6 +700,7 @@
           pos-pos-ovf? neg-neg-ovf? negative-leading positive-leading neg-pos-ovf?]]
         ))))
 
+;; TODO: comparson operations don't work for signed values
 (defmethod verilog-of :>
   [ast name-lookup]
   (let-args ast name-lookup [lhs rhs]
