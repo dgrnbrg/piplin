@@ -178,12 +178,15 @@
   (when-let [n (-> obj typeof :n)]
     (when-not (= (:n type) n)
       (throw+ (error "Bit size mismatch"))))
-  (condp isa-type? (kindof obj)
-    :bits obj
-    :j-integral (instance type
-                          (long-to-bitvec obj
-                                          (:n type)))
-    (throw+ (error "Cannot promote" obj "to bits"))))
+  (try
+    (type obj)
+    (catch Exception _
+      (condp isa-type? (kindof obj)
+        :bits obj
+        :j-integral (instance type
+                              (long-to-bitvec obj
+                                              (:n type)))
+        (throw+ (error "Cannot promote" obj "to bits"))))))
 
 (defbinopimpl impl/bit-and :bits [:j-integral]
   [x y]

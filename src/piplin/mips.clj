@@ -11,6 +11,7 @@
   `(def ~name (enum (conj #{} ~@values))))
 
 ;; Register index
+;; TODO indices are wrong for the decoder
 (defenum rindx
   :r0
   :r1
@@ -118,17 +119,6 @@
                        {}
                        schema))]
     (cast instr {tag data})))
-
-(defunion alu-result
-  :alu (bundle {:dst rindx :data data})
-  :nothing (bits 1)
-  )
-
-(defn ->alu-result
-  ([]
-   (cast alu-result {:nothing #b0}))
-  ([dst data]
-   (cast wbresult {:alu {:dst dst :data data}})))
 
 (let [opFUNC  #b000000  fcSLL   #b000000
       opRT    #b000001  fcSRL   #b000010
@@ -313,9 +303,6 @@
       (sext32 (bit-cat high-bit x))
       x)))
 
-(assert (= (sext32 #b0001) #b00000000_00000000_00000000_0000_0001))
-(assert (= (sext32 #b1000) #b11111111_11111111_11111111_1111_1000))
-
 (defn zext32
   "Zero extends the input to 32 bits"
   [x]
@@ -323,8 +310,6 @@
     (if (not= width 32)
       (zext32 (bit-cat #b0 x))
       x)))
-(assert (= (zext32 #b0001) #b00000000_00000000_00000000_0000_0001))
-(assert (= (zext32 #b1000) #b00000000_00000000_00000000_0000_1000))
 
 (defmacro defbarrelshifter
   [name docstring [x shamt] case-fn ovf-expr]
@@ -348,41 +333,6 @@
   (apply bit-cat (repeat 32 (bit-slice x 31 32)))
   )
 
-;; shift by 7 without sign bit
-(assert (= (sra #b00000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00000111)
-           #b00000000_00000000_00000001_00000000))
-
-;; shift by 7 with sign bit
-(assert (= (sra #b10000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00000111)
-           #b11111111_00000000_00000001_00000000))
-
-;; shift by 0
-(assert (= (sra #b10000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00000000)
-           #b10000000_00000000_10000000_00000000))
-
-;; shift by 31 without sign bit
-(assert (= (sra #b00000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00011111)
-           #b00000000_00000000_00000000_00000000))
-
-;; shift by 31 with sign bit
-(assert (= (sra #b10000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00011111)
-           #b11111111_11111111_11111111_11111111))
-
-;; shift by 32 without sign bit
-(assert (= (sra #b00000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00100000)
-           #b00000000_00000000_00000000_00000000))
-
-;; shift by 32 with sign bit
-(assert (= (sra #b10000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00100000)
-           #b11111111_11111111_11111111_11111111))
-
 (defbarrelshifter srl
   "Shift right logical"
   [x shamt]
@@ -390,26 +340,6 @@
       (apply bit-cat (concat (repeat i #b0)
                              [(bit-slice x i 32)])))
   (cast (bits 32) 0))
-
-;; shift by 7
-(assert (= (srl #b00000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00000111)
-           #b00000000_00000000_00000001_00000000))
-
-;; shift by 0
-(assert (= (srl #b00000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00000000)
-           #b00000000_00000000_10000000_00000000))
-
-;; shift by 31
-(assert (= (srl #b00000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00011111)
-           #b00000000_00000000_00000000_00000000))
-
-;; shift by 63
-(assert (= (srl #b00000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00111111)
-           #b00000000_00000000_00000000_00000000))
 
 (defbarrelshifter sll
   "Shift left logical"
@@ -420,26 +350,6 @@
                        (repeat i #b0) 
                        )))
   (cast (bits 32) 0))
-
-;; shift by 7
-(assert (= (sll #b00000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00000111)
-           #b00000000_01000000_00000000_00000000))
-
-;; shift by 0
-(assert (= (sll #b00000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00000000)
-           #b00000000_00000000_10000000_00000000))
-
-;; shift by 31
-(assert (= (sll #b00000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00011111)
-           #b00000000_00000000_00000000_00000000))
-
-;; shift by 63
-(assert (= (sll #b00000000_00000000_10000000_00000000
-                #b00000000_00000000_00000000_00111111)
-           #b00000000_00000000_00000000_00000000))
 
 (defn s>
   [x y]
@@ -453,39 +363,6 @@
 (defn s<=
   [x y]
   (<= (deserialize (sints 32) x) (deserialize (sints 32) y)))
-
-(defn alu
-  "Does an ALU operation. Could be extended
-   to include reorder tag, pc predicted addr,
-   and prediction epoch.
-   
-   This is a helper function, not a hardware function,
-   although its results are synthesizable, the dispatch
-   isn't."
-  [op x y rdst]
-  (let [->wb (partial ->wb :reg rdst)]
-    (case op
-      :+ (->wb (+ x y))
-      ;; TODO: make sure the signed/unsigned comparison
-      ;; of slt/sltu works
-      :slt (->wb (mux2 (< x y)
-                       1 0))
-      :sltu (->wb (mux2 (< x y)
-                        1 0))
-      :sll (->wb (bit-shift-left x y))
-      :srl (->wb (bit-shift-right x y))
-      ;; TODO: srl and sra should be different
-      :sra (->wb (bit-shift-right x y))
-      :sub (->wb (- x y))
-      :and (->wb (bit-and x y))
-      :or (->wb (bit-or x y))
-      :xor (->wb (bit-xor x y))
-      :nor (->wb (bit-not (bit-or x y)))
-      :lui (->wb (bit-cat (bit-slice x 0 16)
-                          (cast (bits 16) 0)))
-      )
-    )
-  )
 
 (def alu-op
   (bundle {:op (:enum instr)
@@ -522,7 +399,7 @@
   (cast alu-or-store-op
         {:store {:pc pc :addr addr :data data}}))
 
-(defn resolve
+(defn resolve-operands
   "Takes a decoded instr, the pc, and the regfile
    and resolves the operands, returning either
    a store or an alu op."
@@ -616,7 +493,7 @@
               (->alu-op :add pc (cast data 0) (cast data 0) (cast rindx 0)))))
 
 (def reg-writeback
-  (bundle {:pc data
+  (bundle {:pc addr
            :dst rindx
            :val data}))
 
@@ -675,53 +552,3 @@
               :bgez (->writeback (mux2 (s> x y)
                                       pc+4
                                       pc+imm) :r0 0))))))
-
-#_(defn evaluate
-  "Takes an instr, a regfile, and a memory, and returns the result."
-  [instr regfile memory]
-  (letfn [(sreg [rindx] (->signed (regfile rindx)))
-          (zreg [rindx] (->unsigned (regfile rindx)))]
-    (union-match
-      instr
-      ;; Memory operations
-      (:lw {:keys [rbase rdst offset]}
-           (->wb :reg
-                 rdst
-                 (get memory (+ (sreg rbase)
-                                (sext32 offset)))))
-      (:sw {:keys [rbase rsrc offset]}
-           (->wb :mem
-                 (+ (sreg rbase)
-                    (sext32 offset))
-                 (regfile rsrc)))
-
-      (:addiu {:keys [rsrc rdst imm]}
-              (alu :+ (sreg rsrc) (sext32 imm) rdst))
-      (:stli {:keys [rsrc rdst imm]}
-             (->wb :reg
-                   rdst
-                   (mux2 (< (sreg rsrc) (sext32 imm))
-                         1 0)))
-      (:stliu {:keys [rsrc rdst imm]}
-              (->wb :reg
-                    rdst
-                    (mux2 (< (zreg rsrc) (zext32 imm))
-                          1 0)))
-      (:andi {:keys [rsrc rdst imm]}
-              (->wb :reg
-                    rdst
-                    (bit-and (zreg rsrc) (zext32 imm))))
-      (:ori {:keys [rsrc rdst imm]}
-              (->wb :reg
-                    rdst
-                    (bit-or (zreg rsrc) (zext32 imm))))
-      (:xori {:keys [rsrc rdst imm]}
-              (->wb :reg
-                    rdst
-                    (bit-xor (zreg rsrc) (zext32 imm))))
-      (:lui {:keys [rdst imm]}
-              (->wb :reg
-                    rdst
-                    (bit-cat imm (cast (bits 16) 0))))
-      ))
-  )
