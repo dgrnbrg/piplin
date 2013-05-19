@@ -17,7 +17,7 @@ Let's look at some examples of pipinsts:
 - `(cast (sfxpts 7 3) 5.23)` is a **s**igned **f**i**x**ed-**p**oin**t** number that **s**atures on overflow (tops or bottoms out), with 7 bits for the integer part, and 3 bits for the fractional part, with the closest representable value to 5.23 (binary `#b0000101_001`)
 - `true` is a boolean (which is 1 bit wide) (binary `#b1`)
 
-These cover some of the primitive types. Other numeric types include `sints`, which is a **s**igned **int** with **s**aturation on overflow, and `complex`, which takes another numeric type, and adjoins a complex component, so that you can use `+`, `-` and `*` on complex numbers in hardware.
+These cover some of the primitive types. Other numeric types include `sints`, which is a **s**igned **int** with **s**aturation on overflow, and `complex`, which takes another numeric type and adjoins a complex component, so that you can use `+`, `-`, and `*` on complex numbers in hardware.
 
 For more parameterizable types, we usually use a `def` to make the type easier to reuse:
 
