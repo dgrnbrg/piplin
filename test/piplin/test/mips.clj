@@ -13,9 +13,9 @@
     (is (= (get add :imm)
            (cast simm 32768)))
     (is (= (get add :rsrc)
-           :r17))
+           1))
     (is (= (get add :rdst)
-           :r15))))
+           2))))
 
 (deftest sext-test
   (is (= (sext32 #b0001) #b00000000_00000000_00000000_0000_0001))

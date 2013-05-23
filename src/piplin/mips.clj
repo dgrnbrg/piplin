@@ -1,5 +1,6 @@
 (ns piplin.mips
   (:refer-clojure :as clj :exclude [not= bit-or bit-xor + - * bit-and inc dec bit-not < > <= >= = cast not cond condp and or bit-shift-right bit-shift-left pos? neg? zero?])
+  (:use plumbing.core)
   (:use piplin.core))
 
 (defmacro defunion
@@ -12,39 +13,39 @@
 
 ;; Register index
 ;; TODO indices are wrong for the decoder
-(defenum rindx
-  :r0
-  :r1
-  :r2
-  :r3
-  :r4
-  :r5
-  :r6
-  :r7
-  :r8
-  :r9
-  :r10
-  :r11
-  :r12
-  :r13
-  :r14
-  :r15
-  :r16
-  :r17
-  :r18
-  :r19
-  :r20
-  :r21
-  :r22
-  :r23
-  :r24
-  :r25
-  :r26
-  :r27
-  :r28
-  :r29
-  :r30
-  :r31)
+(def rindx (uintm 5))
+(def $zero (rindx 0))
+(def $at (rindx 1))
+(def $v0 (rindx 2))
+(def $v1 (rindx 3))
+(def $a0 (rindx 4))
+(def $a1 (rindx 5))
+(def $a2 (rindx 6))
+(def $a3 (rindx 7))
+(def $t0 (rindx 8))
+(def $t1 (rindx 9))
+(def $t2 (rindx 10))
+(def $t3 (rindx 11))
+(def $t4 (rindx 12))
+(def $t5 (rindx 13))
+(def $t6 (rindx 14))
+(def $t7 (rindx 15))
+(def $t8 (rindx 24))
+(def $t9 (rindx 25))
+(def $s0 (rindx 16))
+(def $s1 (rindx 17))
+(def $s2 (rindx 18))
+(def $s3 (rindx 19))
+(def $s4 (rindx 20))
+(def $s5 (rindx 21))
+(def $s6 (rindx 22))
+(def $s7 (rindx 23))
+(def $s8 (rindx 30))
+(def $k0 (rindx 26))
+(def $k1 (rindx 27))
+(def $gp (rindx 28))
+(def $sp (rindx 29))
+(def $ra (rindx 31))
 
 (def simm (bits 16))
 (def zimm (bits 16))
@@ -112,7 +113,7 @@
   (let [[[tag value]] (seq instr-data)
         schema (:schema (get (:schema instr) tag))
         data (if (= tag :illegal)
-               data
+               value
                (reduce (fn [x [k v]]
                          (assoc x k (deserialize
                                       v (get value k))))
@@ -239,14 +240,14 @@
           rs (bit-slice instr-bits 21 26)
           rt (bit-slice instr-bits 16 21)
           rd (bit-slice instr-bits 11 16)
-          rshamt (bit-slice instr-bits 6 11)
+          shamt (bit-slice instr-bits 6 11)
           funct (bit-slice instr-bits 0 6)
           imm (bit-slice instr-bits 0 16)
-          target (bit-slice instr-bits 0 25)]
+          target (bit-slice instr-bits 0 26)]
 
       (condp = opcode
         opLW (->instr {:lw {:rbase rs :rdst rt :offset imm}})
-        opSW (->instr {:lw {:rbase rs :rsrc rt :offset imm}})
+        opSW (->instr {:sw {:rbase rs :rsrc rt :offset imm}})
         opADDIU (->instr {:addiu { :rsrc rs :rdst rt :imm imm}})
         opSLTI (->instr {:slti { :rsrc rs :rdst rt :imm imm}})
         opSLTIU (->instr {:sltiu { :rsrc rs :rdst rt :imm imm}})
@@ -364,8 +365,29 @@
   [x y]
   (<= (deserialize (sints 32) x) (deserialize (sints 32) y)))
 
+(defenum alu-op-types
+  :lw
+  :add
+  :sub
+  :slt
+  :sltu
+  :and
+  :or
+  :xor
+  :nor
+  :sll
+  :srl
+  :sra
+  :jal
+  :beq
+  :bne
+  :blez
+  :bgtz
+  :bltz
+  :bgez)
+
 (def alu-op
-  (bundle {:op (:enum instr)
+  (bundle {:op alu-op-types
            :pc addr
            :imm simm
            :x data
@@ -408,24 +430,25 @@
     instr
     ;; Memory operations
     (:lw {:keys [rbase rdst offset]}
-         (->alu-op :lw pc (regfile rbase) (zext32 offset) rdst))
+         (->alu-op :lw pc (get regfile rbase) (zext32 offset) rdst))
     (:sw {:keys [rbase rsrc offset]}
          (->store-op pc
-                     (+ (regfile rbase) (zext32 offset))
-                     (regfile rsrc)))
+                     (serialize (+ (cast (uintm 32) (get regfile rbase))
+                                   (cast (uintm 32) (zext32 offset))))
+                     (get regfile rsrc)))
 
     (:addiu {:keys [rsrc rdst imm]}
-            (->alu-op :add pc (regfile rsrc) (sext32 imm) rdst))
+            (->alu-op :add pc (get regfile rsrc) (sext32 imm) rdst))
     (:slti {:keys [rsrc rdst imm]}
-           (->alu-op :slt pc (regfile rsrc) (sext32 imm) rdst))
+           (->alu-op :slt pc (get regfile rsrc) (sext32 imm) rdst))
     (:sltiu {:keys [rsrc rdst imm]}
-            (->alu-op :sltu pc (regfile rsrc) (zext32 imm) rdst))
+            (->alu-op :sltu pc (get regfile rsrc) (zext32 imm) rdst))
     (:andi {:keys [rsrc rdst imm]}
-           (->alu-op :and pc (regfile rsrc) (zext32 imm) rdst))
+           (->alu-op :and pc (get regfile rsrc) (zext32 imm) rdst))
     (:ori {:keys [rsrc rdst imm]}
-          (->alu-op :or pc (regfile rsrc) (zext32 imm) rdst))
+          (->alu-op :or pc (get regfile rsrc) (zext32 imm) rdst))
     (:xori {:keys [rsrc rdst imm]}
-           (->alu-op :xor pc (regfile rsrc) (zext32 imm) rdst))
+           (->alu-op :xor pc (get regfile rsrc) (zext32 imm) rdst))
     (:lui {:keys [rdst imm]}
           (->alu-op :add pc
                     (bit-cat imm (cast (bits 16) 0))
@@ -433,55 +456,55 @@
                     rdst))
 
     (:sll {:keys [rsrc rdst shamt]}
-          (->alu-op :sll pc (regfile rsrc) (zext32 shamt) rdst))
+          (->alu-op :sll pc (get regfile rsrc) (zext32 shamt) rdst))
     (:srl {:keys [rsrc rdst shamt]}
-          (->alu-op :srl pc (regfile rsrc) (zext32 shamt) rdst)) 
+          (->alu-op :srl pc (get regfile rsrc) (zext32 shamt) rdst)) 
     (:sra {:keys [rsrc rdst shamt]}
-          (->alu-op :sra pc (regfile rsrc) (zext32 shamt) rdst)) 
+          (->alu-op :sra pc (get regfile rsrc) (zext32 shamt) rdst)) 
     (:sllv {:keys [rsrc rdst rshamt]}
-           (->alu-op :sll pc (regfile rsrc) (regfile rshamt) rdst)) 
+           (->alu-op :sll pc (get regfile rsrc) (get regfile rshamt) rdst)) 
     (:srlv {:keys [rsrc rdst rshamt]}
-           (->alu-op :srl pc (regfile rsrc) (regfile rshamt) rdst)) 
+           (->alu-op :srl pc (get regfile rsrc) (get regfile rshamt) rdst)) 
     (:srav {:keys [rsrc rdst rshamt]}
-           (->alu-op :sra pc (regfile rsrc) (regfile rshamt) rdst)) 
+           (->alu-op :sra pc (get regfile rsrc) (get regfile rshamt) rdst)) 
     (:addu {:keys [rsrc1 rsrc2 rdst]}
-           (->alu-op :add pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+           (->alu-op :add pc (get regfile rsrc1) (get regfile rsrc2) rdst)) 
     (:subu {:keys [rsrc1 rsrc2 rdst]}
-           (->alu-op :sub pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+           (->alu-op :sub pc (get regfile rsrc1) (get regfile rsrc2) rdst)) 
     (:and {:keys [rsrc1 rsrc2 rdst]}
-          (->alu-op :and pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+          (->alu-op :and pc (get regfile rsrc1) (get regfile rsrc2) rdst)) 
     (:or  {:keys [rsrc1 rsrc2 rdst]}
-         (->alu-op :or pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+         (->alu-op :or pc (get regfile rsrc1) (get regfile rsrc2) rdst)) 
     (:xor {:keys [rsrc1 rsrc2 rdst]}
-          (->alu-op :xor pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+          (->alu-op :xor pc (get regfile rsrc1) (get regfile rsrc2) rdst)) 
     (:nor {:keys [rsrc1 rsrc2 rdst]}
-          (->alu-op :nor pc (regfile rsrc1) (regfile rsrc2) rdst))
+          (->alu-op :nor pc (get regfile rsrc1) (get regfile rsrc2) rdst))
     (:slt {:keys [rsrc1 rsrc2 rdst]}
-          (->alu-op :slt pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+          (->alu-op :slt pc (get regfile rsrc1) (get regfile rsrc2) rdst)) 
     (:sltu {:keys [rsrc1 rsrc2 rdst]}
-           (->alu-op :sltu pc (regfile rsrc1) (regfile rsrc2) rdst)) 
+           (->alu-op :sltu pc (get regfile rsrc1) (get regfile rsrc2) rdst)) 
 
     ;; Jump and branch operations
     (:j {:keys [target]}
-        (->alu-op :jal pc (zext32 target) (cast data 0) :r0))
+        (->alu-op :jal pc (zext32 target) (cast data 0) $zero))
     (:jal {:keys [target]}
-          (->alu-op :jal pc (zext32 target) (cast data 0) :r31))
+          (->alu-op :jal pc (zext32 target) (cast data 0) $ra))
     (:jr {:keys [rsrc]}
-         (->alu-op :jal pc (regfile rsrc) (cast data 0) :r0))
+         (->alu-op :jal pc (get regfile rsrc) (cast data 0) $zero))
     (:jalr {:keys [rsrc rdst]}
-           (->alu-op :jal pc (regfile rsrc) (cast data 0) :r31))
+           (->alu-op :jal pc (get regfile rsrc) (cast data 0) $ra))
     (:beq {:keys [rsrc1 rsrc2 offset]}
-          (->br-op :beq pc (regfile rsrc1) (regfile rsrc2) offset))
+          (->br-op :beq pc (get regfile rsrc1) (get regfile rsrc2) offset))
     (:bne {:keys [rsrc1 rsrc2 offset]}
-          (->br-op :bne pc (regfile rsrc1) (regfile rsrc2) offset))
+          (->br-op :bne pc (get regfile rsrc1) (get regfile rsrc2) offset))
     (:blez {:keys [rsrc offset]}
-           (->br-op :blez pc (regfile rsrc) (cast data 0) offset))
+           (->br-op :blez pc (get regfile rsrc) (cast data 0) offset))
     (:bgtz {:keys [rsrc offset]}
-           (->br-op :bgtz pc (regfile rsrc) (cast data 0) offset))
+           (->br-op :bgtz pc (get regfile rsrc) (cast data 0) offset))
     (:bltz {:keys [rsrc offset]}
-           (->br-op :bltz pc (regfile rsrc) (cast data 0) offset))
+           (->br-op :bltz pc (get regfile rsrc) (cast data 0) offset))
     (:bgez {:keys [rsrc offset]}
-           (->br-op :bgez pc (regfile rsrc) (cast data 0) offset))
+           (->br-op :bgez pc (get regfile rsrc) (cast data 0) offset))
 
     (:mfc0 {:keys [rdst cop0src]}
            ;; TODO implement this
@@ -500,6 +523,7 @@
 (defn ->writeback
   ""
   [pc dst val]
+  ;(println "pc =" pc "dst =" dst "val =" val)
   (cast reg-writeback {:pc pc :dst dst :val val}))
 
 (defn execute
@@ -507,16 +531,16 @@
   [op memory]
   (union-match
     op
-    (:store {pc :pc} (->writeback (+ pc 4) :r0 0))
+    (:store {pc :pc} (->writeback (+ pc 4) $zero 0))
     (:alu {:keys [op pc x y dst imm]}
           (let [pc+4 (+ pc 4)
-                pc+imm (+ pc (sext32 imm))
+                pc+imm (+ pc (cast (uintm 32) (sext32 imm)))
                 ux (deserialize (uintm 32) x)
                 uy (deserialize (uintm 32) y)
                 x+y (serialize (+ ux uy))
                 x-y (serialize (- ux uy))]
             (condp = op
-              :lw (->writeback pc+4 dst (memory x+y))
+              :lw (->writeback pc+4 dst (get memory x+y))
               :add (->writeback pc+4 dst x+y)
               :sub (->writeback pc+4 dst x-y)
               :slt (->writeback pc+4 dst (mux2 (s< x y)
@@ -533,22 +557,86 @@
               :srl (->writeback pc+4 dst (srl x y)) 
               :sra (->writeback pc+4 dst (sra x y)) 
               
-              :jal (->writeback x dst pc+4)
+              :jal (->writeback x dst (serialize pc+4))
               :beq (->writeback (mux2 (= x y)
                                       pc+4
-                                      pc+imm) :r0 0)
+                                      pc+imm) $zero 0)
               :bne (->writeback (mux2 (not= x y)
                                       pc+4
-                                      pc+imm) :r0 0)
+                                      pc+imm) $zero 0)
               :blez (->writeback (mux2 (s<= x y)
                                       pc+4
-                                      pc+imm) :r0 0)
+                                      pc+imm) $zero 0)
               :bgtz (->writeback (mux2 (s>= x y)
                                       pc+4
-                                      pc+imm) :r0 0)
+                                      pc+imm) $zero 0)
               :bltz (->writeback (mux2 (s< x y)
                                       pc+4
-                                      pc+imm) :r0 0)
+                                      pc+imm) $zero 0)
               :bgez (->writeback (mux2 (s> x y)
                                       pc+4
-                                      pc+imm) :r0 0))))))
+                                      pc+imm) $zero 0)
+              (->writeback pc+4 $zero 22))))))
+
+(defn ifelse-memory
+  "Returns a synthesizable function which takes an
+  address and returns the value associated with that
+  key. Requires an `:else` key in the map for any unknown
+  slots. This key cannot be left out."
+  ([data]
+   (ifelse-memory (dissoc data :else) (:else data)))
+  ([data elseval]
+   (if (seq data)
+     (let [[[k v] & more] (seq data)]
+       (fn [addr]
+         (mux2 (= k addr)
+               v
+               ((ifelse-memory more elseval) addr))))
+     (fn [addr] elseval))))
+
+(decode (piplin.types/uninst #b001001_00001_00010_1000_0000_0000_0000))
+(decode #b001001_00001_00010_1000_0000_0000_0000)
+
+(def mipsv1
+  (modulize
+    :mips
+    {
+     :pc (fnk [alu-result]
+              (:pc alu-result))
+     :instr-bits (fnk [pc]
+                      ((ifelse-memory
+                         {:else (cast (bits 32) 0)
+                          (cast (uintm 32) 0)
+                          #b001001_00001_00010_1000_0000_0000_0000}) pc))
+     :decoded-instr (fnk [instr-bits]
+                         (decode instr-bits))
+     :resolved-instr (fnk [decoded-instr pc regfile]
+                          (resolve-operands decoded-instr pc regfile))
+     :alu-result (fnk [resolved-instr memory]
+                      (execute resolved-instr memory))
+    ; :store-result (fnk [resolved-instr memory]
+    ;                    (store memory
+    ;                           (= :store
+    ;                              (piplin.types.union/get-tag
+    ;                                resolved-instr))
+    ;                           (-> (piplin.types.union/get-value
+    ;                                 :store
+    ;                                 resolved-instr)
+    ;                               :addr)
+    ;                           (-> (piplin.types.union/get-value
+    ;                                 :store
+    ;                                 resolved-instr)
+    ;                               :data)))
+    ; :register-writback (fnk [alu-result regfile]
+    ;                         (let [{:keys [dst val]} alu-result]
+    ;                           (store regfile
+    ;                                  (not= $zero dst)
+    ;                                  dst
+    ;                                  val)))
+     
+     }
+    {:pc (cast addr 0)
+     :regfile (cast (array data 32) (repeat 32 (cast data 0)))
+     :memory (cast (array data 100000) (repeat 100000 (cast data 0)))}))
+
+;(sim (compile-root mipsv1) 0)
