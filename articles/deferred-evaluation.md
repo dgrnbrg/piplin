@@ -48,9 +48,9 @@ As we can see above, `enum`s are defined by providing a set of values. Then, we 
 ;; => Exception: "{:a true :b baz} does not match schema {:a AnonType[:boolean], :b PiplinEnum[...]}"
 {% endhighlight %}
 
-In the `bundle`'s definition, you may have noticed the `(anontype :boolean)`. This is how to get the type of boolean values, i.e. `true` and `false`.
+In the `bundle`'s definition, you may have noticed the `(anontype :boolean)`. This is how to get the type of boolean values, i.e. `true` and `false`. Some of the Clojure types don't have any type arguments. Since they are types with only a kind, they're constructed with `anontype`. `:boolean` is the most common, but `:keyword` and `:j-int` can be used for Clojure keywords and JVM integers, respectively.
 
-`bundle`s are constructing by `cast`ing a map to the correct bundle type. Due to an issue with aggregate types, `bundle`s must always be constructed via `cast`.
+`bundle`s are constructed by `cast`ing a map to the correct bundle type. Due to an issue with aggregate types, `bundle`s must always be constructed via `cast`. This is explained below.
 
 ### Warning about Aggregate types
 
@@ -85,7 +85,7 @@ Now, let's see what happens if we add `((uintm 8) 3)` to a register. As a debugg
 
 We can see that we end up with an AST fragment whose topmost node has type `UIntM[8]`. `data:` marks the section that describes what sort of AST this is. In this case, it's a deferred function evaluation, because it has the `:op` key, which determines the function, `+`. The `:args` key contains all the sub-fragments this one depends on. Arguments (in this case, `:lhs` and `:rhs`) have meaning determined by the `:op`.
 
-The `uninst`'s AST representation has the `:op` set to `:noop` and one argument, `:expr`, which is `((uintm 8) 4)`.
+The `uninst`'s AST representation has the `:op` set to `:noop` and one argument, `:expr`, which is `((uintm 8) 4)`. All non-terminal AST elements have an `:op`; however, some AST elements don't actually perform any operation. For these, their `:op` wil be `:noop`, which indicates to the runtime that the AST node simple passes through its contained value, doing nothing to it.
 
 ### Registers and Inputs
 
@@ -101,9 +101,9 @@ AST(UIntM[8], {:port-type :input, :port :foo, :args {}, :op :port})
 
 ## Tying it all together
 
-When you use a function like `+`, `assoc`, or `nth`, the value returned will vary depending on the arguments. If the arguments were Clojure values, the return values will be as usual in Clojure; however, if the arguments are Piplin values, the return value could be either a pipinst or a deferred AST fragment. If all of the arguments are pipinsts, then they will immediately be evaluated. If one or more of the arguments is a deferred AST fragment, then a new deferred AST fragment will be returned. This records what computation to do once the deferred values are available.
+When you use a function like `+`, `assoc`, or `nth`, the value returned will vary depending on the arguments. If the arguments are Clojure values, the return values will be as usual in Clojure; however, if the arguments are Piplin values, the return value could be either a pipinst or a deferred AST fragment. If all of the arguments are pipinsts, then they will be immediately evaluated. If one or more of the arguments is a deferred AST fragment, then a new deferred AST fragment will be returned. This records what computation to do once the deferred values are available.
 
-This design is meant to make it easier to write typed Piplin code using regular Clojure control flow, in order to make it easier to port algorithms that are initially designed and written as software, i.e. as plain Clojure. As you develop your design, you will transition Clojure values into Piplin values. Then, instead of interacting with your functions on the REPL or in unit tests, you can wire them into modules, so that they can be further tested and simulated, then synthesized.
+This design is meant to make it easier to write typed Piplin code using regular Clojure control flow. The ultimate goal is to make it easier to port algorithms that are initially designed and written as software, i.e. as plain Clojure, into FPGAs. As you develop your design, you will transition Clojure values into Piplin values. Then, instead of interacting with your functions on the REPL or in unit tests, you can wire them into modules, so that they can be further tested and simulated, then synthesized.
 
 Another benefit of evaluating pipinsts immediately is that it reduces the amount of computation that is done at runtime, since everything that can be computed before simulation or synthesis will be precomputed.
 
