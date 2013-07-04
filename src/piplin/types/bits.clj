@@ -80,7 +80,7 @@
   "Gets the bits representation of its argument. Supports AST frags."
   [expr]
   (when-not (typeof expr)
-    (throw+ (error "Only piplin ITyped expressions can be serialized")))
+    (throw (ex-info "Only piplin ITyped expressions can be serialized" {:expr expr})))
   (let [n (bit-width-of (typeof expr))
         type (bits n)]
     (if (pipinst? expr)
