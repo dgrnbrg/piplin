@@ -279,8 +279,8 @@
                     (map (comp ::fn #(get compiled-module %)))
                     (remove nil?)
                     (make-sim-fn))
-        ;store-fns (compute-store-fns (select-keys compiled-module reg-keys)
-        ;                             (vals (select-keys compiled-module store-keys)))
+        store-fns (compute-store-fns (select-keys compiled-module reg-keys)
+                                     (vals (select-keys compiled-module store-keys)))
         port->mem-name (make-port->mem-name compiled-module)
         reg-inits (plumb/map-vals
                     ::init
@@ -296,7 +296,7 @@
         history
         (let [reg-state (binding [*sim-state* state]
                           (merge state
-                                 ;(plumb/map-vals #(%) store-fns)
+                                 (plumb/map-vals #(%) store-fns)
                                  ;(plumb/map-vals #(%) reg-fns)  
                                  (zipmap (remove (comp nil? ::fn #(get compiled-module %)) reg-keys)
                                          (reg-fn)))) 
