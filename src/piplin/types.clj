@@ -5,10 +5,6 @@
   (:use piplin.protocols)
   (:require [clojure.pprint]))
 
-(comment
-;  TODO: email jim@dueys.net questions about monads
-  since the error handling is really quite monadic)
-
 (defonce types (atom (make-hierarchy)))
 
 (defn derive-type
@@ -148,13 +144,17 @@
   java.lang.Object
   (equals [this other]
     (and (instance? ASTNode other)
-         (= (.type ^ASTNode other) type)
-         (= (.map ^ASTNode other) map)))
+         (= (.hashCode this) (.hashCode other))
+         #_(= (.type ^ASTNode other) type)
+         #_(= (.map ^ASTNode other) map)))
   (hashCode [this]
     (int (mod (+ (.hashCode type) (* 17 (.hashCode map)))
          Integer/MAX_VALUE)))
   (toString [this]
     (print-str "(ASTNode" type map ")"))
+
+  clojure.lang.IHashEq
+  (hasheq [this] (.hashCode this))
 
   clojure.lang.ILookup
   (valAt
@@ -277,6 +277,8 @@
   [name args]
   `(do
      (defrecord ~name ~args
+       clojure.lang.IHashEq
+       (hasheq [~'this] (.hashCode ~'this))
        clojure.lang.IFn
        (invoke [~'this ~'x]
          (instance ~'this ~'x))
