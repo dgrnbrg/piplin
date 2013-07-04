@@ -8,7 +8,8 @@
   (:use [swiss-arrows.core :only [-<> -<>>]])
   (:use [clojure.pprint :only [pprint]])
   (:require [plumbing.graph :as graph]
-            [plumbing.core :as plumb]))
+            [plumbing.core :as plumb]
+            [piplin.walk :as walk]))
 
 (defn make-port*
   "Takes a keyword name, an owning module token, and
@@ -37,36 +38,48 @@
 
 (def ^:dynamic *sim-state*)
 
+(def fn-lookup (atom {}))
+
+(defn make-sim-expr
+  "Returns a pair of the name, and the line of the `let` binding
+   that defines the name."
+  [expr name-table]
+  (let [name (gensym)]
+    (cond
+      (pipinst? expr)
+      (do
+        (swap! fn-lookup assoc name expr)
+        [name [name `(@fn-lookup '~name)]])
+      (= (-> expr value :port-type) :register)
+      [name [name `(get *sim-state* ~(:port (value expr)))]]
+      :else
+      (let [[sim-fn arg-names] (-> expr meta :sim-factory)
+            args (mapv (comp name-table (-> expr value :args)) arg-names)]
+        (swap! fn-lookup assoc name sim-fn)
+        [name [name `((@fn-lookup '~name) ~@args)]]))))
+
+(declare make-sim-fn-legacy)
+
 (defn make-sim-fn
-  "Takes a map-zipper of the ast of an expr
-  and walks along the expr. It returns a function
-  that computes the expr
-  and takes no args (needed ports come via binding).
-  The function collects its args into a map which it
-  binds before invoking the function so that the
-  ports can get their values at the bottom."
+  "Takes a sequence of exprs, and returns a function that returns
+   a vector containing that sequence of exprs, evaluated."
+  [exprs]
+  ;;TODO: remove this legacy check and upgrade unit tests
+  (if-not (nil? (typeof exprs))
+    (make-sim-fn-legacy exprs)
+    (let [[name-table body]
+          (reduce (fn [[name-table body] expr]
+                    (walk/compile expr make-sim-expr name-table body))
+                  [{} []]
+                  exprs)]
+      (eval `(fn []
+               (let [~@body]
+                 ~(mapv name-table exprs)))))))
+
+(defn make-sim-fn-legacy
+  "This is for compatibility with old make-sim-fn tests."
   [expr]
-  (let [[my-sim-fn my-args]
-        (if (pipinst? expr)
-          [#(identity expr) []]
-          (-> expr
-            meta
-            :sim-factory))]
-    (let [args (:args (value expr))
-          arg-fns (map #(make-sim-fn (val %)) args)
-          arg-map (zipmap (keys args)
-                          arg-fns)
-          fn-vec (map #(get arg-map %) my-args)]
-      (if (= (:op (value expr))
-             :port)
-        (condp = (:port-type (value expr))
-          :register
-          (let [path (conj *module-path* (:port (value expr)))]
-            (fn []
-              (get *sim-state* (:port (value expr)))))
-          (throw (ex-info "Invalid :port-type" (value expr))))
-        (fn []
-          (apply my-sim-fn (map #(%) fn-vec)))))))
+  (comp first (make-sim-fn [expr])))
 
 (defn push-down-map
   "Takes a map and a keyword maps all values maps with the
@@ -255,23 +268,27 @@
   [compiled-module cycles]
   (assert (::compiled (meta compiled-module))
           "Module must be compiled")
-  (assert (empty? (find-inputs compiled-module))
+  ;;TODO: is this next line a perf black hole?
+  #_(assert (empty? (find-inputs compiled-module))
           "Cannot have any input ports during simulation")
   (let [{:keys [reg-keys store-keys wire-keys]} (module-keys-by-type compiled-module)
-        wire-fns (plumb/map-vals (comp make-sim-fn ::fn)
-                                 (select-keys compiled-module wire-keys))
-        reg-fns (plumb/for-map [[k {f ::fn}] (select-keys compiled-module reg-keys)
-                                :when f]
-                               k (make-sim-fn f))
-        store-fns (compute-store-fns (select-keys compiled-module reg-keys)
-                                     (vals (select-keys compiled-module store-keys)))
+        wire-fn (->> wire-keys
+                     (map (comp ::fn #(get compiled-module %)))
+                     (make-sim-fn))
+        reg-fn (->> reg-keys
+                    (map (comp ::fn #(get compiled-module %)))
+                    (remove nil?)
+                    (make-sim-fn))
+        ;store-fns (compute-store-fns (select-keys compiled-module reg-keys)
+        ;                             (vals (select-keys compiled-module store-keys)))
         port->mem-name (make-port->mem-name compiled-module)
         reg-inits (plumb/map-vals
                     ::init
                     (select-keys compiled-module reg-keys))
         inits (binding [*sim-state* reg-inits]
                 (merge reg-inits
-                       (plumb/map-vals #(%) wire-fns)))]
+                       (zipmap wire-keys
+                               (wire-fn))))]
     (loop [state inits
            cycles cycles
            history [inits]]
@@ -279,13 +296,14 @@
         history
         (let [reg-state (binding [*sim-state* state]
                           (merge state
-                                 (plumb/map-vals #(%) store-fns)
-                                 (plumb/map-vals #(%) reg-fns)  
-                                 
-                                 )) 
+                                 ;(plumb/map-vals #(%) store-fns)
+                                 ;(plumb/map-vals #(%) reg-fns)  
+                                 (zipmap (remove (comp nil? ::fn #(get compiled-module %)) reg-keys)
+                                         (reg-fn)))) 
               wire-state (binding [*sim-state* reg-state]
                            (merge reg-state
-                                  (plumb/map-vals #(%) wire-fns)))]
+                                  (zipmap wire-keys
+                                          (wire-fn))))]
           (recur
             wire-state
             (dec cycles)
