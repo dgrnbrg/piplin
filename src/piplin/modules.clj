@@ -32,7 +32,7 @@
     (if-let [args (:args (value expr))]
       (let [subexprs (vals args)]
         (reduce combine x
-                (map #(walk-expr % visit combine)
+                (mapv #(walk-expr % visit combine)
                      subexprs)))
       x)))
 
