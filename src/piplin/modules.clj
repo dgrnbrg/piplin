@@ -67,14 +67,27 @@
   ;;TODO: remove this legacy check and upgrade unit tests
   (if-not (nil? (typeof exprs))
     (make-sim-fn-legacy exprs)
-    (let [[name-table body]
-          (reduce (fn [[name-table body] expr]
-                    (walk/compile expr make-sim-expr name-table body))
-                  [{} []]
-                  exprs)]
-      (eval `(fn []
-               (let [~@body]
-                 ~(mapv name-table exprs)))))))
+    (if (seq exprs)
+      (let [[name-table body]
+            (reduce (fn [[name-table body] expr]
+                      (walk/compile expr make-sim-expr name-table body))
+                    [{} []]
+                    exprs)
+            ;;The partitioning of the binding and reconstruction
+            ;;into nested functions is necessary to avoid the
+            ;;JVM method length limitation when there are many,
+            ;;many operations.
+            bindings (partition 2000 2000 nil body)
+            nested-lets
+            (reduce (fn [form binding]
+                      (fn [terminal]
+                        (form `((fn []
+                                  (let [~@binding]
+                                    ~terminal))))))
+                    identity
+                    bindings)]
+        (eval (first (nested-lets (mapv name-table exprs)))))
+      (constantly []))))
 
 (defn make-sim-fn-legacy
   "This is for compatibility with old make-sim-fn tests."
