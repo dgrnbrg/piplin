@@ -177,7 +177,7 @@ Takes an expr of type bits and returns a subrange
 ### <a href='https://github.com/dgrnbrg/piplin/blob/4755d209644ed00dadae7bd825b22b4a9474e125/src/piplin/types/binops.clj#L99'>piplin.core/=</a>
 
 
-= is a very common function. It must be
+  = is a very common function. It must be
   implemented explicitly (rather than using
   the def-binary-binop function) in order to
   explicitly check whether they're both not
