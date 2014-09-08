@@ -4,7 +4,7 @@
 
 Piplin is an hardware description language (HDL) written in Clojure.
 
-Piplin is no longer in active development. Piplin has been used to synthesize simple VGA drivers and basic processors onto an FPGA. This project is interested, however, I would not try to use it unless you want to mess with the compiler.
+Piplin is no longer in active development. Piplin has been used to synthesize simple VGA drivers and basic processors onto an FPGA. This project is interesting, however, I would not try to use it unless you want to mess with the compiler.
 
 Piplin is tested with Clojure versions 1.4+.
 
